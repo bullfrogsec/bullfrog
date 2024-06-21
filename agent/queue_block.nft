@@ -1,0 +1,54 @@
+table ip filter {
+    set allowed_ips {
+        type ipv4_addr;
+        flags interval;
+        auto-merge
+    }
+}
+
+insert rule ip filter DOCKER-USER iifname "docker0" counter drop
+insert rule ip filter DOCKER-USER iifname "docker0" ip daddr @allowed_ips counter accept
+
+# Accept DNS requests
+insert rule ip filter DOCKER-USER iifname "docker0" udp dport 53 counter accept
+insert rule ip filter DOCKER-USER iifname "docker0" tcp dport 53 counter accept
+
+# Queue DNS responses to userspace
+insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0
+insert rule ip filter DOCKER-USER oif "docker0" tcp sport 53 counter queue num 0
+
+table inet filter {
+    set allowed_ips {
+        type ipv4_addr;
+        flags interval;
+        auto-merge
+    }
+
+    chain input {
+        type filter hook input priority 0; policy accept;
+
+        # Match DNS responses (source port 53) and enqueue to userspace
+        udp sport 53 queue num 0
+        tcp sport 53 queue num 0
+    }
+
+    chain output {
+        type filter hook output priority 0; policy drop;
+
+        # Match DNS request (dest port 53) and enqueue to userspace
+        # we could decide to block DNS queries for unallowed domains, prevent DNS exfiltration
+        #udp dport 53 queue num 0 bypass
+        #tcp dport 53 queue num 0 bypass
+
+        # Allow outbound DNS requests
+        udp dport 53 accept
+        tcp dport 53 accept
+
+        # TODO: get rid of this
+        # Allow established and related traffic
+        ct state established,related accept
+
+        # Allow outbound traffic to IPs in google_ips set
+        ip daddr @allowed_ips accept
+    }
+}

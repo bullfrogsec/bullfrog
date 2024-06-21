@@ -1,0 +1,25 @@
+# https://help.github.com/en/articles/metadata-syntax-for-github-actions
+name: Bullfrog Secure Runner
+description: Controls outbound traffic (egress) to secure GitHub Actions workflows.
+
+inputs:
+  allowed-ips:
+    description: List of allowed IPs
+  allowed-domains:
+    description: List of allowed domains
+  egress-policy:
+    description: "The egress policy to enforce, audit or block (default: audit)"
+    type: string
+    default: "audit"
+  block-dns:
+    description: "If DNS requests should be blocked (default: true). This will only be effective if egress-policy is set to `block`."
+    type: boolean
+    default: true
+  log-directory:
+    type: string
+    default: ${{ runner.temp }}/agent-logs
+
+runs:
+  using: "node20"
+  main: "action/dist/main.js"
+  post: "action/dist/post.js"

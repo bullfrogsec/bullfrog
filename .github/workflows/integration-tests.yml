@@ -1,0 +1,135 @@
+name: Integration Tests
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  audit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable egress filtering
+        uses: ./
+        with:
+          allowed-domains: |
+            *.google.com
+
+      - name: Make HTTP requests
+        run: |
+          curl https://www.google.com --output /dev/null
+          curl https://www.bing.com --max-time 3 --output /dev/null
+
+  block:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable egress filtering
+        uses: ./
+        with:
+          allowed-domains: |
+            *.google.com
+          egress-policy: block
+
+      - name: Make HTTP requests
+        run: source test/make_http_requests.sh
+
+      - name: Make DNS requests
+        run: |
+          if dig example.com; then
+            echo 'Expected 'dig example.com' to fail, but it succeeded';
+            exit 1;
+          fi;
+
+          if dig www.wikipedia.org; then
+            echo 'Expected 'dig www.wikipedia.org' to fail, but it succeeded';
+            exit 1;
+          fi;
+
+  block-but-allow-any-dns-requests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable egress filtering
+        uses: ./
+        with:
+          allowed-domains: |
+            *.google.com
+          block-dns: false
+          egress-policy: block
+
+      - name: Make HTTP requests
+        run: source test/make_http_requests.sh
+
+      - name: Make DNS requests
+        run: |
+          dig example.com
+          dig www.wikipedia.org
+
+  docker:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable egress filtering
+        uses: ./
+        with:
+          allowed-domains: |
+            production.cloudflare.docker.com
+            docker.io
+            *.docker.io
+            www.google.com
+          egress-policy: block
+
+      - name: Test curl calls within Docker
+        run: |
+          docker run --rm --entrypoint sh alpine/curl:8.7.1 -c "
+            if ! curl https://www.google.com --max-time 5 --output /dev/null; then
+              echo 'Expected curl to www.google.com to succeed, but it failed';
+              exit 1;
+            fi;
+
+            if curl https://www.bing.com --max-time 5 --output /dev/null; then
+              echo 'Expected curl to www.bing.com to fail, but it succeeded';
+              exit 1;
+            fi;
+          "

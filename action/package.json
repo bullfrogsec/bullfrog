@@ -1,0 +1,18 @@
+{
+  "name": "action",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "0.21.5",
+    "prettier": "3.3.2",
+    "ts-node": "10.9.2",
+    "typescript": "5.4.5"
+  },
+  "dependencies": {
+    "@actions/core": "1.10.1"
+  }
+}

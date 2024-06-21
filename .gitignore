@@ -1,0 +1,8 @@
+*.o
+node_modules/
+.vagrant/*
+!.vagrant/provision.sh
+
+# Ignore generated files when running the agent locally
+allowed_domains.txt
+allowed_ips.txt
