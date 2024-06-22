@@ -19017,11 +19017,18 @@ function installPackages() {
     throw new Error("Couldn't install packages");
   }
 }
-function installTetragon() {
+function installTetragon({ actionDirectory }) {
   console.log("Installing Tetragon");
-  const { status } = (0, import_node_child_process.spawnSync)("bash", ["action/scripts/install_tetragon.sh"], {
-    stdio: "inherit"
-  });
+  const { status } = (0, import_node_child_process.spawnSync)(
+    "bash",
+    [import_node_path.default.join(actionDirectory, "scripts", "install_tetragon.sh")],
+    {
+      stdio: "inherit",
+      env: {
+        TETRAGON_POLICIES_DIRECTORY: import_node_path.default.join(actionDirectory, "tetragon")
+      }
+    }
+  );
   if (status !== 0) {
     throw new Error("Couldn't install Tetragon");
   }
@@ -19048,6 +19055,7 @@ async function startTetragon({
   ).unref();
 }
 async function startAgent({
+  agentDirectory,
   egressPolicy,
   blockDNS,
   agentLogFilepath
@@ -19055,20 +19063,27 @@ async function startAgent({
   const blockingMode = egressPolicy === BLOCK;
   console.log("Loading nftables rules");
   if (blockingMode && blockDNS) {
-    await exec("sudo nft -f ./agent/queue_block_with_dns.nft");
+    await exec(
+      `sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_block_with_dns.nft")}`
+    );
     console.log("loaded blocking rules (with DNS)");
   } else if (blockingMode) {
-    await exec("sudo nft -f ./agent/queue_block.nft");
+    await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_block.nft")}`);
     console.log("loaded blocking rules");
   } else {
-    await exec("sudo nft -f ./agent/queue_audit.nft");
+    await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_audit.nft")}`);
     console.log("loaded audit rules");
   }
   console.log("Starting agent");
   const agentOut = (await import_promises.default.open(agentLogFilepath, "a")).fd;
   (0, import_node_child_process.spawn)(
     "sudo",
-    ["./agent/agent", "--mode", egressPolicy, blockDNS ? "--block-dns" : ""],
+    [
+      import_node_path.default.join(agentDirectory, "agent"),
+      "--mode",
+      egressPolicy,
+      blockDNS ? "--block-dns" : ""
+    ],
     {
       stdio: ["ignore", agentOut, agentOut],
       detached: true
@@ -19077,6 +19092,8 @@ async function startAgent({
 }
 async function _main() {
   const { allowedDomains, allowedIps, egressPolicy, blockDNS, logDirectory } = parseInputs();
+  const actionDirectory = import_node_path.default.join(__dirname, "..");
+  const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
   await import_promises.default.mkdir(logDirectory, { recursive: true });
   if (allowedDomains.length !== 0) {
     await import_promises.default.writeFile("allowed_domains.txt", allowedDomains.join("\n"));
@@ -19088,12 +19105,17 @@ async function _main() {
   const connectLogFilepath = import_node_path.default.join(logDirectory, CONNECT_LOG_FILENAME);
   const tetragonLogFilepath = import_node_path.default.join(logDirectory, TETRAGON_LOG_FILENAME);
   installPackages();
-  installTetragon();
+  installTetragon({ actionDirectory });
   await startTetragon({
     connectLogFilepath,
     tetragonLogFilepath
   });
-  await startAgent({ egressPolicy, blockDNS, agentLogFilepath });
+  await startAgent({
+    agentDirectory,
+    egressPolicy,
+    blockDNS,
+    agentLogFilepath
+  });
 }
 async function main() {
   try {
