@@ -16,4 +16,4 @@ sudo rm -rf /tmp/tetragon-v1.1.0-amd64
 sudo install -d /etc/tetragon/tetragon.conf.d/
 sudo install -d /etc/tetragon/tetragon.tp.d/
 sudo cp -v -n -r /usr/local/lib/tetragon/tetragon.conf.d /etc/tetragon/
-sudo cp tetragon/tracing-policies/* /etc/tetragon/tetragon.tp.d
+sudo cp "$TETRAGON_POLICIES_DIRECTORY"/* /etc/tetragon/tetragon.tp.d
