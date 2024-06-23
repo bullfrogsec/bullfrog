@@ -11,7 +11,7 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 ```yaml
 # This action should be the first step of your job, and should be loaded on every separate job.
 # If this action is not loaded first, it will not be able to see or block any requests that occured prior to the action running.
-- uses: bullfrogsec/bullfrog@v1
+- uses: bullfrogsec/bullfrog@<version>
   with:
     # List of IPs to allow outbound connections to.
     # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
@@ -23,14 +23,17 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
     # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#communication-requirements-for-github-hosted-runners-and-github for additional domains that should be allowed for additional Github Actions features.
     allowed-domains:
 
+    # Controls the policy for DNS requests when `egress-policy` is set to `block`.
+    #
+    #  - `allowed-domains-only` (default): Allows DNS requests only for domains specified in `allowed-domains`.
+    #  - `any`: Allows any DNS requests.
+    #
+    # Default: `allowed-domains-only`
+    dns-policy:
+
     # The egress policy to enforce. Valid values are `audit` and `block`.
     # Default: audit
     egress-policy:
-
-    # Whether DNS requests should also be blocked. This only be effective if `egress-policy: block`.
-    # Note that if DNS requests are blocked, you will not be able to see which process is responsible for the outbound network request.
-    # Default: true
-    block-dns:
 ```
 
 <!-- end usage -->
@@ -47,13 +50,13 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 The default usage will run in audit mode and will not block any request.
 
 ```yaml
-- uses: bullfrogsec/bullfrog@v1
+- uses: bullfrogsec/bullfrog@<version>
 ```
 
 ### Block every outbound connections
 
 ```yaml
-- uses: bullfrogsec/bullfrog@v1
+- uses: bullfrogsec/bullfrog@<version>
   with:
     egress-policy: block
 ```
@@ -61,7 +64,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to domains required for pulling a docker image from the docker hub
 
 ```yaml
-- uses: bullfrogsec/bullfrog@v1
+- uses: bullfrogsec/bullfrog@<version>
   with:
     egress-policy: block
     allowed-domains: |
@@ -73,12 +76,12 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to a specific IP address without blocking DNS requests
 
 ```yaml
-- uses: bullfrogsec/bullfrog@v1
+- uses: bullfrogsec/bullfrog@<version>
   with:
     egress-policy: block
     allowed-ips: |
       1.2.3.4
-    block-dns: false
+    dns-policy: any
 ```
 
 ## Reviewing blocked or unallowed outbound requests

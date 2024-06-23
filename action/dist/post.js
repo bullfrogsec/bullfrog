@@ -18853,7 +18853,7 @@ var require_core = __commonJS({
       return inputs.map((input) => input.trim());
     }
     exports2.getMultilineInput = getMultilineInput;
-    function getBooleanInput2(name, options) {
+    function getBooleanInput(name, options) {
       const trueValue = ["true", "True", "TRUE"];
       const falseValue = ["false", "False", "FALSE"];
       const val = getInput2(name, options);
@@ -18864,7 +18864,7 @@ var require_core = __commonJS({
       throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}
 Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
-    exports2.getBooleanInput = getBooleanInput2;
+    exports2.getBooleanInput = getBooleanInput;
     function setOutput(name, value) {
       const filePath = process.env["GITHUB_OUTPUT"] || "";
       if (filePath) {
@@ -18973,32 +18973,35 @@ var import_promises = __toESM(require("node:fs/promises"));
 var import_node_util = __toESM(require("node:util"));
 var import_node_child_process = require("node:child_process");
 
-// src/types.ts
+// src/inputs.ts
 var core = __toESM(require_core());
 
 // src/constants.ts
 var CONNECT_LOG_FILENAME = "connect.log";
 var AUDIT = "audit";
 var BLOCK = "block";
+var ALLOWED_DOMAINS_ONLY = "allowed-domains-only";
+var ANY = "any";
 
-// src/types.ts
+// src/inputs.ts
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
   const rawAllowedDomains = core.getInput("allowed-domains");
   const allowedDomains = rawAllowedDomains.length !== 0 ? rawAllowedDomains.split("\n") : [];
   const egressPolicy = core.getInput("egress-policy");
-  if (![AUDIT, BLOCK].includes(egressPolicy)) {
-    console.error(
-      `Invalid egress policy: ${egressPolicy}. Defaulting to audit policy.`
-    );
+  if (egressPolicy !== AUDIT && egressPolicy !== BLOCK) {
+    throw new Error(`egress-policy must be '${AUDIT}' or '${BLOCK}'`);
   }
-  const blockDNS = core.getBooleanInput("block-dns");
+  const dnsPolicy = core.getInput("dns-policy");
+  if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
+    throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
+  }
   return {
     allowedDomains,
     allowedIps,
+    dnsPolicy,
     egressPolicy,
-    blockDNS,
     logDirectory: core.getInput("log-directory", { required: true })
   };
 }

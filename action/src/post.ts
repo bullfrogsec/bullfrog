@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import fs from "node:fs/promises";
 import util from "node:util";
 import { exec as execCb } from "node:child_process";
-import { parseInputs } from "./types";
+import { parseInputs } from "./inputs";
 import path from "node:path";
 import { BLOCK, CONNECT_LOG_FILENAME } from "./constants";
 

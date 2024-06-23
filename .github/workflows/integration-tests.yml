@@ -87,7 +87,7 @@ jobs:
         with:
           allowed-domains: |
             *.google.com
-          block-dns: false
+          dns-policy: any
           egress-policy: block
 
       - name: Make HTTP requests
