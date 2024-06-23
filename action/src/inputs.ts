@@ -1,13 +1,14 @@
 import * as core from "@actions/core";
-import { AUDIT, BLOCK } from "./constants";
+import { ALLOWED_DOMAINS_ONLY, ANY, AUDIT, BLOCK } from "./constants";
 
+export type DnsPolicy = typeof ALLOWED_DOMAINS_ONLY | typeof ANY;
 export type EgressPolicy = typeof AUDIT | typeof BLOCK;
 
 export interface Inputs {
   allowedDomains: Array<string>;
   allowedIps: Array<string>;
+  dnsPolicy: DnsPolicy;
   egressPolicy: EgressPolicy;
-  blockDNS: boolean;
   logDirectory: string;
 }
 
@@ -22,21 +23,22 @@ export function parseInputs(): Inputs {
   const allowedDomains =
     rawAllowedDomains.length !== 0 ? rawAllowedDomains.split("\n") : [];
 
-  const egressPolicy = core.getInput("egress-policy") as EgressPolicy;
-
-  if (![AUDIT, BLOCK].includes(egressPolicy)) {
-    console.error(
-      `Invalid egress policy: ${egressPolicy}. Defaulting to audit policy.`
-    );
+  const egressPolicy = core.getInput("egress-policy");
+  if (egressPolicy !== AUDIT && egressPolicy !== BLOCK) {
+    throw new Error(`egress-policy must be '${AUDIT}' or '${BLOCK}'`);
   }
 
-  const blockDNS = core.getBooleanInput("block-dns");
+  const dnsPolicy = core.getInput("dns-policy");
+
+  if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
+    throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
+  }
 
   return {
     allowedDomains,
     allowedIps,
+    dnsPolicy,
     egressPolicy,
-    blockDNS,
     logDirectory: core.getInput("log-directory", { required: true }),
   };
 }

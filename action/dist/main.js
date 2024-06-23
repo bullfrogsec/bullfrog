@@ -18853,7 +18853,7 @@ var require_core = __commonJS({
       return inputs.map((input) => input.trim());
     }
     exports2.getMultilineInput = getMultilineInput;
-    function getBooleanInput2(name, options) {
+    function getBooleanInput(name, options) {
       const trueValue = ["true", "True", "TRUE"];
       const falseValue = ["false", "False", "FALSE"];
       const val = getInput2(name, options);
@@ -18864,7 +18864,7 @@ var require_core = __commonJS({
       throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}
 Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
-    exports2.getBooleanInput = getBooleanInput2;
+    exports2.getBooleanInput = getBooleanInput;
     function setOutput(name, value) {
       const filePath = process.env["GITHUB_OUTPUT"] || "";
       if (filePath) {
@@ -18980,8 +18980,10 @@ var CONNECT_LOG_FILENAME = "connect.log";
 var TETRAGON_LOG_FILENAME = "tetragon.log";
 var AUDIT = "audit";
 var BLOCK = "block";
+var ALLOWED_DOMAINS_ONLY = "allowed-domains-only";
+var ANY = "any";
 
-// src/types.ts
+// src/inputs.ts
 var core = __toESM(require_core());
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
@@ -18989,17 +18991,18 @@ function parseInputs() {
   const rawAllowedDomains = core.getInput("allowed-domains");
   const allowedDomains = rawAllowedDomains.length !== 0 ? rawAllowedDomains.split("\n") : [];
   const egressPolicy = core.getInput("egress-policy");
-  if (![AUDIT, BLOCK].includes(egressPolicy)) {
-    console.error(
-      `Invalid egress policy: ${egressPolicy}. Defaulting to audit policy.`
-    );
+  if (egressPolicy !== AUDIT && egressPolicy !== BLOCK) {
+    throw new Error(`egress-policy must be '${AUDIT}' or '${BLOCK}'`);
   }
-  const blockDNS = core.getBooleanInput("block-dns");
+  const dnsPolicy = core.getInput("dns-policy");
+  if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
+    throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
+  }
   return {
     allowedDomains,
     allowedIps,
+    dnsPolicy,
     egressPolicy,
-    blockDNS,
     logDirectory: core.getInput("log-directory", { required: true })
   };
 }
@@ -19056,13 +19059,13 @@ async function startTetragon({
 }
 async function startAgent({
   agentDirectory,
+  dnsPolicy,
   egressPolicy,
-  blockDNS,
   agentLogFilepath
 }) {
   const blockingMode = egressPolicy === BLOCK;
   console.log("Loading nftables rules");
-  if (blockingMode && blockDNS) {
+  if (blockingMode && dnsPolicy === ALLOWED_DOMAINS_ONLY) {
     await exec(
       `sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_block_with_dns.nft")}`
     );
@@ -19080,9 +19083,10 @@ async function startAgent({
     "sudo",
     [
       import_node_path.default.join(agentDirectory, "agent"),
-      "--mode",
-      egressPolicy,
-      blockDNS ? "--block-dns" : ""
+      "--dns-policy",
+      dnsPolicy,
+      "--egress-policy",
+      egressPolicy
     ],
     {
       stdio: ["ignore", agentOut, agentOut],
@@ -19091,7 +19095,7 @@ async function startAgent({
   ).unref();
 }
 async function _main() {
-  const { allowedDomains, allowedIps, egressPolicy, blockDNS, logDirectory } = parseInputs();
+  const { allowedDomains, allowedIps, dnsPolicy, egressPolicy, logDirectory } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
   await import_promises.default.mkdir(logDirectory, { recursive: true });
@@ -19112,8 +19116,8 @@ async function _main() {
   });
   await startAgent({
     agentDirectory,
+    dnsPolicy,
     egressPolicy,
-    blockDNS,
     agentLogFilepath
   });
 }

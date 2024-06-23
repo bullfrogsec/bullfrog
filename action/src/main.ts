@@ -8,8 +8,9 @@ import {
   CONNECT_LOG_FILENAME,
   TETRAGON_LOG_FILENAME,
   BLOCK,
+  ALLOWED_DOMAINS_ONLY,
 } from "./constants";
-import { parseInputs, EgressPolicy } from "./types";
+import { parseInputs, EgressPolicy, DnsPolicy } from "./inputs";
 
 const exec = util.promisify(execCb);
 
@@ -78,20 +79,20 @@ async function startTetragon({
 
 async function startAgent({
   agentDirectory,
+  dnsPolicy,
   egressPolicy,
-  blockDNS,
   agentLogFilepath,
 }: {
   agentDirectory: string;
+  dnsPolicy: DnsPolicy;
   egressPolicy: EgressPolicy;
-  blockDNS: boolean;
   agentLogFilepath: string;
 }) {
   const blockingMode = egressPolicy === BLOCK;
 
   console.log("Loading nftables rules");
 
-  if (blockingMode && blockDNS) {
+  if (blockingMode && dnsPolicy === ALLOWED_DOMAINS_ONLY) {
     await exec(
       `sudo nft -f ${path.join(agentDirectory, "queue_block_with_dns.nft")}`
     );
@@ -111,9 +112,10 @@ async function startAgent({
     "sudo",
     [
       path.join(agentDirectory, "agent"),
-      "--mode",
+      "--dns-policy",
+      dnsPolicy,
+      "--egress-policy",
       egressPolicy,
-      blockDNS ? "--block-dns" : "",
     ],
     {
       stdio: ["ignore", agentOut, agentOut],
@@ -123,7 +125,7 @@ async function startAgent({
 }
 
 async function _main() {
-  const { allowedDomains, allowedIps, egressPolicy, blockDNS, logDirectory } =
+  const { allowedDomains, allowedIps, dnsPolicy, egressPolicy, logDirectory } =
     parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -151,8 +153,8 @@ async function _main() {
   });
   await startAgent({
     agentDirectory,
+    dnsPolicy,
     egressPolicy,
-    blockDNS,
     agentLogFilepath,
   });
 }

@@ -199,11 +199,11 @@ func main() {
 	// set the mode (audit or block) based on the program argument
 	blockDNS := false
 
-	modeFlag := flag.String("mode", "audit", "Mode: audit or block")
-	blockDNSFlag := flag.Bool("block-dns", false, "Enable DNS blocking")
+	dnsPolicy := flag.String("dns-policy", "allowed-domains-only", "DNS policy: allowed-domains-only or any")
+	egressPolicy := flag.String("egress-policy", "audit", "Egress policy: audit or block")
 	flag.Parse()
 
-	if *modeFlag == "block" {
+	if *egressPolicy == "block" {
 		blocking = true
 		fmt.Println("Blocking mode enabled")
 	} else {
@@ -211,7 +211,7 @@ func main() {
 	}
 
 	if blocking {
-		if *blockDNSFlag {
+		if *dnsPolicy == "allowed-domains-only" {
 			blockDNS = true
 			fmt.Println("DNS queries to unallowed domains will be blocked")
 			// With this option enabled, the queue will receive DNS queries and not responses
