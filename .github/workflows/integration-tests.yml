@@ -141,3 +141,31 @@ jobs:
 
       - name: Nginx with port forwarding
         run: source test/docker_nginx_port_forwarding.sh
+
+  simulate-usage-in-another-workflow:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    timeout-minutes: 2
+
+    steps:
+      # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow. Refer to https://github.com/bullfrogsec/bullfrog/commit/3a3e5e03112ef726b3079d402415760c9021fa39 for details.
+
+      - uses: jenseng/dynamic-uses@02f544690a931f3967153cd5f14679cfeb61f830
+        with:
+          uses: bullfrogsec/bullfrog@${{ github.sha }}
+          with: '{"allowed-domains": "www.google.com", "egress-policy": "block"}'
+
+      - name: Make HTTP requests
+        run: |
+          if ! curl https://www.google.com --output /dev/null; then
+            echo 'Expected curl to www.google.com to succeed, but it failed';
+            exit 1;
+          fi;
+
+          if curl https://www.bing.com --max-time 5 --output /dev/null; then
+            echo 'Expected curl to www.bing.com to fail, but it succeeded';
+            exit 1;
+          fi;
