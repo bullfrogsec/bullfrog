@@ -113,6 +113,8 @@ jobs:
       - name: Enable egress filtering
         uses: ./
         with:
+          allowed-ips: |
+            172.17.0.0/16
           allowed-domains: |
             production.cloudflare.docker.com
             docker.io
@@ -133,3 +135,9 @@ jobs:
               exit 1;
             fi;
           "
+
+      - name: Nginx
+        run: source test/docker_nginx.sh
+
+      - name: Nginx with port forwarding
+        run: source test/docker_nginx_port_forwarding.sh
