@@ -208,6 +208,7 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          token: ${{ secrets.BULLFROG_BOT_PAT }}
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
         env:
