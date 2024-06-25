@@ -206,6 +206,7 @@ jobs:
         if: github.event_name == 'push'
         id: release
         with:
+          releaseType: ""
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
       - name: Upload Release Artifact
