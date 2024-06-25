@@ -210,6 +210,7 @@ jobs:
           # we use node release type which will bump the changelog and package.json
           # go release type is normally only including changelog, so it's covered
           release-type: node
+          token: ${{ secrets.BULLFROG_BOT_PAT }}
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
         env:
