@@ -202,11 +202,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-      - uses: googleapis/release-please-action@v3
+      - uses: googleapis/release-please-action@v4
         if: github.event_name == 'push'
         id: release
         with:
-          releaseType: ""
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
       - name: Upload Release Artifact
