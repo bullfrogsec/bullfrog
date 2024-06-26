@@ -1,0 +1,23 @@
+name: Conventional Commits Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Enable egress filtering
+        uses: bullfrogsec/bullfrog@v0.3
+        with:
+          egress-policy: block
+      - name: PR Conventional Commit Validation
+        uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5
+        with:
+          task_types: '["feat","fix","docs","test","ci","refactor","perf","chore","revert"]'
+          add_label: "true"
