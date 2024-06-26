@@ -53,6 +53,9 @@ jobs:
         uses: bullfrogsec/bullfrog@v0.4
         with:
           egress-policy: block
+          allowed-domains: |
+            *.github.com
+            results-receiver.actions.githubusercontent.com.luykedtozraezimdvwvtsy4hga.cx.internal.cloudapp.net
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
@@ -82,8 +85,8 @@ jobs:
 
       - name: Make HTTP requests
         run: |
-          timeout 3 curl https://www.google.com --output /dev/null
-          timeout 3 curl https://www.bing.com --output /dev/null
+          timeout 5 curl https://www.google.com --output /dev/null
+          timeout 5 curl https://www.bing.com --output /dev/null
 
   test-block:
     needs: build
@@ -113,12 +116,12 @@ jobs:
 
       - name: Make DNS requests
         run: |
-          if timeout 3 dig example.com; then
+          if timeout 5 dig example.com; then
             echo 'Expected 'dig example.com' to fail, but it succeeded';
             exit 1;
           fi;
 
-          if timeout 3 dig www.wikipedia.org; then
+          if timeout 5 dig www.wikipedia.org; then
             echo 'Expected 'dig www.wikipedia.org' to fail, but it succeeded';
             exit 1;
           fi;
@@ -148,8 +151,8 @@ jobs:
 
       - name: Make DNS requests
         run: |
-          timeout 3 dig example.com
-          timeout 3 dig www.wikipedia.org
+          timeout 5 dig example.com
+          timeout 5 dig www.wikipedia.org
 
   test-docker:
     needs: build
@@ -175,12 +178,12 @@ jobs:
       - name: Test curl calls within Docker
         run: |
           docker run --rm --entrypoint sh alpine/curl:8.7.1 -c "
-            if ! timeout 3 curl https://www.google.com --output /dev/null; then
+            if ! timeout 5 curl https://www.google.com --output /dev/null; then
               echo 'Expected curl to www.google.com to succeed, but it failed';
               exit 1;
             fi;
 
-            if timeout 3 curl https://www.bing.com --output /dev/null; then
+            if timeout 5 curl https://www.bing.com --output /dev/null; then
               echo 'Expected curl to www.bing.com to fail, but it succeeded';
               exit 1;
             fi;
