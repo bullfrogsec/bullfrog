@@ -204,7 +204,9 @@ jobs:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@v0.3
         with:
-          egress-policy: block
+          egress-policy: audit
+          allowed-domains: |
+            uploads.github.com
       - name: Checkout
         uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
