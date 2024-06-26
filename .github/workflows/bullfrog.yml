@@ -28,7 +28,7 @@ jobs:
             *.blob.core.windows.net
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - name: Install deps
         run: sudo apt-get install libnetfilter-queue-dev
       - name: Build
@@ -53,7 +53,7 @@ jobs:
         with:
           egress-policy: block
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
@@ -69,6 +69,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
 
       - name: Enable egress filtering
         uses: ./
@@ -93,6 +96,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
 
       - name: Enable egress filtering
         uses: ./
@@ -124,6 +130,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
 
       - name: Enable egress filtering
         uses: ./
@@ -208,7 +217,7 @@ jobs:
           allowed-domains: |
             uploads.github.com
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
