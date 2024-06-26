@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.3
+        uses: bullfrogsec/bullfrog@v0.4
         with:
           egress-policy: block
           allowed-domains: |
@@ -49,7 +49,7 @@ jobs:
     needs: build
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.3
+        uses: bullfrogsec/bullfrog@v0.4
         with:
           egress-policy: block
       - name: Checkout
@@ -211,7 +211,7 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.3
+        uses: bullfrogsec/bullfrog@v0.4
         with:
           egress-policy: audit
           allowed-domains: |
