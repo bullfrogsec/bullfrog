@@ -264,7 +264,7 @@ jobs:
 
       - uses: jenseng/dynamic-uses@02f544690a931f3967153cd5f14679cfeb61f830
         with:
-          uses: fallard84/bullfrog@${{ needs.release.outputs.tag_name }}
+          uses: bullfrogsec/bullfrog@${{ needs.release.outputs.tag_name }}
           with: '{"allowed-domains": "www.google.com", "egress-policy": "block"}'
 
       - name: Make HTTP requests
