@@ -713,7 +713,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug("making CONNECT request");
+      debug2("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -733,7 +733,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug(
+          debug2(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -745,7 +745,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug("got illegal response body from proxy");
+          debug2("got illegal response body from proxy");
           socket.destroy();
           var error = new Error("got illegal response body from proxy");
           error.code = "ECONNRESET";
@@ -753,13 +753,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug("tunneling connection has established");
+        debug2("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug(
+        debug2(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -821,9 +821,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug;
+    var debug2;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug = function() {
+      debug2 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -833,10 +833,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug = function() {
+      debug2 = function() {
       };
     }
-    exports2.debug = debug;
+    exports2.debug = debug2;
   }
 });
 
@@ -18887,10 +18887,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug(message) {
+    function debug2(message) {
       command_1.issueCommand("debug", {}, message);
     }
-    exports2.debug = debug;
+    exports2.debug = debug2;
     function error(message, properties = {}) {
       command_1.issueCommand("error", utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
     }
@@ -18977,6 +18977,7 @@ var import_node_child_process = require("node:child_process");
 var core = __toESM(require_core());
 
 // src/constants.ts
+var AGENT_LOG_FILENAME = "agent.log";
 var CONNECT_LOG_FILENAME = "connect.log";
 var AUDIT = "audit";
 var BLOCK = "block";
@@ -19017,9 +19018,9 @@ async function printAnnotations({
     const correlatedData = await getCorrelateData({ connectLogFilepath });
     const { egressPolicy } = parseInputs();
     const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
-    console.log("\n\nCorrelated data:\n");
+    core2.debug("\n\nCorrelated data:\n");
     correlatedData.forEach((data) => {
-      console.log(JSON.stringify(data));
+      core2.debug(JSON.stringify(data));
       if (data.decision !== "blocked") {
         return;
       }
@@ -19041,7 +19042,7 @@ async function printAnnotations({
     });
     return;
   } catch (error) {
-    console.log("No annotations found");
+    core2.debug("No annotations found");
   }
 }
 async function getOutboundConnections({
@@ -19098,11 +19099,11 @@ async function getCorrelateData({
 }) {
   await new Promise((resolve) => setTimeout(resolve, 5e3));
   const connections = await getOutboundConnections({ connectLogFilepath });
-  console.log("\n\nConnections:\n");
-  connections.forEach((c) => console.log(JSON.stringify(c)));
+  core2.debug("\n\nConnections:\n");
+  connections.forEach((c) => core2.debug(JSON.stringify(c)));
   const decisions = await getDecisions();
-  console.log("\nDecisions:\n");
-  decisions.forEach((d) => console.log(JSON.stringify(d)));
+  core2.debug("\nDecisions:\n");
+  decisions.forEach((d) => core2.debug(JSON.stringify(d)));
   const correlatedData = [];
   for (const connection of connections) {
     let decision = decisions.find(
@@ -19135,10 +19136,25 @@ async function getCorrelateData({
   }
   return correlatedData;
 }
+async function printAgentLogs({
+  agentLogFilepath
+}) {
+  try {
+    const log = await import_promises.default.readFile(agentLogFilepath, "utf8");
+    const lines = log.split("\n");
+    for (const line of lines) {
+      core2.debug(line);
+    }
+  } catch (error) {
+    console.error("Error reading log file", error);
+  }
+}
 async function _main() {
   const { logDirectory } = parseInputs();
   const connectLogFilepath = import_node_path.default.join(logDirectory, CONNECT_LOG_FILENAME);
+  const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   await printAnnotations({ connectLogFilepath });
+  await printAgentLogs({ agentLogFilepath });
 }
 async function main() {
   try {

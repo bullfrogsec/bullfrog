@@ -19093,6 +19093,7 @@ async function startAgent({
       detached: true
     }
   ).unref();
+  await new Promise((resolve) => setTimeout(resolve, 5e3));
 }
 async function _main() {
   const { allowedDomains, allowedIps, dnsPolicy, egressPolicy, logDirectory } = parseInputs();

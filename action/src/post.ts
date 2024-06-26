@@ -4,7 +4,7 @@ import util from "node:util";
 import { exec as execCb } from "node:child_process";
 import { parseInputs } from "./inputs";
 import path from "node:path";
-import { BLOCK, CONNECT_LOG_FILENAME } from "./constants";
+import { AGENT_LOG_FILENAME, BLOCK, CONNECT_LOG_FILENAME } from "./constants";
 
 const exec = util.promisify(execCb);
 
@@ -20,10 +20,10 @@ async function printAnnotations({
     const { egressPolicy } = parseInputs();
     const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
 
-    console.log("\n\nCorrelated data:\n");
+    core.debug("\n\nCorrelated data:\n");
 
     correlatedData.forEach((data) => {
-      console.log(JSON.stringify(data));
+      core.debug(JSON.stringify(data));
       if (data.decision !== "blocked") {
         return;
       }
@@ -45,7 +45,7 @@ async function printAnnotations({
     });
     return;
   } catch (error) {
-    console.log("No annotations found");
+    core.debug("No annotations found");
   }
 }
 
@@ -129,12 +129,12 @@ async function getCorrelateData({
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
   const connections = await getOutboundConnections({ connectLogFilepath });
-  console.log("\n\nConnections:\n");
-  connections.forEach((c) => console.log(JSON.stringify(c)));
+  core.debug("\n\nConnections:\n");
+  connections.forEach((c) => core.debug(JSON.stringify(c)));
 
   const decisions = await getDecisions();
-  console.log("\nDecisions:\n");
-  decisions.forEach((d) => console.log(JSON.stringify(d)));
+  core.debug("\nDecisions:\n");
+  decisions.forEach((d) => core.debug(JSON.stringify(d)));
   const correlatedData: CorrelatedData[] = [];
   for (const connection of connections) {
     let decision = decisions.find(
@@ -168,11 +168,29 @@ async function getCorrelateData({
   return correlatedData;
 }
 
+async function printAgentLogs({
+  agentLogFilepath,
+}: {
+  agentLogFilepath: string;
+}) {
+  try {
+    const log = await fs.readFile(agentLogFilepath, "utf8");
+    const lines = log.split("\n");
+    for (const line of lines) {
+      core.debug(line);
+    }
+  } catch (error) {
+    console.error("Error reading log file", error);
+  }
+}
+
 async function _main() {
   const { logDirectory } = parseInputs();
   const connectLogFilepath = path.join(logDirectory, CONNECT_LOG_FILENAME);
+  const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   await printAnnotations({ connectLogFilepath });
+  await printAgentLogs({ agentLogFilepath });
 }
 
 async function main() {

@@ -122,6 +122,8 @@ async function startAgent({
       detached: true,
     }
   ).unref();
+  // TODO: Use a more reliable method to wait for the agent to be ready
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 
 async function _main() {
