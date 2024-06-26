@@ -35,7 +35,7 @@ jobs:
         run: |
           make bootstrap
           make build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: build-artifacts
           path: |
@@ -54,7 +54,7 @@ jobs:
           egress-policy: block
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
       - name: Check if dist has changed for the action/dist folder
@@ -69,7 +69,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
 
@@ -96,7 +96,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
 
@@ -130,7 +130,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
 
@@ -218,10 +218,10 @@ jobs:
             uploads.github.com
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f
         if: github.event_name == 'push'
         id: release
         with:
