@@ -10,9 +10,9 @@ on:
   # To guarantee Maintained check is occasionally updated. See
   # https://github.com/ossf/scorecard/blob/main/docs/checks.md#maintained
   schedule:
-    - cron: '25 19 * * 2'
+    - cron: "25 19 * * 2"
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 # Declare default permissions as read only.
 permissions: read-all
@@ -31,10 +31,6 @@ jobs:
       # actions: read
 
     steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.4
-        with:
-          egress-policy: audit
       - name: "Checkout code"
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
