@@ -213,6 +213,7 @@ jobs:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@v0.4
         with:
+          # TODO: set to block once we confirm the domains required for the release process
           egress-policy: audit
           allowed-domains: |
             uploads.github.com
