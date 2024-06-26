@@ -252,16 +252,16 @@ func main() {
 		if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
 
 			dns, _ := dnsLayer.(*layers.DNS)
-			// fmt.Println("DNS ID: ", dns.ID)
-			// fmt.Println("DNS QR: ", dns.QR) // true if this is a response, false if it's a query
-			// fmt.Println("DNS OpCode: ", dns.OpCode)
-			// fmt.Println("DNS ResponseCode: ", dns.ResponseCode)
-			// for _, q := range dns.Questions {
-			//         fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
-			// }
+			fmt.Println("DNS ID: ", dns.ID)
+			fmt.Println("DNS QR: ", dns.QR) // true if this is a response, false if it's a query
+			fmt.Println("DNS OpCode: ", dns.OpCode)
+			fmt.Println("DNS ResponseCode: ", dns.ResponseCode)
+			for _, q := range dns.Questions {
+			        fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
+			}
 			if blockDNS && !dns.QR {
 				for _, q := range dns.Questions {
-					if q.Type == layers.DNSTypeA {
+					if q.Type == layers.DNSTypeA || q.Type == layers.DNSTypeCNAME {
 						domain := string(q.Name)
 						fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 						fmt.Print(domain)
@@ -304,6 +304,18 @@ func main() {
 							fmt.Println("-> Unallowed request")
 						}
 					}
+				} else if a.Type == layers.DNSTypeCNAME {	// dynamically add cname records to the allowlist
+					cnameDomain := string(a.CNAME)
+					fmt.Printf("DNS Answer: %s %s %s\n", a.Name, a.Type, cnameDomain)
+					fmt.Printf("%s:%s", a.Name, cnameDomain)
+					domainQuery := string(dns.Questions[0].Name)
+					if isDomainAllowed(domainQuery, allowedDomains) {
+						fmt.Println("-> Allowed request")
+						if !allowedDomains[cnameDomain] {
+							fmt.Printf("Adding %s to the allowed domains list\n", cnameDomain)
+							allowedDomains[cnameDomain] = true
+						}
+					} 
 				}
 			}
 		}
