@@ -17,7 +17,7 @@ jobs:
         with:
           egress-policy: audit
       - name: PR Conventional Commit Validation
-        uses: ytanikin/PRConventionalCommits@1.1.0
+        uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5
         with:
           task_types: '["feat","fix","docs","test","ci","refactor","perf","chore","revert"]'
           add_label: "false"
