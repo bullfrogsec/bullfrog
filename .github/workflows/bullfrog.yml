@@ -25,6 +25,7 @@ jobs:
             *.golang.org
             storage.googleapis.com
             *.github.com
+            *.blob.core.windows.net
 
       - name: Checkout
         uses: actions/checkout@v4
