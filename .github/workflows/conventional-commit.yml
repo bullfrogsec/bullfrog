@@ -15,7 +15,7 @@ jobs:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@v0.3
         with:
-          egress-policy: audit
+          egress-policy: block
       - name: PR Conventional Commit Validation
         uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5
         with:
