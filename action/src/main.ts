@@ -91,8 +91,9 @@ async function downloadAgent({
   version: string;
 }): Promise<string> {
   if (localAgentPath !== "") {
-    core.debug(`Using local agent from ${localAgentPath}`);
-    return localAgentPath;
+    const absolutePath = path.join(actionDirectory, "..", localAgentPath);
+    core.debug(`Using local agent from ${absolutePath}`);
+    return absolutePath;
   }
   console.log(`Downloading agent v${version}`);
 

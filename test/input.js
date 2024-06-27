@@ -8,4 +8,4 @@ bing.com
 `;
 
 // uncomment to test with local agent
-// process.env["INPUT_LOCAL-AGENT-PATH"] = "/vagrant/agent/agent";
+// process.env["INPUT_LOCAL-AGENT-PATH"] = "agent/agent";

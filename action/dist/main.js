@@ -19088,8 +19088,9 @@ async function downloadAgent({
   version: version2
 }) {
   if (localAgentPath !== "") {
-    core3.debug(`Using local agent from ${localAgentPath}`);
-    return localAgentPath;
+    const absolutePath = import_node_path.default.join(actionDirectory, "..", localAgentPath);
+    core3.debug(`Using local agent from ${absolutePath}`);
+    return absolutePath;
   }
   console.log(`Downloading agent v${version2}`);
   const { status } = (0, import_node_child_process.spawnSync)(
