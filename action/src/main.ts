@@ -148,7 +148,7 @@ async function startAgent({
   console.time("Agent startup time");
 
   // make agent executable
-  await exec(`chmod +x ${agentPath}`);
+  await exec(`sudo chmod +x ${agentPath}`);
 
   spawn(
     "sudo",

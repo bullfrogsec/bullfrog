@@ -64,6 +64,21 @@ jobs:
         run: |
           git diff --exit-code --quiet action/dist || (echo "action/dist has changed, please commit the changes" && exit 1)
 
+  test-load-agent:
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
+        with:
+          name: build-artifacts
+
+      - name: Enable egress filtering
+        uses: ./
+
   test-audit:
     needs: build
     runs-on: ubuntu-22.04

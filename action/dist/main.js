@@ -19130,7 +19130,7 @@ async function startAgent({
   const agentOut = (await import_promises3.default.open(agentLogFilepath, "a")).fd;
   console.log(`Starting agent from ${agentPath}`);
   console.time("Agent startup time");
-  await exec(`chmod +x ${agentPath}`);
+  await exec(`sudo chmod +x ${agentPath}`);
   (0, import_node_child_process.spawn)(
     "sudo",
     [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
