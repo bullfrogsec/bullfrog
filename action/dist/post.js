@@ -19020,6 +19020,7 @@ async function printAnnotations({
     const { egressPolicy } = parseInputs();
     const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
     core2.debug("\n\nCorrelated data:\n");
+    const annotations = [];
     correlatedData.forEach((data) => {
       core2.debug(JSON.stringify(data));
       if (data.decision !== "blocked") {
@@ -19027,20 +19028,21 @@ async function printAnnotations({
       }
       const time = data.ts.toISOString();
       if (data.domain === "unknown") {
-        core2.warning(
+        annotations.push(
           `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``
         );
         return;
       } else if (data.destIp === "unknown") {
-        core2.warning(
+        annotations.push(
           `[${time}] ${result} DNS request to ${data.domain} from unknown process`
         );
       } else {
-        core2.warning(
+        annotations.push(
           `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``
         );
       }
     });
+    core2.warning(annotations.join("\n"));
     return;
   } catch (error) {
     core2.debug("No annotations found");
