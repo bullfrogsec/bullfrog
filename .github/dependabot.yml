@@ -10,7 +10,7 @@ updates:
     directory: "/action"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "go"
+  - package-ecosystem: "gomod"
     directory: "/agent"
     schedule:
       interval: "weekly"
