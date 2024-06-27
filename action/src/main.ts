@@ -143,6 +143,10 @@ async function startAgent({
   const agentOut = (await fs.open(agentLogFilepath, "a")).fd;
   console.log(`Starting agent from ${agentPath}`);
   console.time("Agent startup time");
+
+  // make agent executable
+  await exec(`chmod +x ${agentPath}`);
+
   spawn(
     "sudo",
     [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
