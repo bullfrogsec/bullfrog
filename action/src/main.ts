@@ -9,6 +9,9 @@ import {
   TETRAGON_LOG_FILENAME,
   BLOCK,
   ALLOWED_DOMAINS_ONLY,
+  AGENT_INSTALL_PATH,
+  TETRAGON_EVENTS_LOG_PATH,
+  AGENT_READY_PATH,
 } from "./constants";
 import { parseInputs, EgressPolicy, DnsPolicy } from "./inputs";
 import { waitForFile } from "./util";
@@ -64,7 +67,7 @@ async function startTetragon({
     detached: true,
   }).unref();
 
-  const tetragonReady = await waitForFile("/var/log/tetragon/tetragon.log");
+  const tetragonReady = await waitForFile(TETRAGON_EVENTS_LOG_PATH);
   if (!tetragonReady) {
     throw new Error("Tetragon could not start");
   }
@@ -72,7 +75,7 @@ async function startTetragon({
 
   const connectOut = (await fs.open(connectLogFilepath, "a")).fd;
   spawn(
-    `sudo tail -n +1 -F /var/log/tetragon/tetragon.log | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
+    `sudo tail -n +1 -F ${TETRAGON_EVENTS_LOG_PATH} | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
     {
       shell: true,
       stdio: ["ignore", connectOut, "ignore"],
@@ -107,7 +110,7 @@ async function downloadAgent({
     throw new Error("Couldn't download agent");
   }
 
-  return "agent";
+  return AGENT_INSTALL_PATH;
 }
 
 async function startAgent({
@@ -156,7 +159,7 @@ async function startAgent({
     }
   ).unref();
 
-  const agentReady = await waitForFile("/var/run/bullfrog/agent-ready");
+  const agentReady = await waitForFile(AGENT_READY_PATH);
   if (!agentReady) {
     throw new Error("Agent could not start");
   }

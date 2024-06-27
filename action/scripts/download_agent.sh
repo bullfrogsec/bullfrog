@@ -8,6 +8,7 @@ VERSION=$1
 TMP_DIR="/tmp"
 AGENT_FILE_PATH="${TMP_DIR}/agent"
 AGENT_FILE="$AGENT_FILE_PATH.tar.gz"
+FINAL_BIN_DIR="/opt/bullfrog"
 
 echo "https://github.com/bullfrogsec/bullfrog/releases/download/${VERSION}/agent.tar.gz -o $AGENT_FILE"
 
@@ -18,5 +19,6 @@ else
 fi
 tar -xvf "$AGENT_FILE" -C $TMP_DIR
 
-sudo cp -vRf "$AGENT_FILE_PATH/agent" /usr/local/bin/
+mkdir -p "$FINAL_BIN_DIR"
+sudo cp -vRf "$AGENT_FILE_PATH/agent" "$FINAL_BIN_DIR/agent"
 sudo rm -rf "$AGENT_FILE_PATH"

@@ -18978,6 +18978,9 @@ var import_node_path = __toESM(require("node:path"));
 var AGENT_LOG_FILENAME = "agent.log";
 var CONNECT_LOG_FILENAME = "connect.log";
 var TETRAGON_LOG_FILENAME = "tetragon.log";
+var TETRAGON_EVENTS_LOG_PATH = "/var/log/tetragon/tetragon.log";
+var AGENT_INSTALL_PATH = "/opt/bullfrog/agent";
+var AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";
 var AUDIT = "audit";
 var BLOCK = "block";
 var ALLOWED_DOMAINS_ONLY = "allowed-domains-only";
@@ -19067,14 +19070,14 @@ async function startTetragon({
     stdio: ["ignore", out, out],
     detached: true
   }).unref();
-  const tetragonReady = await waitForFile("/var/log/tetragon/tetragon.log");
+  const tetragonReady = await waitForFile(TETRAGON_EVENTS_LOG_PATH);
   if (!tetragonReady) {
     throw new Error("Tetragon could not start");
   }
   console.timeEnd("Tetragon startup time");
   const connectOut = (await import_promises3.default.open(connectLogFilepath, "a")).fd;
   (0, import_node_child_process.spawn)(
-    `sudo tail -n +1 -F /var/log/tetragon/tetragon.log | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
+    `sudo tail -n +1 -F ${TETRAGON_EVENTS_LOG_PATH} | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
     {
       shell: true,
       stdio: ["ignore", connectOut, "ignore"],
@@ -19101,7 +19104,7 @@ async function downloadAgent({
   if (status !== 0) {
     throw new Error("Couldn't download agent");
   }
-  return "agent";
+  return AGENT_INSTALL_PATH;
 }
 async function startAgent({
   agentDirectory,
@@ -19136,7 +19139,7 @@ async function startAgent({
       detached: true
     }
   ).unref();
-  const agentReady = await waitForFile("/var/run/bullfrog/agent-ready");
+  const agentReady = await waitForFile(AGENT_READY_PATH);
   if (!agentReady) {
     throw new Error("Agent could not start");
   }
