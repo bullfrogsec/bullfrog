@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/bullfrogsec/bullfrog/compare/v0.5.0...v0.5.1) (2024-06-27)
+
+
+### Bug Fixes
+
+* fixing problem with agent installation ([#27](https://github.com/bullfrogsec/bullfrog/issues/27)) ([6287cf4](https://github.com/bullfrogsec/bullfrog/commit/6287cf455f993c8b4a1874eaf82520d7643b2f75))
+* group annotations to avoid reaching limit ([#26](https://github.com/bullfrogsec/bullfrog/issues/26)) ([804f346](https://github.com/bullfrogsec/bullfrog/commit/804f346cfeebd7d234bbee61b2784501e164d00a))
+
 ## [0.5.0](https://github.com/bullfrogsec/bullfrog/compare/v0.4.1...v0.5.0) (2024-06-27)
 
 
