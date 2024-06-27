@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/bullfrogsec/bullfrog/compare/v0.4.1...v0.5.0) (2024-06-27)
+
+
+### Features
+
+* fetch agent from release and reliably wait for agent to be ready ([#18](https://github.com/bullfrogsec/bullfrog/issues/18)) ([98606c4](https://github.com/bullfrogsec/bullfrog/commit/98606c47408f749b09a1c2c65f9d46dbd4aa7a08))
+
 ## [0.4.1](https://github.com/bullfrogsec/bullfrog/compare/v0.4.0...v0.4.1) (2024-06-26)
 
 
