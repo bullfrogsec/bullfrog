@@ -22,6 +22,8 @@ async function printAnnotations({
 
     core.debug("\n\nCorrelated data:\n");
 
+    const annotations: string[] = [];
+
     correlatedData.forEach((data) => {
       core.debug(JSON.stringify(data));
       if (data.decision !== "blocked") {
@@ -29,20 +31,21 @@ async function printAnnotations({
       }
       const time = data.ts.toISOString();
       if (data.domain === "unknown") {
-        core.warning(
+        annotations.push(
           `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``
         );
         return;
       } else if (data.destIp === "unknown") {
-        core.warning(
+        annotations.push(
           `[${time}] ${result} DNS request to ${data.domain} from unknown process`
         );
       } else {
-        core.warning(
+        annotations.push(
           `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``
         );
       }
     });
+    core.warning(annotations.join("\n"));
     return;
   } catch (error) {
     core.debug("No annotations found");
