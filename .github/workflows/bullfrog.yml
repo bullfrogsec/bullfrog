@@ -36,6 +36,7 @@ jobs:
         run: |
           make bootstrap
           make build
+          chmod +x agent/agent
       - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: build-artifacts
