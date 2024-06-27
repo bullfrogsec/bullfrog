@@ -10,6 +10,7 @@ export interface Inputs {
   dnsPolicy: DnsPolicy;
   egressPolicy: EgressPolicy;
   logDirectory: string;
+  localAgentPath: string;
 }
 
 export function parseInputs(): Inputs {
@@ -40,5 +41,6 @@ export function parseInputs(): Inputs {
     dnsPolicy,
     egressPolicy,
     logDirectory: core.getInput("log-directory", { required: true }),
+    localAgentPath: core.getInput("local-agent-path"),
   };
 }

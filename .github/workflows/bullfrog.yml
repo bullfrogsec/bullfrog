@@ -81,6 +81,7 @@ jobs:
         with:
           allowed-domains: |
             *.google.com
+          local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: |
@@ -109,6 +110,7 @@ jobs:
           allowed-domains: |
             *.google.com
           egress-policy: block
+          local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -144,6 +146,7 @@ jobs:
             *.google.com
           dns-policy: any
           egress-policy: block
+          local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -161,6 +164,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
+        with:
+          name: build-artifacts
 
       - name: Enable egress filtering
         uses: ./
@@ -173,6 +179,7 @@ jobs:
             *.docker.io
             www.google.com
           egress-policy: block
+          local-agent-path: agent/agent
 
       - name: Test curl calls within Docker
         run: |
