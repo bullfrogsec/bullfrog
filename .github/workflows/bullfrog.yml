@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.4
+        uses: bullfrogsec/bullfrog@v0
         with:
           egress-policy: block
           dns-policy: any
@@ -50,7 +50,7 @@ jobs:
     needs: build
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.4
+        uses: bullfrogsec/bullfrog@v0
         with:
           egress-policy: block
           allowed-domains: |
@@ -214,7 +214,7 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.4
+        uses: bullfrogsec/bullfrog@v0
         with:
           # TODO: set to block once we confirm the domains required for the release process
           egress-policy: audit
