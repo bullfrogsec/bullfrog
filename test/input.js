@@ -6,3 +6,6 @@ process.env["INPUT_ALLOWED-DOMAINS"] = `
 *.google.com
 bing.com
 `;
+
+// uncomment to test with local agent
+// process.env["INPUT_LOCAL-AGENT-PATH"] = "/vagrant/agent/agent";

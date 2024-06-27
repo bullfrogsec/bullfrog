@@ -13,3 +13,4 @@ service docker restart
 rm -rf /tmp/gha-agent/logs
 rm -f /var/log/tetragon/tetragon.log
 rm -rf /var/log/gha-agent
+rm /tmp/agent.tar.gz

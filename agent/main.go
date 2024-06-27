@@ -195,6 +195,21 @@ func addIpToLogs(decision string, domain string, ip string) {
 	fmt.Fprintf(f, "%d|%s|%s|%s\n", time.Now().Unix(), decision, domain, ip)
 }
 
+func setAgentIsReady() {
+	if _, err := os.Stat("/var/run/bullfrog"); os.IsNotExist(err) {
+		os.Mkdir("/var/run/bullfrog", 0755)
+	}
+
+	f, err := os.OpenFile("/var/run/bullfrog/agent-ready", os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("failed to open /var/run/bullfrog/agent-ready")
+		return
+	}
+	defer f.Close()
+
+	fmt.Fprintf(f, "%d\n", time.Now().Unix())
+}
+
 func main() {
 	// set the mode (audit or block) based on the program argument
 	blockDNS := false
@@ -246,6 +261,7 @@ func main() {
 	packets := nfq.GetPackets()
 
 	fmt.Println("Waiting for packets...")
+	setAgentIsReady()
 
 	for p := range packets {
 		packet := p.Packet

@@ -7,9 +7,9 @@ TETRAGON_FILE="/tmp/tetragon.tar.gz"
 if [ -f "$TETRAGON_FILE" ]; then
     echo "$TETRAGON_FILE exists."
 else
-    curl -L https://github.com/cilium/tetragon/releases/download/v1.1.0/tetragon-v1.1.0-amd64.tar.gz -o $TETRAGON_FILE
+    curl -L https://github.com/cilium/tetragon/releases/download/v1.1.0/tetragon-v1.1.0-amd64.tar.gz -o "$TETRAGON_FILE"
 fi
-tar -xvf /tmp/tetragon.tar.gz -C /tmp
+tar -xvf "$TETRAGON_FILE" -C /tmp
 
 sudo cp -vRf /tmp/tetragon-v1.1.0-amd64/usr/local/* /usr/local/
 sudo rm -rf /tmp/tetragon-v1.1.0-amd64

@@ -17,6 +17,10 @@ inputs:
     description: "Directory to store log files."
     type: string
     default: ${{ runner.temp }}/agent-logs
+  local-agent-path:
+    description: "Path to a local agent binary to use instead of fetching it from Github. This is useful for testing changes to the agent without releasing it. The path is relative to the action directory."
+    type: string
+    default: ""
 
 runs:
   using: "node20"

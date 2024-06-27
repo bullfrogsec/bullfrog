@@ -19003,7 +19003,8 @@ function parseInputs() {
     allowedIps,
     dnsPolicy,
     egressPolicy,
-    logDirectory: core.getInput("log-directory", { required: true })
+    logDirectory: core.getInput("log-directory", { required: true }),
+    localAgentPath: core.getInput("local-agent-path")
   };
 }
 

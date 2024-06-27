@@ -509,7 +509,7 @@ var require_file_command = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
-    var fs2 = __importStar(require("fs"));
+    var fs3 = __importStar(require("fs"));
     var os = __importStar(require("os"));
     var uuid_1 = (init_esm_node(), __toCommonJS(esm_node_exports));
     var utils_1 = require_utils();
@@ -518,10 +518,10 @@ var require_file_command = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs2.existsSync(filePath)) {
+      if (!fs3.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs2.appendFileSync(filePath, `${utils_1.toCommandValue(message)}${os.EOL}`, {
+      fs3.appendFileSync(filePath, `${utils_1.toCommandValue(message)}${os.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -713,7 +713,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug("making CONNECT request");
+      debug3("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -733,7 +733,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug(
+          debug3(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -745,7 +745,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug("got illegal response body from proxy");
+          debug3("got illegal response body from proxy");
           socket.destroy();
           var error = new Error("got illegal response body from proxy");
           error.code = "ECONNRESET";
@@ -753,13 +753,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug("tunneling connection has established");
+        debug3("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug(
+        debug3(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -821,9 +821,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug;
+    var debug3;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug = function() {
+      debug3 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -833,10 +833,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug = function() {
+      debug3 = function() {
       };
     }
-    exports2.debug = debug;
+    exports2.debug = debug3;
   }
 });
 
@@ -18887,10 +18887,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug(message) {
+    function debug3(message) {
       command_1.issueCommand("debug", {}, message);
     }
-    exports2.debug = debug;
+    exports2.debug = debug3;
     function error(message, properties = {}) {
       command_1.issueCommand("error", utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
     }
@@ -18968,8 +18968,8 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 });
 
 // src/main.ts
-var core2 = __toESM(require_core());
-var import_promises = __toESM(require("node:fs/promises"));
+var core3 = __toESM(require_core());
+var import_promises3 = __toESM(require("node:fs/promises"));
 var import_node_util = __toESM(require("node:util"));
 var import_node_child_process = require("node:child_process");
 var import_node_path = __toESM(require("node:path"));
@@ -19003,8 +19003,28 @@ function parseInputs() {
     allowedIps,
     dnsPolicy,
     egressPolicy,
-    logDirectory: core.getInput("log-directory", { required: true })
+    logDirectory: core.getInput("log-directory", { required: true }),
+    localAgentPath: core.getInput("local-agent-path")
   };
+}
+
+// src/util.ts
+var core2 = __toESM(require_core());
+var import_promises = __toESM(require("node:fs/promises"));
+var import_promises2 = require("node:timers/promises");
+async function waitForFile(filePath, timeout = 15e3, interval = 500) {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeout) {
+    try {
+      await import_promises.default.access(filePath);
+      core2.debug(`File ${filePath} is available!`);
+      return true;
+    } catch (err) {
+      await (0, import_promises2.setTimeout)(interval);
+    }
+  }
+  core2.debug(`Timeout: File ${filePath} is not available.`);
+  return false;
 }
 
 // src/main.ts
@@ -19040,14 +19060,19 @@ async function startTetragon({
   connectLogFilepath,
   tetragonLogFilepath
 }) {
-  const out = (await import_promises.default.open(tetragonLogFilepath, "a")).fd;
-  console.log("Starting Tetragon");
+  const out = (await import_promises3.default.open(tetragonLogFilepath, "a")).fd;
+  core3.debug("Starting Tetragon");
+  console.time("Tetragon startup time");
   (0, import_node_child_process.spawn)("sudo", ["tetragon"], {
     stdio: ["ignore", out, out],
     detached: true
   }).unref();
-  await new Promise((resolve) => setTimeout(resolve, 5e3));
-  const connectOut = (await import_promises.default.open(connectLogFilepath, "a")).fd;
+  const tetragonReady = await waitForFile("/var/log/tetragon/tetragon.log");
+  if (!tetragonReady) {
+    throw new Error("Tetragon could not start");
+  }
+  console.timeEnd("Tetragon startup time");
+  const connectOut = (await import_promises3.default.open(connectLogFilepath, "a")).fd;
   (0, import_node_child_process.spawn)(
     `sudo tail -n +1 -F /var/log/tetragon/tetragon.log | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
     {
@@ -19057,11 +19082,32 @@ async function startTetragon({
     }
   ).unref();
 }
+async function downloadAgent({
+  actionDirectory,
+  localAgentPath,
+  version: version2
+}) {
+  if (localAgentPath !== "") {
+    core3.debug(`Using local agent from ${localAgentPath}`);
+    return localAgentPath;
+  }
+  console.log(`Downloading agent v${version2}`);
+  const { status } = (0, import_node_child_process.spawnSync)(
+    "bash",
+    [import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh"), `v${version2}`],
+    { stdio: "inherit" }
+  );
+  if (status !== 0) {
+    throw new Error("Couldn't download agent");
+  }
+  return "agent";
+}
 async function startAgent({
   agentDirectory,
   dnsPolicy,
   egressPolicy,
-  agentLogFilepath
+  agentLogFilepath,
+  agentPath
 }) {
   const blockingMode = egressPolicy === BLOCK;
   console.log("Loading nftables rules");
@@ -19077,34 +19123,41 @@ async function startAgent({
     await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_audit.nft")}`);
     console.log("loaded audit rules");
   }
-  console.log("Starting agent");
-  const agentOut = (await import_promises.default.open(agentLogFilepath, "a")).fd;
+  const agentOut = (await import_promises3.default.open(agentLogFilepath, "a")).fd;
+  console.log(`Starting agent from ${agentPath}`);
+  console.time("Agent startup time");
   (0, import_node_child_process.spawn)(
     "sudo",
-    [
-      import_node_path.default.join(agentDirectory, "agent"),
-      "--dns-policy",
-      dnsPolicy,
-      "--egress-policy",
-      egressPolicy
-    ],
+    [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
     {
       stdio: ["ignore", agentOut, agentOut],
       detached: true
     }
   ).unref();
-  await new Promise((resolve) => setTimeout(resolve, 5e3));
+  const agentReady = await waitForFile("/var/run/bullfrog/agent-ready");
+  if (!agentReady) {
+    throw new Error("Agent could not start");
+  }
+  console.timeEnd("Agent startup time");
 }
 async function _main() {
-  const { allowedDomains, allowedIps, dnsPolicy, egressPolicy, logDirectory } = parseInputs();
+  const {
+    allowedDomains,
+    allowedIps,
+    dnsPolicy,
+    egressPolicy,
+    logDirectory,
+    localAgentPath
+  } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
-  await import_promises.default.mkdir(logDirectory, { recursive: true });
+  const pkg = require(`${actionDirectory}/../package.json`);
+  await import_promises3.default.mkdir(logDirectory, { recursive: true });
   if (allowedDomains.length !== 0) {
-    await import_promises.default.writeFile("allowed_domains.txt", allowedDomains.join("\n"));
+    await import_promises3.default.writeFile("allowed_domains.txt", allowedDomains.join("\n"));
   }
   if (allowedIps.length !== 0) {
-    await import_promises.default.writeFile("allowed_ips.txt", allowedIps.join("\n"));
+    await import_promises3.default.writeFile("allowed_ips.txt", allowedIps.join("\n"));
   }
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   const connectLogFilepath = import_node_path.default.join(logDirectory, CONNECT_LOG_FILENAME);
@@ -19115,11 +19168,17 @@ async function _main() {
     connectLogFilepath,
     tetragonLogFilepath
   });
+  const agentPath = await downloadAgent({
+    actionDirectory,
+    localAgentPath,
+    version: pkg.version
+  });
   await startAgent({
     agentDirectory,
     dnsPolicy,
     egressPolicy,
-    agentLogFilepath
+    agentLogFilepath,
+    agentPath
   });
 }
 async function main() {
@@ -19127,7 +19186,7 @@ async function main() {
     await _main();
   } catch (error) {
     console.error(error);
-    core2.setFailed(error);
+    core3.setFailed(error);
     process.exit(1);
   }
 }
