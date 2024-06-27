@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0.4
+        uses: bullfrogsec/bullfrog@v0
         with:
           egress-policy: block
       - name: PR Conventional Commit Validation
