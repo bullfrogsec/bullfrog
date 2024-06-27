@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/bullfrogsec/bullfrog/compare/v0.5.1...v0.5.2) (2024-06-27)
+
+
+### Bug Fixes
+
+* use sudo to chmod agent ([#29](https://github.com/bullfrogsec/bullfrog/issues/29)) ([e6a8c1a](https://github.com/bullfrogsec/bullfrog/commit/e6a8c1a2ef6fe5b233781995e6e46c680e3dcc13))
+
 ## [0.5.1](https://github.com/bullfrogsec/bullfrog/compare/v0.5.0...v0.5.1) (2024-06-27)
 
 
