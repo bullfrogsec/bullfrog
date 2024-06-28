@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/bullfrogsec/bullfrog/compare/v0.5.2...v0.5.3) (2024-06-28)
+
+
+### Bug Fixes
+
+* add pre-release in release workflow ([#32](https://github.com/bullfrogsec/bullfrog/issues/32)) ([6bbe61a](https://github.com/bullfrogsec/bullfrog/commit/6bbe61a073fb0eb168fd79ce5575e3b86f76bd5e))
+
 ## [0.5.2](https://github.com/bullfrogsec/bullfrog/compare/v0.5.1...v0.5.2) (2024-06-27)
 
 
