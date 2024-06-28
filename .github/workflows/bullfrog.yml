@@ -64,21 +64,6 @@ jobs:
         run: |
           git diff --exit-code --quiet action/dist || (echo "action/dist has changed, please commit the changes" && exit 1)
 
-  test-load-agent:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 2
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
-        with:
-          name: build-artifacts
-
-      - name: Enable egress filtering
-        uses: ./
-
   test-audit:
     needs: build
     runs-on: ubuntu-22.04
@@ -216,7 +201,7 @@ jobs:
       - name: Nginx with port forwarding
         run: source test/docker_nginx_port_forwarding.sh
 
-  release:
+  pre-release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     permissions:
@@ -234,6 +219,8 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
     steps:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@v0
@@ -262,36 +249,19 @@ jobs:
           echo "Upload"
           tar -czf agent.tar.gz agent/agent
           gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
-        # Update major/minor tags for Github Action
-        # Ref: https://github.com/googleapis/release-please-action/tree/main?tab=readme-ov-file#creating-majorminor-tags
-      - name: Tag major and minor versions for Github Action
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/fallard84/bullfrog.git"
-          git tag -d v${{ steps.release.outputs.major }} || true
-          git tag -d v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} || true
-          git push origin :v${{ steps.release.outputs.major }} || true
-          git push origin :v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} || true
-          git tag -a v${{ steps.release.outputs.major }} -m "Release v${{ steps.release.outputs.major }}"
-          git tag -a v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} -m "Release v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}"
-          git push origin v${{ steps.release.outputs.major }}
-          git push origin v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}
 
-  validate-action-in-another-workflow:
-    needs: release
-    if: ${{ needs.release.outputs.release_created }}
+  pre-release-validation:
+    needs: pre-release
+    if: ${{ needs.pre-release.outputs.release_created }}
     runs-on: ubuntu-22.04
     timeout-minutes: 2
 
     steps:
       # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow. Refer to https://github.com/bullfrogsec/bullfrog/commit/3a3e5e03112ef726b3079d402415760c9021fa39 for details.
-
       - uses: jenseng/dynamic-uses@02f544690a931f3967153cd5f14679cfeb61f830
         with:
-          uses: bullfrogsec/bullfrog@${{ needs.release.outputs.tag_name }}
-          with: '{"allowed-domains": "www.google.com", "egress-policy": "block"}'
+          uses: ${{ github.repository }}@${{ needs.pre-release.outputs.tag_name }}
+          with: '{"allowed-domains": "www.google.com", "egress-policy": "block", "agent-download-base-url": "https://github.com/${{ github.repository }}/releases/download/"}'
 
       - name: Make HTTP requests
         run: |
@@ -304,3 +274,33 @@ jobs:
             echo 'Expected curl to www.bing.com to fail, but it succeeded';
             exit 1;
           fi;
+
+  release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    needs: [pre-release, pre-release-validation]
+    steps:
+      - name: Enable egress filtering
+        uses: bullfrogsec/bullfrog@v0
+        with:
+          # TODO: set to block once we confirm the domains required for the release process
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Promote to a release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit ${{ needs.pre-release.outputs.tag_name }} --prerelease=false
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git tag -d v${{ needs.pre-release.outputs.major }} || true
+          git tag -d v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} || true
+          git push origin :v${{ needs.pre-release.outputs.major }} || true
+          git push origin :v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} || true
+          git tag -a v${{ needs.pre-release.outputs.major }} -m "Release v${{ needs.pre-release.outputs.major }}"
+          git tag -a v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} -m "Release v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }}"
+          git push origin v${{ needs.pre-release.outputs.major }}
+          git push origin v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }}

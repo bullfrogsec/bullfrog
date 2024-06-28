@@ -19007,7 +19007,8 @@ function parseInputs() {
     dnsPolicy,
     egressPolicy,
     logDirectory: core.getInput("log-directory", { required: true }),
-    localAgentPath: core.getInput("local-agent-path")
+    localAgentPath: core.getInput("local-agent-path"),
+    agentDownloadBaseURL: core.getInput("agent-download-base-url")
   };
 }
 
@@ -19088,7 +19089,8 @@ async function startTetragon({
 async function downloadAgent({
   actionDirectory,
   localAgentPath,
-  version: version2
+  version: version2,
+  agentDownloadBaseURL
 }) {
   if (localAgentPath !== "") {
     const absolutePath = import_node_path.default.join(actionDirectory, "..", localAgentPath);
@@ -19098,7 +19100,11 @@ async function downloadAgent({
   console.log(`Downloading agent v${version2}`);
   const { status } = (0, import_node_child_process.spawnSync)(
     "bash",
-    [import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh"), `v${version2}`],
+    [
+      import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh"),
+      `v${version2}`,
+      agentDownloadBaseURL
+    ],
     { stdio: "inherit" }
   );
   if (status !== 0) {
@@ -19152,7 +19158,8 @@ async function _main() {
     dnsPolicy,
     egressPolicy,
     logDirectory,
-    localAgentPath
+    localAgentPath,
+    agentDownloadBaseURL
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
@@ -19176,7 +19183,8 @@ async function _main() {
   const agentPath = await downloadAgent({
     actionDirectory,
     localAgentPath,
-    version: pkg.version
+    version: pkg.version,
+    agentDownloadBaseURL
   });
   await startAgent({
     agentDirectory,
