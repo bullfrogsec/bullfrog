@@ -11,6 +11,7 @@ export interface Inputs {
   egressPolicy: EgressPolicy;
   logDirectory: string;
   localAgentPath: string;
+  agentDownloadBaseURL: string;
 }
 
 export function parseInputs(): Inputs {
@@ -42,5 +43,6 @@ export function parseInputs(): Inputs {
     egressPolicy,
     logDirectory: core.getInput("log-directory", { required: true }),
     localAgentPath: core.getInput("local-agent-path"),
+    agentDownloadBaseURL: core.getInput("agent-download-base-url"),
   };
 }

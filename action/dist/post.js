@@ -19004,7 +19004,8 @@ function parseInputs() {
     dnsPolicy,
     egressPolicy,
     logDirectory: core.getInput("log-directory", { required: true }),
-    localAgentPath: core.getInput("local-agent-path")
+    localAgentPath: core.getInput("local-agent-path"),
+    agentDownloadBaseURL: core.getInput("agent-download-base-url")
   };
 }
 
