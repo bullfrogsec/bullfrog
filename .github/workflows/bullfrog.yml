@@ -9,11 +9,12 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-22.04
-    permissions:
-      contents: read
 
     steps:
       - name: Enable egress filtering
@@ -45,8 +46,6 @@ jobs:
 
   check-dist-diff:
     runs-on: ubuntu-22.04
-    permissions:
-      contents: read
     needs: build
     steps:
       - name: Enable egress filtering
