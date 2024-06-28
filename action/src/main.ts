@@ -88,10 +88,12 @@ async function downloadAgent({
   actionDirectory,
   localAgentPath,
   version,
+  agentDownloadBaseURL,
 }: {
   actionDirectory: string;
   localAgentPath: string;
   version: string;
+  agentDownloadBaseURL: string;
 }): Promise<string> {
   if (localAgentPath !== "") {
     const absolutePath = path.join(actionDirectory, "..", localAgentPath);
@@ -102,7 +104,11 @@ async function downloadAgent({
 
   const { status } = spawnSync(
     "bash",
-    [path.join(actionDirectory, "scripts", "download_agent.sh"), `v${version}`],
+    [
+      path.join(actionDirectory, "scripts", "download_agent.sh"),
+      `v${version}`,
+      agentDownloadBaseURL,
+    ],
     { stdio: "inherit" }
   );
 
@@ -174,6 +180,7 @@ async function _main() {
     egressPolicy,
     logDirectory,
     localAgentPath,
+    agentDownloadBaseURL,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -204,6 +211,7 @@ async function _main() {
     actionDirectory,
     localAgentPath,
     version: pkg.version,
+    agentDownloadBaseURL,
   });
   await startAgent({
     agentDirectory,
