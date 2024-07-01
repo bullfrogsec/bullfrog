@@ -21,7 +21,6 @@ jobs:
         uses: bullfrogsec/bullfrog@v0
         with:
           egress-policy: block
-          dns-policy: any
           allowed-domains: |
             registry.npmjs.org
             *.golang.org
