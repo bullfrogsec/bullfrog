@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.5](https://github.com/bullfrogsec/bullfrog/compare/v0.5.4...v0.5.5) (2024-07-01)
+
+
+### Bug Fixes
+
+* filtering dns server in agent instead of nftables ([#45](https://github.com/bullfrogsec/bullfrog/issues/45)) ([e1a20a3](https://github.com/bullfrogsec/bullfrog/commit/e1a20a3e2a0c0641dff8ae34f92fb2e8acb722e9))
+* only allow trusted local dns server ([#41](https://github.com/bullfrogsec/bullfrog/issues/41)) ([46f90f1](https://github.com/bullfrogsec/bullfrog/commit/46f90f18b7ee65240e346a60f0d0323002ab09aa))
+
 ## [0.5.4](https://github.com/bullfrogsec/bullfrog/compare/v0.5.3...v0.5.4) (2024-07-01)
 
 

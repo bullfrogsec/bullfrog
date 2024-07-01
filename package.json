@@ -1,6 +1,6 @@
 {
   "name": "bullfrog",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Github Action for securing your Github workflows",
   "author": "Bullfrog Security",
   "license": "MIT"
