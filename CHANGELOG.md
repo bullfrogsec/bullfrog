@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/bullfrogsec/bullfrog/compare/v0.5.3...v0.5.4) (2024-07-01)
+
+
+### Bug Fixes
+
+* Verify Tetragon SHA256 checksum ([#39](https://github.com/bullfrogsec/bullfrog/issues/39)) ([3b314cb](https://github.com/bullfrogsec/bullfrog/commit/3b314cb4acd3ada8f2d6fc9fbf2e64100509d3ec))
+
 ## [0.5.3](https://github.com/bullfrogsec/bullfrog/compare/v0.5.2...v0.5.3) (2024-06-28)
 
 
