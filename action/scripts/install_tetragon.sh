@@ -8,6 +8,7 @@ if [ -f "$TETRAGON_FILE" ]; then
     echo "$TETRAGON_FILE exists."
 else
     curl -L https://github.com/cilium/tetragon/releases/download/v1.1.0/tetragon-v1.1.0-amd64.tar.gz -o "$TETRAGON_FILE"
+    echo "e00fd8050869910b8a3ddd75c333eda67ca71d891b0d5e2b1516de3052628e07 $TETRAGON_FILE" | sha256sum --check
 fi
 tar -xvf "$TETRAGON_FILE" -C /tmp
 
