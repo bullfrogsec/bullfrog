@@ -30,12 +30,15 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - name: Install deps
         run: sudo apt-get install libnetfilter-queue-dev
+
       - name: Build
         run: |
           make bootstrap
           make build
+
       - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: build-artifacts
@@ -53,11 +56,14 @@ jobs:
           egress-policy: block
           allowed-domains: |
             *.github.com
+
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
+
       - name: Check if dist has changed for the action/dist folder
         run: |
           git diff --exit-code --quiet action/dist || (echo "action/dist has changed, please commit the changes" && exit 1)
@@ -70,6 +76,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
@@ -98,6 +105,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
@@ -133,6 +141,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
@@ -162,6 +171,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
@@ -222,16 +232,20 @@ jobs:
     steps:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@v0
+
         with:
           # TODO: set to block once we confirm the domains required for the release process
           egress-policy: audit
           allowed-domains: |
             uploads.github.com
+
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
         with:
           name: build-artifacts
+
       - uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f
         if: github.event_name == 'push'
         id: release
@@ -239,6 +253,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.BULLFROG_BOT_PAT }}
+
       - name: Upload Release Artifact
         if: ${{ steps.release.outputs.release_created }}
         env:
@@ -284,8 +299,10 @@ jobs:
         with:
           # TODO: set to block once we confirm the domains required for the release process
           egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
       - name: Promote to a release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

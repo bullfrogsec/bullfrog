@@ -16,8 +16,10 @@ jobs:
         uses: bullfrogsec/bullfrog@v0
         with:
           egress-policy: block
+
       - name: PR Conventional Commit Validation
         uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5
+
         with:
           task_types: '["feat","fix","docs","test","ci","refactor","perf","chore","revert"]'
           add_label: "true"
