@@ -7,7 +7,12 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 
 # install curl and other dependencies
-apt-get install -y curl software-properties-common apt-utils jq golang
+apt-get install -y curl software-properties-common apt-utils jq make net-tools libnetfilter-queue-dev
+
+# install golang 1.22.4
+curl -OL https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/vagrant/.bashrc
 
 # install Node.js 20.x
 curl -sL https://deb.nodesource.com/setup_20.x | bash -

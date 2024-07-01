@@ -210,6 +210,61 @@ func setAgentIsReady() {
 	fmt.Fprintf(f, "%d\n", time.Now().Unix())
 }
 
+func getDNSServer() (string, error) {
+	networkInterface, err := exec.Command("sh", "-c", "ip route | grep default | awk '{print $5}'").Output()
+    if err != nil {
+        fmt.Printf("Error getting default network interface: %s\n", err)
+        return "", err
+    }
+	// remove new line of networkInterface
+	networkInterface = networkInterface[:len(networkInterface)-1]
+	fmt.Printf("Network interface: %s\n", networkInterface)
+
+	cmd := fmt.Sprintf("resolvectl status %s | grep 'DNS Servers' | awk '{print $3}'", networkInterface)
+	fmt.Printf("cmd: %s\n", cmd)
+
+	dnsServer, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		fmt.Println("Error getting DNS server: ", err)
+		return "", err
+	}
+	// remove new line of dnsServer
+	dnsServer = dnsServer[:len(dnsServer)-1]
+	return string(dnsServer), nil
+}
+
+func loadAllowedDNSServers(allowedDNSServers map[string]bool) error {
+	dnsServer, err := getDNSServer()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("DNS Server: %s\n", dnsServer)
+	allowedDNSServers[dnsServer] = true
+
+	// trust systemd-resolved by default
+	allowedDNSServers["127.0.0.53"] = true
+	return nil
+}
+
+func getDestinationIP(packet *netfilter.NFPacket) (string, error) {
+	ipLayer := packet.Packet.Layer(layers.LayerTypeIPv4)
+	if ipLayer == nil {
+		ipLayer = packet.Packet.Layer(layers.LayerTypeIPv6)
+	}
+	if ipLayer == nil {
+		return "", fmt.Errorf("Failed to get IP layer")
+	}
+	ip, _ := ipLayer.(*layers.IPv4)
+	if ip == nil {
+		ip6, _ := ipLayer.(*layers.IPv6)
+		if ip6 == nil {
+			return "", fmt.Errorf("Failed to get IP layer")
+		}
+		return ip6.DstIP.String(), nil
+	}
+	return ip.DstIP.String(), nil
+}
+
 func main() {
 	// set the mode (audit or block) based on the program argument
 	blockDNS := false
@@ -235,6 +290,7 @@ func main() {
 
 	allowedDomains := make(map[string]bool)
 	allowedIps := make(map[string]bool)
+	allowedDNSServers := make(map[string]bool)
 	allowedCIDR := []*net.IPNet{}
 
 	err := loadAllowedIp("allowed_ips.txt", allowedIps, &allowedCIDR)
@@ -245,6 +301,11 @@ func main() {
 	err = loadAllowedDomain("allowed_domains.txt", allowedDomains)
 	if err != nil {
 		log.Fatalf("Loading domain allowlist: %v", err)
+	}
+
+	err = loadAllowedDNSServers(allowedDNSServers)
+	if err != nil {
+		log.Fatalf("Loading DNS servers allowlist: %v", err)
 	}
 
 	err = addToNftables(allowedIps, allowedCIDR)
@@ -275,23 +336,42 @@ func main() {
 			for _, q := range dns.Questions {
 			        fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 			}
+			// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 			if blockDNS && !dns.QR {
 				for _, q := range dns.Questions {
 					if q.Type == layers.DNSTypeA || q.Type == layers.DNSTypeCNAME {
 						domain := string(q.Name)
 						fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 						fmt.Print(domain)
+
+						// making sure the DNS query is using a trusted DNS server
+						destinationIP, err := getDestinationIP(&p)
+						if err != nil {
+							fmt.Println("Failed to get destination IP")
+							addIpToLogs("blocked", domain, "unknown")
+							p.SetVerdict(netfilter.Verdict(netfilter.NF_DROP))
+							continue
+						}
+						if !allowedDNSServers[destinationIP] {
+							fmt.Printf("-> Blocked DNS Query. Untrusted DNS server %s\n", destinationIP)
+							addIpToLogs("blocked", domain, "unknown")
+							p.SetVerdict(netfilter.Verdict(netfilter.NF_DROP))
+							continue
+						}
+
 						if isDomainAllowed(domain, allowedDomains) {
 							fmt.Println("-> Allowed DNS Query")
 							p.SetVerdict(netfilter.Verdict(netfilter.NF_ACCEPT))
-						} else {
-							fmt.Println("-> Blocked DNS Query")
-							addIpToLogs("blocked", domain, "unknown")
-							p.SetVerdict(netfilter.Verdict(netfilter.NF_DROP))
-						}
+							continue
+						} 
+						fmt.Println("-> Blocked DNS Query")
+						addIpToLogs("blocked", domain, "unknown")
+						p.SetVerdict(netfilter.Verdict(netfilter.NF_DROP))
+						continue
 					}
 				}
 			}
+			// interface DNS responses so we can allow IPs from allowed domains
 			for _, a := range dns.Answers {
 				if a.Type == layers.DNSTypeA {
 					fmt.Printf("DNS Answer: %s %s %s\n", a.Name, a.Type, a.IP)
