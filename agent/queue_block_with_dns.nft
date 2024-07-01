@@ -12,8 +12,8 @@ insert rule ip filter DOCKER-USER iifname "docker0" ip daddr @allowed_ips counte
 
 # Match DNS request (dest port 53) and enqueue to userspace
 # Block DNS queries for unallowed domains, preventing DNS exfiltration
-insert rule ip filter DOCKER-USER iifname "docker0" udp dport 53 counter queue num 0
-insert rule ip filter DOCKER-USER iifname "docker0" tcp dport 53 counter queue num 0
+insert rule ip filter DOCKER-USER iifname "docker0" ip daddr 127.0.0.53 udp dport 53 counter queue num 0
+insert rule ip filter DOCKER-USER iifname "docker0" ip daddr 127.0.0.53 tcp dport 53 counter queue num 0
 
 # Match DNS responses (source port 53) and enqueue to userspace
 insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0
@@ -41,8 +41,8 @@ table inet filter {
 
         # Match DNS request (dest port 53) and enqueue to userspace
         # Block DNS queries for unallowed domains, preventing DNS exfiltration
-        udp dport 53 queue num 0
-        tcp dport 53 queue num 0
+        ip daddr 127.0.0.53 udp dport 53 queue num 0
+        ip daddr 127.0.0.53 tcp dport 53 queue num 0
 
         # TODO: get rid of this
         # Allow established and related traffic
@@ -52,3 +52,4 @@ table inet filter {
         ip daddr @allowed_ips accept
     }
 }
+ 
