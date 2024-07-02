@@ -312,7 +312,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit ${{ needs.pre-release.outputs.tag_name }} --prerelease=false
+          gh release edit ${{ needs.pre-release.outputs.tag_name }} --prerelease=false --latest
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
