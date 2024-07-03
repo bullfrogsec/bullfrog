@@ -32,16 +32,16 @@ async function printAnnotations({
       const time = data.ts.toISOString();
       if (data.domain === "unknown") {
         annotations.push(
-          `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``
+          `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``,
         );
         return;
       } else if (data.destIp === "unknown") {
         annotations.push(
-          `[${time}] ${result} DNS request to ${data.domain} from unknown process`
+          `[${time}] ${result} DNS request to ${data.domain} from unknown process`,
         );
       } else {
         annotations.push(
-          `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``
+          `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``,
         );
       }
     });
@@ -141,7 +141,7 @@ async function getCorrelateData({
   const correlatedData: CorrelatedData[] = [];
   for (const connection of connections) {
     let decision = decisions.find(
-      (d) => connection.destIp === d.destIp && d.domain !== "unknown"
+      (d) => connection.destIp === d.destIp && d.domain !== "unknown",
     );
     if (!decision) {
       decision = decisions.find((d) => connection.destIp === d.destIp);
@@ -187,7 +187,7 @@ async function printAgentLogs({
   }
 }
 
-async function _main() {
+async function main() {
   const { logDirectory } = parseInputs();
   const connectLogFilepath = path.join(logDirectory, CONNECT_LOG_FILENAME);
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
@@ -196,15 +196,8 @@ async function _main() {
   await printAgentLogs({ agentLogFilepath });
 }
 
-async function main() {
-  try {
-    await _main();
-  } catch (error: any) {
-    console.error(error);
-    core.setFailed(error);
-    process.exit(1);
-  }
-}
-
-// Main has a global try catch, it should never throw
-main();
+main().catch((error) => {
+  console.error(error);
+  core.setFailed(error);
+  process.exit(1);
+});

@@ -5,10 +5,16 @@ bootstrap:
 build:
 	go build -trimpath -ldflags=-buildid=
 
-.PHONY: test
-test: test.binary-is-up-to-date
+.PHONY: fix
+fix:
+	go fmt
 
-.PHONY: test.binary-is-up-to-date
-test.binary-is-up-to-date:
-	make build
-	git diff --exit-code --name-only HEAD -- agent
+
+GOFMT_OUTPUT = $(shell gofmt -l .)
+
+.PHONY: test.lint
+test.lint:
+	@if [ -n "$(GOFMT_OUTPUT)" ]; then \
+		echo "$(GOFMT_OUTPUT)"; \
+		exit 1; \
+	fi

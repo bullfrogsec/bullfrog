@@ -19151,7 +19151,7 @@ async function startAgent({
   }
   console.timeEnd("Agent startup time");
 }
-async function _main() {
+async function main() {
   const {
     allowedDomains,
     allowedIps,
@@ -19194,16 +19194,11 @@ async function _main() {
     agentPath
   });
 }
-async function main() {
-  try {
-    await _main();
-  } catch (error) {
-    console.error(error);
-    core3.setFailed(error);
-    process.exit(1);
-  }
-}
-main();
+main().catch((error) => {
+  console.error(error);
+  core3.setFailed(error);
+  process.exit(1);
+});
 /*! Bundled license information:
 
 undici/lib/fetch/body.js:

@@ -8,3 +8,11 @@ bootstrap:
 build:
 	npx esbuild src/main.ts $(ESBUILD_ARGS)
 	npx esbuild src/post.ts $(ESBUILD_ARGS)
+
+.PHONY: fix
+fix:
+	npx eslint --fix .
+
+.PHONY: test.lint
+test.lint:
+	npx eslint .

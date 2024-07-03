@@ -5,7 +5,7 @@ import { setTimeout } from "node:timers/promises";
 export async function waitForFile(
   filePath: string,
   timeout = 15000,
-  interval = 500
+  interval = 500,
 ) {
   const startTime = Date.now();
 
