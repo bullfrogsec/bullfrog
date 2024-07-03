@@ -1,4 +1,4 @@
-ESBUILD_ARGS := --bundle --platform=node --sourcemap --target=node20 --outdir=dist
+ESBUILD_ARGS := --bundle --packages=bundle --platform=node --sourcemap --target=node20 --outdir=dist
 
 .PHONY: bootstrap
 bootstrap:
