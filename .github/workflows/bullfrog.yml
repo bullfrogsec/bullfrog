@@ -89,7 +89,7 @@ jobs:
         with:
           allowed-domains: |
             *.google.com
-          local-agent-path: agent/agent
+          _local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: |
@@ -120,7 +120,7 @@ jobs:
           allowed-domains: |
             *.google.com
           egress-policy: block
-          local-agent-path: agent/agent
+          _local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -148,7 +148,7 @@ jobs:
             *.google.com
           dns-policy: any
           egress-policy: block
-          local-agent-path: agent/agent
+          _local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -182,7 +182,7 @@ jobs:
             *.docker.io
             www.google.com
           egress-policy: block
-          local-agent-path: agent/agent
+          _local-agent-path: agent/agent
 
       - name: Test curl calls within Docker
         run: |
