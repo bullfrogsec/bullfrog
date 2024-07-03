@@ -8,8 +8,3 @@ bootstrap:
 build:
 	npx esbuild src/main.ts $(ESBUILD_ARGS)
 	npx esbuild src/post.ts $(ESBUILD_ARGS)
-
-# Example how to run post. I'm not sure how you ran it locally
-.PHONY: post.run
-post.run:
-	NODE_OPTIONS=--enable-source-maps npx node dist/post.js

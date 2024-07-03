@@ -22,3 +22,14 @@ build.action:
 .PHONY: build.agent
 build.agent:
 	cd $(AGENT_DIRECTORY) && make build
+
+.PHONY: test.integration
+test.integration: test.integration.block
+
+.PHONY: test.integration.block
+test.integration.block:
+	vagrant ssh --command "bash /vagrant/test/block.sh"
+
+.PHONY: vagrant.up
+vagrant.up:
+	vagrant up
