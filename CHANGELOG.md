@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/bullfrogsec/bullfrog/compare/v0.5.5...v0.6.0) (2024-07-03)
+
+
+### Features
+
+* Prefix internal inputs with an underscore ([#49](https://github.com/bullfrogsec/bullfrog/issues/49)) ([c0f4e59](https://github.com/bullfrogsec/bullfrog/commit/c0f4e59dcab9ac92154f5e4c9a097fb1553af557))
+
 ## [0.5.5](https://github.com/bullfrogsec/bullfrog/compare/v0.5.4...v0.5.5) (2024-07-01)
 
 
