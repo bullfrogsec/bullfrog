@@ -24,7 +24,7 @@ function installPackages() {
   const { status } = spawnSync(
     "sudo",
     ["apt-get", "install", "-y", "libnetfilter-queue-dev", "nftables"],
-    { stdio: "inherit" }
+    { stdio: "inherit" },
   );
 
   if (status !== 0) {
@@ -43,7 +43,7 @@ function installTetragon({ actionDirectory }: { actionDirectory: string }) {
       env: {
         TETRAGON_POLICIES_DIRECTORY: path.join(actionDirectory, "tetragon"),
       },
-    }
+    },
   );
 
   if (status !== 0) {
@@ -80,7 +80,7 @@ async function startTetragon({
       shell: true,
       stdio: ["ignore", connectOut, "ignore"],
       detached: true,
-    }
+    },
   ).unref();
 }
 
@@ -109,7 +109,7 @@ async function downloadAgent({
       `v${version}`,
       agentDownloadBaseURL,
     ],
-    { stdio: "inherit" }
+    { stdio: "inherit" },
   );
 
   if (status !== 0) {
@@ -138,7 +138,7 @@ async function startAgent({
 
   if (blockingMode && dnsPolicy === ALLOWED_DOMAINS_ONLY) {
     await exec(
-      `sudo nft -f ${path.join(agentDirectory, "queue_block_with_dns.nft")}`
+      `sudo nft -f ${path.join(agentDirectory, "queue_block_with_dns.nft")}`,
     );
     console.log("loaded blocking rules (with DNS)");
   } else if (blockingMode) {
@@ -162,7 +162,7 @@ async function startAgent({
     {
       stdio: ["ignore", agentOut, agentOut],
       detached: true,
-    }
+    },
   ).unref();
 
   const agentReady = await waitForFile(AGENT_READY_PATH);
@@ -172,7 +172,7 @@ async function startAgent({
   console.timeEnd("Agent startup time");
 }
 
-async function _main() {
+async function main() {
   const {
     allowedDomains,
     allowedIps,
@@ -186,6 +186,7 @@ async function _main() {
   const actionDirectory = path.join(__dirname, "..");
 
   const agentDirectory = path.join(actionDirectory, "..", "agent");
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const pkg = require(`${actionDirectory}/../package.json`);
 
   await fs.mkdir(logDirectory, { recursive: true });
@@ -223,15 +224,8 @@ async function _main() {
   });
 }
 
-async function main() {
-  try {
-    await _main();
-  } catch (error: any) {
-    console.error(error);
-    core.setFailed(error);
-    process.exit(1);
-  }
-}
-
-// Main has a global try catch, it should never throw
-main();
+main().catch((error) => {
+  console.error(error);
+  core.setFailed(error);
+  process.exit(1);
+});

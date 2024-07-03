@@ -30,6 +30,17 @@ test.integration: test.integration.block
 test.integration.block:
 	vagrant ssh --command "bash /vagrant/test/block.sh"
 
+.PHONY: test.lint
+test.lint: test.lint.action test.lint.agent
+
+.PHONY: test.lint.action
+test.lint.action:
+	cd $(ACTION_DIRECTORY) && make test.lint
+
+.PHONY: test.lint.agent
+test.lint.agent:
+	cd $(AGENT_DIRECTORY) && make test.lint
+
 .PHONY: vagrant.up
 vagrant.up:
 	vagrant up

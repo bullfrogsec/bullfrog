@@ -19153,23 +19153,18 @@ async function printAgentLogs({
     console.error("Error reading log file", error);
   }
 }
-async function _main() {
+async function main() {
   const { logDirectory } = parseInputs();
   const connectLogFilepath = import_node_path.default.join(logDirectory, CONNECT_LOG_FILENAME);
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   await printAnnotations({ connectLogFilepath });
   await printAgentLogs({ agentLogFilepath });
 }
-async function main() {
-  try {
-    await _main();
-  } catch (error) {
-    console.error(error);
-    core2.setFailed(error);
-    process.exit(1);
-  }
-}
-main();
+main().catch((error) => {
+  console.error(error);
+  core2.setFailed(error);
+  process.exit(1);
+});
 /*! Bundled license information:
 
 undici/lib/fetch/body.js:

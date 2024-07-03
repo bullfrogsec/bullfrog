@@ -212,10 +212,10 @@ func setAgentIsReady() {
 
 func getDNSServer() (string, error) {
 	networkInterface, err := exec.Command("sh", "-c", "ip route | grep default | awk '{print $5}'").Output()
-    if err != nil {
-        fmt.Printf("Error getting default network interface: %s\n", err)
-        return "", err
-    }
+	if err != nil {
+		fmt.Printf("Error getting default network interface: %s\n", err)
+		return "", err
+	}
 	// remove new line of networkInterface
 	networkInterface = networkInterface[:len(networkInterface)-1]
 	fmt.Printf("Network interface: %s\n", networkInterface)
@@ -334,7 +334,7 @@ func main() {
 			fmt.Println("DNS OpCode: ", dns.OpCode)
 			fmt.Println("DNS ResponseCode: ", dns.ResponseCode)
 			for _, q := range dns.Questions {
-			        fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
+				fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 			}
 			// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 			if blockDNS && !dns.QR {
@@ -363,7 +363,7 @@ func main() {
 							fmt.Println("-> Allowed DNS Query")
 							p.SetVerdict(netfilter.Verdict(netfilter.NF_ACCEPT))
 							continue
-						} 
+						}
 						fmt.Println("-> Blocked DNS Query")
 						addIpToLogs("blocked", domain, "unknown")
 						p.SetVerdict(netfilter.Verdict(netfilter.NF_DROP))
@@ -400,7 +400,7 @@ func main() {
 							fmt.Println("-> Unallowed request")
 						}
 					}
-				} else if a.Type == layers.DNSTypeCNAME {	// dynamically add cname records to the allowlist
+				} else if a.Type == layers.DNSTypeCNAME { // dynamically add cname records to the allowlist
 					cnameDomain := string(a.CNAME)
 					fmt.Printf("DNS Answer: %s %s %s\n", a.Name, a.Type, cnameDomain)
 					fmt.Printf("%s:%s", a.Name, cnameDomain)
@@ -411,7 +411,7 @@ func main() {
 							fmt.Printf("Adding %s to the allowed domains list\n", cnameDomain)
 							allowedDomains[cnameDomain] = true
 						}
-					} 
+					}
 				}
 			}
 		}

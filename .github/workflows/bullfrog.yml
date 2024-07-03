@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
 
     steps:
       - name: Enable egress filtering
@@ -47,8 +48,10 @@ jobs:
             action/dist
 
   check-dist-diff:
-    runs-on: ubuntu-22.04
     needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+
     steps:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@v0
@@ -71,7 +74,7 @@ jobs:
   test-audit:
     needs: build
     runs-on: ubuntu-22.04
-    timeout-minutes: 2
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -96,11 +99,12 @@ jobs:
   test-block:
     needs: build
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
-    timeout-minutes: 3
 
     steps:
       - name: Checkout
@@ -127,7 +131,7 @@ jobs:
   test-block-but-allow-any-dns-requests:
     needs: build
     runs-on: ubuntu-22.04
-    timeout-minutes: 2
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -157,7 +161,7 @@ jobs:
   test-docker:
     needs: build
     runs-on: ubuntu-22.04
-    timeout-minutes: 2
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -203,7 +207,7 @@ jobs:
   test-integration:
     needs: build
     runs-on: ubuntu-22.04
-    timeout-minutes: 8
+    timeout-minutes: 10
 
     steps:
       - name: Enable egress filtering
@@ -241,6 +245,29 @@ jobs:
       - name: Run Tests
         run: make test.integration
 
+  test-lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Enable egress filtering
+        uses: bullfrogsec/bullfrog@v0
+        with:
+          egress-policy: block
+          allowed-domains: |
+            registry.npmjs.org
+
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
+      - name: Bootstrap
+        run: |
+          make bootstrap
+
+      - name: Lint
+        run: |
+          make test.lint
+
   pre-release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
@@ -256,6 +283,7 @@ jobs:
         test-block-but-allow-any-dns-requests,
         test-docker,
         test-integration,
+        test-lint,
       ]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
