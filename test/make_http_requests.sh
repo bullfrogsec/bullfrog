@@ -10,7 +10,7 @@ if timeout 5 curl https://www.bing.com --output /dev/null; then
   exit 1;
 fi;
 
-if docker pull alpine:3.14; then
+if timeout 5 docker pull alpine:3.14; then
   echo "Expected docker pull to fail, but it succeeded"
   exit 1;
 fi

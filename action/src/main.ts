@@ -184,6 +184,7 @@ async function _main() {
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
+
   const agentDirectory = path.join(actionDirectory, "..", "agent");
   const pkg = require(`${actionDirectory}/../package.json`);
 

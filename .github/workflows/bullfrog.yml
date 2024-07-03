@@ -122,21 +122,7 @@ jobs:
         run: source test/make_http_requests.sh
 
       - name: Make DNS requests
-        run: |
-          if timeout 5 dig example.com; then
-            echo 'Expected 'dig example.com' to fail, but it succeeded';
-            exit 1;
-          fi;
-
-          if timeout 5 dig www.wikipedia.org; then
-            echo 'Expected 'dig www.wikipedia.org' to fail, but it succeeded';
-            exit 1;
-          fi;
-
-          if timeout 5 dig @8.8.8.8 www.google.com; then
-            echo 'Expected 'dig @8.8.8.8 www.google.com' to fail, but it succeeded';
-            exit 1;
-          fi;
+        run: source test/make_dns_requests.sh
 
   test-block-but-allow-any-dns-requests:
     needs: build
@@ -214,6 +200,47 @@ jobs:
       - name: Nginx with port forwarding
         run: source test/docker_nginx_port_forwarding.sh
 
+  test-integration:
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Enable egress filtering
+        uses: bullfrogsec/bullfrog@v0
+        with:
+          egress-policy: block
+          allowed-domains: |
+            *.canonical.com
+            *.github.com
+            *.ubuntu.com
+            archivist.vagrantup.com
+            deb.nodesource.com
+            dl.google.com
+            download.docker.com
+            go.dev
+            objects.githubusercontent.com
+            vagrantcloud-files-production.s3-accelerate.amazonaws.com
+            vagrantcloud.com
+            www.google.com
+
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
+      - uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e
+        with:
+          name: build-artifacts
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get install --yes vagrant virtualbox
+
+      - name: Start VM
+        run: make vagrant.up
+
+      - name: Run Tests
+        run: make test.integration
+
   pre-release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
@@ -228,6 +255,7 @@ jobs:
         test-block,
         test-block-but-allow-any-dns-requests,
         test-docker,
+        test-integration,
       ]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
