@@ -19064,27 +19064,29 @@ async function startTetragon({
   connectLogFilepath,
   tetragonLogFilepath
 }) {
-  const out = (await import_promises3.default.open(tetragonLogFilepath, "a")).fd;
+  const out = await import_promises3.default.open(tetragonLogFilepath, "a");
   core3.debug("Starting Tetragon");
   console.time("Tetragon startup time");
   (0, import_node_child_process.spawn)("sudo", ["tetragon"], {
-    stdio: ["ignore", out, out],
+    stdio: ["ignore", out.fd, out.fd],
     detached: true
   }).unref();
+  await out.close();
   const tetragonReady = await waitForFile(TETRAGON_EVENTS_LOG_PATH);
   if (!tetragonReady) {
     throw new Error("Tetragon could not start");
   }
   console.timeEnd("Tetragon startup time");
-  const connectOut = (await import_promises3.default.open(connectLogFilepath, "a")).fd;
+  const connectOut = await import_promises3.default.open(connectLogFilepath, "a");
   (0, import_node_child_process.spawn)(
     `sudo tail -n +1 -F ${TETRAGON_EVENTS_LOG_PATH} | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
     {
       shell: true,
-      stdio: ["ignore", connectOut, "ignore"],
+      stdio: ["ignore", connectOut.fd, "ignore"],
       detached: true
     }
   ).unref();
+  await connectOut.close();
 }
 async function downloadAgent({
   actionDirectory,
@@ -19133,7 +19135,7 @@ async function startAgent({
     await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_audit.nft")}`);
     console.log("loaded audit rules");
   }
-  const agentOut = (await import_promises3.default.open(agentLogFilepath, "a")).fd;
+  const agentOut = await import_promises3.default.open(agentLogFilepath, "a");
   console.log(`Starting agent from ${agentPath}`);
   console.time("Agent startup time");
   await exec(`sudo chmod +x ${agentPath}`);
@@ -19141,10 +19143,11 @@ async function startAgent({
     "sudo",
     [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
     {
-      stdio: ["ignore", agentOut, agentOut],
+      stdio: ["ignore", agentOut.fd, agentOut.fd],
       detached: true
     }
   ).unref();
+  await agentOut.close();
   const agentReady = await waitForFile(AGENT_READY_PATH);
   if (!agentReady) {
     throw new Error("Agent could not start");

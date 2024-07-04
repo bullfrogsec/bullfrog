@@ -58,14 +58,17 @@ async function startTetragon({
   connectLogFilepath: string;
   tetragonLogFilepath: string;
 }) {
-  const out = (await fs.open(tetragonLogFilepath, "a")).fd;
+  const out = await fs.open(tetragonLogFilepath, "a");
 
   core.debug("Starting Tetragon");
   console.time("Tetragon startup time");
+
   spawn("sudo", ["tetragon"], {
-    stdio: ["ignore", out, out],
+    stdio: ["ignore", out.fd, out.fd],
     detached: true,
   }).unref();
+
+  await out.close();
 
   const tetragonReady = await waitForFile(TETRAGON_EVENTS_LOG_PATH);
   if (!tetragonReady) {
@@ -73,15 +76,18 @@ async function startTetragon({
   }
   console.timeEnd("Tetragon startup time");
 
-  const connectOut = (await fs.open(connectLogFilepath, "a")).fd;
+  const connectOut = await fs.open(connectLogFilepath, "a");
+
   spawn(
     `sudo tail -n +1 -F ${TETRAGON_EVENTS_LOG_PATH} | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
     {
       shell: true,
-      stdio: ["ignore", connectOut, "ignore"],
+      stdio: ["ignore", connectOut.fd, "ignore"],
       detached: true,
     },
   ).unref();
+
+  await connectOut.close();
 }
 
 async function downloadAgent({
@@ -149,7 +155,7 @@ async function startAgent({
     console.log("loaded audit rules");
   }
 
-  const agentOut = (await fs.open(agentLogFilepath, "a")).fd;
+  const agentOut = await fs.open(agentLogFilepath, "a");
   console.log(`Starting agent from ${agentPath}`);
   console.time("Agent startup time");
 
@@ -160,10 +166,12 @@ async function startAgent({
     "sudo",
     [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
     {
-      stdio: ["ignore", agentOut, agentOut],
+      stdio: ["ignore", agentOut.fd, agentOut.fd],
       detached: true,
     },
   ).unref();
+
+  await agentOut.close();
 
   const agentReady = await waitForFile(AGENT_READY_PATH);
   if (!agentReady) {

@@ -12,7 +12,7 @@ else
 fi
 tar -xf "$TETRAGON_FILE" -C /tmp
 
-sudo cp -vRf /tmp/tetragon-v1.1.0-amd64/usr/local/* /usr/local/
+sudo cp -rf /tmp/tetragon-v1.1.0-amd64/usr/local/* /usr/local/
 sudo rm -rf /tmp/tetragon-v1.1.0-amd64
 sudo install -d /etc/tetragon/tetragon.conf.d/
 sudo install -d /etc/tetragon/tetragon.tp.d/
