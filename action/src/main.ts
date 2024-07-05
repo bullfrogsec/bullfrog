@@ -5,16 +5,14 @@ import { exec as execCb, spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import {
   AGENT_LOG_FILENAME,
-  CONNECT_LOG_FILENAME,
   TETRAGON_LOG_FILENAME,
   BLOCK,
   ALLOWED_DOMAINS_ONLY,
   AGENT_INSTALL_PATH,
-  TETRAGON_EVENTS_LOG_PATH,
   AGENT_READY_PATH,
 } from "./constants";
 import { parseInputs, EgressPolicy, DnsPolicy } from "./inputs";
-import { waitForFile } from "./util";
+import { waitForFile, waitForStringInFile } from "./util";
 
 const exec = util.promisify(execCb);
 
@@ -52,10 +50,8 @@ function installTetragon({ actionDirectory }: { actionDirectory: string }) {
 }
 
 async function startTetragon({
-  connectLogFilepath,
   tetragonLogFilepath,
 }: {
-  connectLogFilepath: string;
   tetragonLogFilepath: string;
 }) {
   const out = await fs.open(tetragonLogFilepath, "a");
@@ -63,31 +59,32 @@ async function startTetragon({
   core.debug("Starting Tetragon");
   console.time("Tetragon startup time");
 
-  spawn("sudo", ["tetragon"], {
-    stdio: ["ignore", out.fd, out.fd],
-    detached: true,
-  }).unref();
-
-  await out.close();
-
-  const tetragonReady = await waitForFile(TETRAGON_EVENTS_LOG_PATH);
-  if (!tetragonReady) {
-    throw new Error("Tetragon could not start");
-  }
-  console.timeEnd("Tetragon startup time");
-
-  const connectOut = await fs.open(connectLogFilepath, "a");
-
   spawn(
-    `sudo tail -n +1 -F ${TETRAGON_EVENTS_LOG_PATH} | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
+    "sudo",
+    [
+      "tetragon",
+      "--export-file-max-size-mb",
+      "1000",
+      "--export-file-perm",
+      "644",
+      "--export-allowlist",
+      '{"event_set": ["PROCESS_KPROBE"], "policy_names": ["connect"]}',
+    ],
     {
-      shell: true,
-      stdio: ["ignore", connectOut.fd, "ignore"],
+      stdio: ["ignore", out.fd, out.fd],
       detached: true,
     },
   ).unref();
 
-  await connectOut.close();
+  await out.close();
+
+  await waitForStringInFile({
+    filePath: tetragonLogFilepath,
+    str: "Listening for events...",
+    timeoutMs: 15_000,
+  });
+
+  console.timeEnd("Tetragon startup time");
 }
 
 async function downloadAgent({
@@ -208,13 +205,11 @@ async function main() {
   }
 
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
-  const connectLogFilepath = path.join(logDirectory, CONNECT_LOG_FILENAME);
   const tetragonLogFilepath = path.join(logDirectory, TETRAGON_LOG_FILENAME);
 
   installPackages();
   installTetragon({ actionDirectory });
   await startTetragon({
-    connectLogFilepath,
     tetragonLogFilepath,
   });
   const agentPath = await downloadAgent({
