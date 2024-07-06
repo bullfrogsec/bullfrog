@@ -6,7 +6,7 @@ export DEBIAN_FRONTEND=noninteractive
 # update package list
 apt-get update
 
-apt-get install --yes jq make net-tools libnetfilter-queue-dev
+apt-get install --yes jq make gcc net-tools libnetfilter-queue-dev
 
 # https://askubuntu.com/questions/1367139/apt-get-upgrade-auto-restart-services
 apt-get remove --yes needrestart
@@ -37,5 +37,4 @@ echo \
 apt-get update
 apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-groupadd docker
 usermod -aG docker vagrant
