@@ -18976,9 +18976,7 @@ var import_node_path = __toESM(require("node:path"));
 
 // src/constants.ts
 var AGENT_LOG_FILENAME = "agent.log";
-var CONNECT_LOG_FILENAME = "connect.log";
 var TETRAGON_LOG_FILENAME = "tetragon.log";
-var TETRAGON_EVENTS_LOG_PATH = "/var/log/tetragon/tetragon.log";
 var AGENT_INSTALL_PATH = "/opt/bullfrog/agent";
 var AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";
 var AUDIT = "audit";
@@ -19030,6 +19028,25 @@ async function waitForFile(filePath, timeout = 15e3, interval = 500) {
   core2.debug(`Timeout: File ${filePath} is not available.`);
   return false;
 }
+async function waitForStringInFile({
+  filePath,
+  str,
+  timeoutMs
+}) {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeoutMs) {
+    let content = "";
+    try {
+      content = await import_promises.default.readFile(filePath, { encoding: "utf-8" });
+    } catch (err) {
+    }
+    if (content.includes(str)) {
+      return;
+    }
+    await (0, import_promises2.setTimeout)(500);
+  }
+  throw new Error(`Couldn't find ${str} in file ${filePath}`);
+}
 
 // src/main.ts
 var exec = import_node_util.default.promisify(import_node_child_process.exec);
@@ -19061,32 +19078,34 @@ function installTetragon({ actionDirectory }) {
   }
 }
 async function startTetragon({
-  connectLogFilepath,
   tetragonLogFilepath
 }) {
   const out = await import_promises3.default.open(tetragonLogFilepath, "a");
   core3.debug("Starting Tetragon");
   console.time("Tetragon startup time");
-  (0, import_node_child_process.spawn)("sudo", ["tetragon"], {
-    stdio: ["ignore", out.fd, out.fd],
-    detached: true
-  }).unref();
-  await out.close();
-  const tetragonReady = await waitForFile(TETRAGON_EVENTS_LOG_PATH);
-  if (!tetragonReady) {
-    throw new Error("Tetragon could not start");
-  }
-  console.timeEnd("Tetragon startup time");
-  const connectOut = await import_promises3.default.open(connectLogFilepath, "a");
   (0, import_node_child_process.spawn)(
-    `sudo tail -n +1 -F ${TETRAGON_EVENTS_LOG_PATH} | jq -c --unbuffered 'select(.process_kprobe.policy_name == "connect")'`,
+    "sudo",
+    [
+      "tetragon",
+      "--export-file-max-size-mb",
+      "1000",
+      "--export-file-perm",
+      "644",
+      "--export-allowlist",
+      '{"event_set": ["PROCESS_KPROBE"], "policy_names": ["connect"]}'
+    ],
     {
-      shell: true,
-      stdio: ["ignore", connectOut.fd, "ignore"],
+      stdio: ["ignore", out.fd, out.fd],
       detached: true
     }
   ).unref();
-  await connectOut.close();
+  await out.close();
+  await waitForStringInFile({
+    filePath: tetragonLogFilepath,
+    str: "Listening for events...",
+    timeoutMs: 15e3
+  });
+  console.timeEnd("Tetragon startup time");
 }
 async function downloadAgent({
   actionDirectory,
@@ -19175,12 +19194,10 @@ async function main() {
     await import_promises3.default.writeFile("allowed_ips.txt", allowedIps.join("\n"));
   }
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
-  const connectLogFilepath = import_node_path.default.join(logDirectory, CONNECT_LOG_FILENAME);
   const tetragonLogFilepath = import_node_path.default.join(logDirectory, TETRAGON_LOG_FILENAME);
   installPackages();
   installTetragon({ actionDirectory });
   await startTetragon({
-    connectLogFilepath,
     tetragonLogFilepath
   });
   const agentPath = await downloadAgent({

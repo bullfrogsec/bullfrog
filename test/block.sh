@@ -19,6 +19,7 @@ sudo systemctl restart docker
 sudo rm -f /var/run/bullfrog/agent-ready
 # sudo rm -f /tmp/tetragon.tar.gz
 sudo rm -f $POST_WARNINGS_FILEPATH
+sudo rm -f /var/log/tetragon/tetragon.log
 
 sudo NODE_OPTIONS=--enable-source-maps node \
   --require /vagrant/test/block.env.js \

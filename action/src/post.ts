@@ -1,22 +1,18 @@
 import * as core from "@actions/core";
 import fs from "node:fs/promises";
-import util from "node:util";
-import { exec as execCb } from "node:child_process";
 import { parseInputs } from "./inputs";
 import path from "node:path";
-import { AGENT_LOG_FILENAME, BLOCK, CONNECT_LOG_FILENAME } from "./constants";
-
-const exec = util.promisify(execCb);
+import {
+  AGENT_LOG_FILENAME,
+  BLOCK,
+  TETRAGON_EVENTS_LOG_PATH,
+} from "./constants";
 
 const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
 
-async function printAnnotations({
-  connectLogFilepath,
-}: {
-  connectLogFilepath: string;
-}) {
+async function printAnnotations() {
   try {
-    const correlatedData = await getCorrelateData({ connectLogFilepath });
+    const correlatedData = await getCorrelateData();
     const { egressPolicy } = parseInputs();
     const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
 
@@ -69,22 +65,21 @@ type Decision = {
 
 type CorrelatedData = TetragonLog & Decision;
 
-async function getOutboundConnections({
-  connectLogFilepath,
-}: {
-  connectLogFilepath: string;
-}): Promise<TetragonLog[]> {
+async function getOutboundConnections(): Promise<TetragonLog[]> {
   try {
     const connections: TetragonLog[] = [];
-    // TODO: We shouldn't be using sudo at this point, since we'll probably want to disable sudo early in the action
-    await exec(`sudo chmod 644 ${connectLogFilepath}`);
-    const log = await fs.readFile(connectLogFilepath, "utf8");
-    const lines = log.split("\n");
+
+    const tetragonLogFile = await fs.open(TETRAGON_EVENTS_LOG_PATH);
+
     const functionsToTrack = ["tcp_connect"];
-    for (const line of lines) {
-      if (!line) continue;
-      const processEntry = JSON.parse(line).process_kprobe;
-      if (!processEntry) continue;
+
+    for await (const line of tetragonLogFile.readLines()) {
+      const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
+
+      if (processEntry?.["policy_name"] !== "connect") {
+        continue;
+      }
+
       if (functionsToTrack.includes(processEntry.function_name)) {
         connections.push({
           ts: new Date(processEntry.process.start_time),
@@ -95,6 +90,7 @@ async function getOutboundConnections({
         });
       }
     }
+
     return connections;
   } catch (error) {
     console.error("Error reading log file", error);
@@ -123,27 +119,27 @@ async function getDecisions(): Promise<Decision[]> {
   }
 }
 
-async function getCorrelateData({
-  connectLogFilepath,
-}: {
-  connectLogFilepath: string;
-}): Promise<CorrelatedData[]> {
+async function getCorrelateData(): Promise<CorrelatedData[]> {
   // give some time for the logs to be written
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  const connections = await getOutboundConnections({ connectLogFilepath });
+  const connections = await getOutboundConnections();
+
   core.debug("\n\nConnections:\n");
   connections.forEach((c) => core.debug(JSON.stringify(c)));
 
   const decisions = await getDecisions();
+
   core.debug("\nDecisions:\n");
   decisions.forEach((d) => core.debug(JSON.stringify(d)));
+
   const correlatedData: CorrelatedData[] = [];
+
   for (const connection of connections) {
     let decision = decisions.find(
       (d) => connection.destIp === d.destIp && d.domain !== "unknown",
     );
-    if (!decision) {
+    if (decision === undefined) {
       decision = decisions.find((d) => connection.destIp === d.destIp);
     }
     correlatedData.push({
@@ -156,6 +152,7 @@ async function getCorrelateData({
       args: connection.args,
     });
   }
+
   // Add any decisions that don't have a corresponding connection (blocked DNS queries)
   for (const decision of decisions.filter((d) => d.destIp === "unknown")) {
     correlatedData.push({
@@ -189,10 +186,9 @@ async function printAgentLogs({
 
 async function main() {
   const { logDirectory } = parseInputs();
-  const connectLogFilepath = path.join(logDirectory, CONNECT_LOG_FILENAME);
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
-  await printAnnotations({ connectLogFilepath });
+  await printAnnotations();
   await printAgentLogs({ agentLogFilepath });
 }
 
