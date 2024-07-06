@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/bullfrogsec/bullfrog/compare/v0.6.0...v0.6.1) (2024-07-06)
+
+
+### Bug Fixes
+
+* Close file descriptors ([#52](https://github.com/bullfrogsec/bullfrog/issues/52)) ([13fe985](https://github.com/bullfrogsec/bullfrog/commit/13fe98528ceb3c2eff19a4983d89bc3e61131a82))
+* Simplify Tetragon integration ([#55](https://github.com/bullfrogsec/bullfrog/issues/55)) ([7c3757b](https://github.com/bullfrogsec/bullfrog/commit/7c3757b03e3f98d577adddd7b6b9f2f5b018c73b))
+
 ## [0.6.0](https://github.com/bullfrogsec/bullfrog/compare/v0.5.5...v0.6.0) (2024-07-03)
 
 
