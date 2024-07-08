@@ -16,14 +16,15 @@ import (
 )
 
 var (
-	blocking       = false
-	defaultDomains = []string{"github.com", "api.github.com", "*.actions.githubusercontent.com", "results-receiver.actions.githubusercontent.com", "*.blob.core.windows.net"}
-	defaultIps     = []string{"168.63.129.16", "169.254.169.254", "127.0.0.1"}
+	blocking          = false
+	defaultDomains    = []string{"github.com", "api.github.com", "*.actions.githubusercontent.com", "results-receiver.actions.githubusercontent.com", "*.blob.core.windows.net"}
+	defaultIps        = []string{"168.63.129.16", "169.254.169.254", "127.0.0.1"}
+	defaultDNSServers = []string{"127.0.0.53"}
 )
 
 const (
-	ACCEPT_REQUEST uint16 = 0
-	DROP_REQUEST   uint16 = 1
+	ACCEPT_REQUEST uint8 = 0
+	DROP_REQUEST   uint8 = 1
 )
 
 type Agent struct {
@@ -87,6 +88,7 @@ func (a *Agent) init(egressPolicy string, dnsPolicy string) error {
 	return nil
 }
 
+// TODO: don't use input in files
 func (a *Agent) loadAllowedDomain(filename string) error {
 
 	fmt.Println("loading allowed domains")
@@ -119,6 +121,7 @@ func (a *Agent) loadAllowedDomain(filename string) error {
 	return nil
 }
 
+// TODO: don't use input in files
 func (a *Agent) loadAllowedIp(filename string) error {
 
 	fmt.Println("loading allowed ips")
@@ -168,13 +171,13 @@ func (a *Agent) addToFirewall(ips map[string]bool, cidr []*net.IPNet) error {
 	for ip := range ips {
 		err := a.firewall.AddIp(ip)
 		if err != nil {
-			return fmt.Errorf("Error adding %s to nftables: %v\n", ip, err)
+			return fmt.Errorf("Error adding %s to firewall: %v\n", ip, err)
 		}
 	}
 	for _, c := range cidr {
 		err := a.firewall.AddIp(c.String())
 		if err != nil {
-			return fmt.Errorf("Error adding %s to nftables: %v\n", c.String(), err)
+			return fmt.Errorf("Error adding %s to firewall: %v\n", c.String(), err)
 		}
 	}
 	return nil
@@ -211,6 +214,7 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 	return false
 }
 
+// TODO: move to a separate struct with an interface
 func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
 	a.decisionLogsMutex.Lock()
 	defer a.decisionLogsMutex.Unlock()
@@ -229,21 +233,7 @@ func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
 	fmt.Fprintf(f, "%d|%s|%s|%s\n", time.Now().Unix(), decision, domain, ip)
 }
 
-func (a *Agent) setAgentIsReady() {
-	if _, err := os.Stat("/var/run/bullfrog"); os.IsNotExist(err) {
-		os.Mkdir("/var/run/bullfrog", 0755)
-	}
-
-	f, err := os.OpenFile("/var/run/bullfrog/agent-ready", os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Println("failed to open /var/run/bullfrog/agent-ready")
-		return
-	}
-	defer f.Close()
-
-	fmt.Fprintf(f, "%d\n", time.Now().Unix())
-}
-
+// TODO: move to a separate struct with an interface
 func (a *Agent) getDNSServer() (string, error) {
 	networkInterface, err := exec.Command("sh", "-c", "ip route | grep default | awk '{print $5}'").Output()
 	if err != nil {
@@ -268,6 +258,10 @@ func (a *Agent) getDNSServer() (string, error) {
 }
 
 func (a *Agent) loadAllowedDNSServers() error {
+	for _, dns := range defaultDNSServers {
+		a.allowedDNSServers[dns] = true
+	}
+
 	dnsServer, err := a.getDNSServer()
 	if err != nil {
 		return err
@@ -275,8 +269,6 @@ func (a *Agent) loadAllowedDNSServers() error {
 	fmt.Printf("DNS Server: %s\n", dnsServer)
 	a.allowedDNSServers[dnsServer] = true
 
-	// trust systemd-resolved by default
-	a.allowedDNSServers["127.0.0.53"] = true
 	return nil
 }
 
@@ -299,7 +291,95 @@ func (a *Agent) getDestinationIP(packet gopacket.Packet) (string, error) {
 	return ip.DstIP.String(), nil
 }
 
-func (a *Agent) processPacket(packet gopacket.Packet) uint16 {
+func (a *Agent) processDNSQuery(packet gopacket.Packet) uint8 {
+	dnsLayer := packet.Layer(layers.LayerTypeDNS)
+	dns, _ := dnsLayer.(*layers.DNS)
+	for _, q := range dns.Questions {
+		domain := string(q.Name)
+		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
+		fmt.Print(domain)
+
+		// making sure the DNS query is using a trusted DNS server
+		destinationIP, err := a.getDestinationIP(packet)
+		if err != nil {
+			fmt.Println("Failed to get destination IP")
+			a.addIpToLogs("blocked", domain, "unknown")
+			return DROP_REQUEST
+		}
+		if !a.allowedDNSServers[destinationIP] {
+			fmt.Printf("-> Blocked DNS Query. Untrusted DNS server %s\n", destinationIP)
+			a.addIpToLogs("blocked", domain, "unknown")
+			return DROP_REQUEST
+		}
+
+		if a.isDomainAllowed(domain) {
+			fmt.Println("-> Allowed DNS Query")
+			return ACCEPT_REQUEST
+		}
+		fmt.Println("-> Blocked DNS Query")
+		a.addIpToLogs("blocked", domain, "unknown")
+		return DROP_REQUEST
+	}
+	return DROP_REQUEST
+}
+
+func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourceRecord) {
+	fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
+	fmt.Printf("%s:%s", answer.Name, answer.IP)
+	ip := answer.IP.String()
+	if a.isDomainAllowed(domain) {
+		fmt.Println("-> Allowed request")
+		if !a.allowedIps[ip] {
+			err := a.firewall.AddIp(ip)
+			a.addIpToLogs("allowed", domain, ip)
+			if err != nil {
+				fmt.Printf("failed to add %s to NFT tables", ip)
+			} else {
+				a.allowedIps[ip] = true
+			}
+		}
+	} else if a.isIpAllowed(ip) {
+		fmt.Println("-> Allowed request")
+		a.addIpToLogs("allowed", domain, ip)
+	} else {
+		a.addIpToLogs("blocked", domain, ip)
+		if blocking {
+			fmt.Println("-> Blocked request")
+		} else {
+			fmt.Println("-> Unallowed request")
+		}
+	}
+}
+
+func (a *Agent) processDNSTypeCNAMEResponse(domain string, answer *layers.DNSResourceRecord) {
+	cnameDomain := string(answer.CNAME)
+	fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, cnameDomain)
+	fmt.Printf("%s:%s", answer.Name, cnameDomain)
+	if a.isDomainAllowed(domain) {
+		fmt.Println("-> Allowed request")
+		if !a.allowedDomains[cnameDomain] {
+			fmt.Printf("Adding %s to the allowed domains list\n", cnameDomain)
+			a.allowedDomains[cnameDomain] = true
+		}
+	}
+}
+
+func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
+	dnsLayer := packet.Layer(layers.LayerTypeDNS)
+	dns, _ := dnsLayer.(*layers.DNS)
+	domain := string(dns.Questions[0].Name)
+	for _, answer := range dns.Answers {
+		if answer.Type == layers.DNSTypeA {
+			a.processDNSTypeAResponse(domain, &answer)
+		} else if answer.Type == layers.DNSTypeCNAME {
+			a.processDNSTypeCNAMEResponse(domain, &answer)
+		}
+	}
+	return ACCEPT_REQUEST
+}
+
+// TODO: split this function
+func (a *Agent) processPacket(packet gopacket.Packet) uint8 {
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
 
 		dns, _ := dnsLayer.(*layers.DNS)
@@ -312,79 +392,10 @@ func (a *Agent) processPacket(packet gopacket.Packet) uint16 {
 		}
 		// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 		if a.blockDNS && !dns.QR {
-			for _, q := range dns.Questions {
-				if q.Type == layers.DNSTypeA || q.Type == layers.DNSTypeCNAME {
-					domain := string(q.Name)
-					fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
-					fmt.Print(domain)
-
-					// making sure the DNS query is using a trusted DNS server
-					destinationIP, err := a.getDestinationIP(packet)
-					if err != nil {
-						fmt.Println("Failed to get destination IP")
-						a.addIpToLogs("blocked", domain, "unknown")
-						return DROP_REQUEST
-					}
-					if !a.allowedDNSServers[destinationIP] {
-						fmt.Printf("-> Blocked DNS Query. Untrusted DNS server %s\n", destinationIP)
-						a.addIpToLogs("blocked", domain, "unknown")
-						return DROP_REQUEST
-					}
-
-					if a.isDomainAllowed(domain) {
-						fmt.Println("-> Allowed DNS Query")
-						return ACCEPT_REQUEST
-					}
-					fmt.Println("-> Blocked DNS Query")
-					a.addIpToLogs("blocked", domain, "unknown")
-					return DROP_REQUEST
-				}
-			}
-		}
-		// interface DNS responses so we can allow IPs from allowed domains
-		for _, answer := range dns.Answers {
-			if answer.Type == layers.DNSTypeA {
-				fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
-				fmt.Printf("%s:%s", answer.Name, answer.IP)
-				domain := string(dns.Questions[0].Name)
-				ip := answer.IP.String()
-				if a.isDomainAllowed(domain) {
-					fmt.Println("-> Allowed request")
-					if !a.allowedIps[ip] {
-						err := a.firewall.AddIp(ip)
-						a.addIpToLogs("allowed", domain, ip)
-						if err != nil {
-							fmt.Printf("failed to add %s to NFT tables", ip)
-						} else {
-							a.allowedIps[ip] = true
-						}
-					}
-				} else if a.isIpAllowed(ip) {
-					fmt.Println("-> Allowed request")
-					a.addIpToLogs("allowed", domain, ip)
-				} else {
-					a.addIpToLogs("blocked", domain, ip)
-					if blocking {
-						fmt.Println("-> Blocked request")
-					} else {
-						fmt.Println("-> Unallowed request")
-					}
-				}
-			} else if answer.Type == layers.DNSTypeCNAME { // dynamically add cname records to the allowlist
-				cnameDomain := string(answer.CNAME)
-				fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, cnameDomain)
-				fmt.Printf("%s:%s", answer.Name, cnameDomain)
-				domainQuery := string(dns.Questions[0].Name)
-				if a.isDomainAllowed(domainQuery) {
-					fmt.Println("-> Allowed request")
-					if !a.allowedDomains[cnameDomain] {
-						fmt.Printf("Adding %s to the allowed domains list\n", cnameDomain)
-						a.allowedDomains[cnameDomain] = true
-					}
-				}
-			}
+			return a.processDNSQuery(packet)
+		} else if dns.QR {
+			return a.processDNSResponse(packet)
 		}
 	}
 	return ACCEPT_REQUEST
-
 }
