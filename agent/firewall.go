@@ -12,7 +12,7 @@ type IFirewall interface {
 type NFTFirewall struct {
 }
 
-func (nft NFTFirewall) AddIp(ip string) error {
+func (nft *NFTFirewall) AddIp(ip string) error {
 	if !blocking {
 		return nil
 	}
