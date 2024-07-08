@@ -97,50 +97,22 @@ func loadAllowedIp(filename string, allowedIps map[string]bool, allowedCIDR *[]*
 	return nil
 }
 
-func addToNftables(ips map[string]bool, cidr []*net.IPNet) error {
+func addToFirewall(firewall IFirewall, ips map[string]bool, cidr []*net.IPNet) error {
 	if !blocking {
 		return nil
 	}
 	for ip := range ips {
-		err := addIpToNftables(ip)
+		err := firewall.AddIp(ip)
 		if err != nil {
 			return fmt.Errorf("Error adding %s to nftables: %v\n", ip, err)
 		}
 	}
 	for _, c := range cidr {
-		err := addIpToNftables(c.String())
+		err := firewall.AddIp(c.String())
 		if err != nil {
 			return fmt.Errorf("Error adding %s to nftables: %v\n", c.String(), err)
 		}
 	}
-	return nil
-}
-
-func addIpToNftables(ip string) error {
-	if !blocking {
-		return nil
-	}
-	ip_str := fmt.Sprintf("{ %s }", ip)
-
-	{
-		cmd := exec.Command("nft", "add", "element", "inet", "filter", "allowed_ips", ip_str)
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-		fmt.Printf("nft add element inet filter allowed_ips %s\n", ip)
-	}
-
-	// Docker as well (ip vs inet)
-	{
-		cmd := exec.Command("nft", "add", "element", "ip", "filter", "allowed_ips", ip_str)
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-		fmt.Printf("nft add element ip filter allowed_ips %s\n", ip)
-	}
-
 	return nil
 }
 
@@ -288,6 +260,8 @@ func main() {
 		}
 	}
 
+	nft := NFTFirewall{}
+
 	allowedDomains := make(map[string]bool)
 	allowedIps := make(map[string]bool)
 	allowedDNSServers := make(map[string]bool)
@@ -308,7 +282,7 @@ func main() {
 		log.Fatalf("Loading DNS servers allowlist: %v", err)
 	}
 
-	err = addToNftables(allowedIps, allowedCIDR)
+	err = addToFirewall(nft, allowedIps, allowedCIDR)
 	if err != nil {
 		log.Fatalf("Error adding to nftables: %v", err)
 	}
@@ -381,7 +355,7 @@ func main() {
 					if isDomainAllowed(domain, allowedDomains) {
 						fmt.Println("-> Allowed request")
 						if !allowedIps[ip] {
-							err := addIpToNftables(ip)
+							err := nft.AddIp(ip)
 							addIpToLogs("allowed", domain, ip)
 							if err != nil {
 								fmt.Printf("failed to add %s to NFT tables", ip)
