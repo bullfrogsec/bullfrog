@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"path"
 	"sync"
 	"time"
@@ -27,11 +26,12 @@ const (
 )
 
 type AgentConfig struct {
-	EgressPolicy   string
-	DNSPolicy      string
-	AllowedDomains []string
-	AllowedIPs     []string
-	Firewall       IFirewall
+	EgressPolicy    string
+	DNSPolicy       string
+	AllowedDomains  []string
+	AllowedIPs      []string
+	Firewall        IFirewall
+	NetInfoProvider INetInfoProvider
 }
 
 type Agent struct {
@@ -42,16 +42,17 @@ type Agent struct {
 	allowedCIDR       []*net.IPNet
 	decisionLogsMutex sync.Mutex
 	firewall          IFirewall
+	netInfoProvider   INetInfoProvider
 }
 
 func NewAgent(config AgentConfig) *Agent {
-
 	agent := &Agent{
 		blockDNS:          false,
 		allowedDomains:    make(map[string]bool),
 		allowedIps:        make(map[string]bool),
 		allowedDNSServers: make(map[string]bool),
 		firewall:          config.Firewall,
+		netInfoProvider:   config.NetInfoProvider,
 	}
 	agent.init(config)
 	return agent
@@ -113,7 +114,7 @@ func (a *Agent) loadAllowedIp(ips []string) {
 	mergedIps := append(defaultIps, ips...)
 
 	for _, ip := range mergedIps {
-		if(ip == "") {
+		if ip == "" {
 			continue
 		}
 		fmt.Printf("IP: %s\n", ip)
@@ -122,7 +123,7 @@ func (a *Agent) loadAllowedIp(ips []string) {
 			fmt.Printf("CIDR: %s\n", cidr)
 			a.allowedCIDR = append(a.allowedCIDR, cidr)
 			continue
-		} 
+		}
 
 		netIp := net.ParseIP(ip)
 		if netIp != nil {
@@ -203,41 +204,17 @@ func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
 	fmt.Fprintf(f, "%d|%s|%s|%s\n", time.Now().Unix(), decision, domain, ip)
 }
 
-// TODO: move to a separate struct with an interface
-func (a *Agent) getDNSServer() (string, error) {
-	networkInterface, err := exec.Command("sh", "-c", "ip route | grep default | awk '{print $5}'").Output()
-	if err != nil {
-		fmt.Printf("Error getting default network interface: %s\n", err)
-		return "", err
-	}
-	// remove new line of networkInterface
-	networkInterface = networkInterface[:len(networkInterface)-1]
-	fmt.Printf("Network interface: %s\n", networkInterface)
-
-	cmd := fmt.Sprintf("resolvectl status %s | grep 'DNS Servers' | awk '{print $3}'", networkInterface)
-	fmt.Printf("cmd: %s\n", cmd)
-
-	dnsServer, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		fmt.Println("Error getting DNS server: ", err)
-		return "", err
-	}
-	// remove new line of dnsServer
-	dnsServer = dnsServer[:len(dnsServer)-1]
-	return string(dnsServer), nil
-}
-
 func (a *Agent) loadAllowedDNSServers() error {
-	for _, dns := range defaultDNSServers {
-		a.allowedDNSServers[dns] = true
-	}
 
-	dnsServer, err := a.getDNSServer()
+	dnsServer, err := a.netInfoProvider.GetDNSServer()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("DNS Server: %s\n", dnsServer)
-	a.allowedDNSServers[dnsServer] = true
+	mergedDNSServers := append(defaultDNSServers, dnsServer)
+
+	for _, dns := range mergedDNSServers {
+		a.allowedDNSServers[dns] = true
+	}
 
 	return nil
 }
