@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -32,6 +30,7 @@ type AgentConfig struct {
 	AllowedIPs      []string
 	Firewall        IFirewall
 	NetInfoProvider INetInfoProvider
+	FileSystem      IFileSystem
 }
 
 type Agent struct {
@@ -40,9 +39,9 @@ type Agent struct {
 	allowedIps        map[string]bool
 	allowedDNSServers map[string]bool
 	allowedCIDR       []*net.IPNet
-	decisionLogsMutex sync.Mutex
 	firewall          IFirewall
 	netInfoProvider   INetInfoProvider
+	filesystem        IFileSystem
 }
 
 func NewAgent(config AgentConfig) *Agent {
@@ -53,6 +52,7 @@ func NewAgent(config AgentConfig) *Agent {
 		allowedDNSServers: make(map[string]bool),
 		firewall:          config.Firewall,
 		netInfoProvider:   config.NetInfoProvider,
+		filesystem:        config.FileSystem,
 	}
 	agent.init(config)
 	return agent
@@ -185,23 +185,9 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 	return false
 }
 
-// TODO: move to a separate struct with an interface
 func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
-	a.decisionLogsMutex.Lock()
-	defer a.decisionLogsMutex.Unlock()
-
-	if _, err := os.Stat("/var/log/gha-agent"); os.IsNotExist(err) {
-		os.Mkdir("/var/log/gha-agent", 0755)
-	}
-
-	f, err := os.OpenFile("/var/log/gha-agent/decisions.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Println("failed to open /var/log/gha-agent/decisions.log")
-		return
-	}
-	defer f.Close()
-
-	fmt.Fprintf(f, "%d|%s|%s|%s\n", time.Now().Unix(), decision, domain, ip)
+	content := fmt.Sprintf("%d|%s|%s|%s\n", time.Now().Unix(), decision, domain, ip)
+	a.filesystem.Append("/var/log/gha-agent/decisions.log", content)
 }
 
 func (a *Agent) loadAllowedDNSServers() error {

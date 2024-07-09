@@ -34,13 +34,15 @@ func main() {
 
 	nft := NFTFirewall{}
 	linuxNetInfoProvider := LinuxNetInfoProvider{}
+	fileSystem := FileSystem{}
 	agent := NewAgent(AgentConfig{
 		DNSPolicy:       *dnsPolicy,
 		EgressPolicy:    *egressPolicy,
 		AllowedDomains:  strings.Split(*allowedDomains, ","),
 		AllowedIPs:      strings.Split(*allowedIPs, ","),
 		Firewall:        &nft,
-		NetInfoProvider: &linuxNetInfoProvider},
+		NetInfoProvider: &linuxNetInfoProvider,
+		FileSystem:      &fileSystem},
 	)
 
 	nfq, err := netfilter.NewNFQueue(0, 1000, netfilter.NF_DEFAULT_PACKET_SIZE)
