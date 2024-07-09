@@ -19137,6 +19137,8 @@ async function startAgent({
   agentDirectory,
   dnsPolicy,
   egressPolicy,
+  allowedDomains,
+  allowedIps,
   agentLogFilepath,
   agentPath
 }) {
@@ -19158,9 +19160,15 @@ async function startAgent({
   console.log(`Starting agent from ${agentPath}`);
   console.time("Agent startup time");
   await exec(`sudo chmod +x ${agentPath}`);
+  const allowedDomainsFlag = allowedDomains.length > 0 ? `--allowed-domains ${allowedDomains.join(",")}` : "";
+  const allowedIpsFlag = allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
   (0, import_node_child_process.spawn)(
     "sudo",
-    [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
+    [
+      "sh",
+      "-c",
+      `${agentPath} --dns-policy ${dnsPolicy} --egress-policy ${egressPolicy} ${allowedDomainsFlag} ${allowedIpsFlag}`
+    ],
     {
       stdio: ["ignore", agentOut.fd, agentOut.fd],
       detached: true
@@ -19210,6 +19218,8 @@ async function main() {
     agentDirectory,
     dnsPolicy,
     egressPolicy,
+    allowedDomains,
+    allowedIps,
     agentLogFilepath,
     agentPath
   });

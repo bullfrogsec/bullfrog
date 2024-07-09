@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
@@ -27,11 +28,18 @@ func setAgentIsReady() {
 func main() {
 	dnsPolicy := flag.String("dns-policy", "allowed-domains-only", "DNS policy: allowed-domains-only or any")
 	egressPolicy := flag.String("egress-policy", "audit", "Egress policy: audit or block")
+	allowedDomains := flag.String("allowed-domains", "", "Comma-separated list of allowed domains")
+	allowedIPs := flag.String("allowed-ips", "", "Comma-separated list of allowed IPs or IP ranges in CIDR notation")
 	flag.Parse()
 
 	nft := NFTFirewall{}
-	agent := NewAgent(&nft)
-	agent.init(*egressPolicy, *dnsPolicy)
+	agent := NewAgent(AgentConfig{
+		DNSPolicy:      *dnsPolicy,
+		EgressPolicy:   *egressPolicy,
+		AllowedDomains: strings.Split(*allowedDomains, ","),
+		AllowedIPs:     strings.Split(*allowedIPs, ","),
+		Firewall:       &nft},
+	)
 
 	nfq, err := netfilter.NewNFQueue(0, 1000, netfilter.NF_DEFAULT_PACKET_SIZE)
 	if err != nil {

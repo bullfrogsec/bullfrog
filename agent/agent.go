@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
@@ -27,32 +26,45 @@ const (
 	DROP_REQUEST   uint8 = 1
 )
 
+type AgentConfig struct {
+	EgressPolicy   string
+	DNSPolicy      string
+	AllowedDomains []string
+	AllowedIPs     []string
+	Firewall       IFirewall
+}
+
 type Agent struct {
 	blockDNS          bool
 	allowedDomains    map[string]bool
 	allowedIps        map[string]bool
 	allowedDNSServers map[string]bool
 	allowedCIDR       []*net.IPNet
-	firewall          IFirewall
 	decisionLogsMutex sync.Mutex
+	firewall          IFirewall
 }
 
-func NewAgent(firewall IFirewall) *Agent {
-	return &Agent{
+func NewAgent(config AgentConfig) *Agent {
+
+	agent := &Agent{
 		blockDNS:          false,
 		allowedDomains:    make(map[string]bool),
 		allowedIps:        make(map[string]bool),
 		allowedDNSServers: make(map[string]bool),
-		firewall:          firewall,
+		firewall:          config.Firewall,
 	}
+	agent.init(config)
+	return agent
 }
 
-func (a *Agent) init(egressPolicy string, dnsPolicy string) error {
+func (a *Agent) init(config AgentConfig) error {
 
-	fmt.Printf("Egress policy: %s\n", egressPolicy)
-	fmt.Printf("DNS policy: %s\n", dnsPolicy)
+	fmt.Printf("Egress policy: %s\n", config.EgressPolicy)
+	fmt.Printf("DNS policy: %s\n", config.DNSPolicy)
+	fmt.Printf("Allowed domains: %v\n", config.AllowedDomains)
+	fmt.Printf("Allowed IPs: %v\n", config.AllowedIPs)
 
-	if egressPolicy == "block" {
+	if config.EgressPolicy == "block" {
 		blocking = true
 		fmt.Println("Blocking mode enabled")
 	} else {
@@ -60,23 +72,16 @@ func (a *Agent) init(egressPolicy string, dnsPolicy string) error {
 	}
 
 	if blocking {
-		if dnsPolicy == "allowed-domains-only" {
+		if config.DNSPolicy == "allowed-domains-only" {
 			a.blockDNS = true
 			fmt.Println("DNS queries to unallowed domains will be blocked")
 		}
 	}
 
-	err := a.loadAllowedIp("allowed_ips.txt")
-	if err != nil {
-		log.Fatalf("Loading IP allowlist: %v", err)
-	}
+	a.loadAllowedIp(config.AllowedIPs)
+	a.loadAllowedDomain(config.AllowedDomains)
 
-	err = a.loadAllowedDomain("allowed_domains.txt")
-	if err != nil {
-		log.Fatalf("Loading domain allowlist: %v", err)
-	}
-
-	err = a.loadAllowedDNSServers()
+	err := a.loadAllowedDNSServers()
 	if err != nil {
 		log.Fatalf("Loading DNS servers allowlist: %v", err)
 	}
@@ -88,80 +93,45 @@ func (a *Agent) init(egressPolicy string, dnsPolicy string) error {
 	return nil
 }
 
-// TODO: don't use input in files
-func (a *Agent) loadAllowedDomain(filename string) error {
+func (a *Agent) loadAllowedDomain(domains []string) {
 
 	fmt.Println("loading allowed domains")
 
+	mergedDomains := append(defaultDomains, domains...)
+
 	// loads default first
-	for _, domain := range defaultDomains {
+	for _, domain := range mergedDomains {
+		fmt.Printf("Domain: %s\n", domain)
 		a.allowedDomains[domain] = true
 	}
-
-	file, err := os.Open(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Printf("No %s file found, using defaults only\n", filename)
-			return nil
-		}
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		a.allowedDomains[line] = true
-	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
-// TODO: don't use input in files
-func (a *Agent) loadAllowedIp(filename string) error {
+func (a *Agent) loadAllowedIp(ips []string) {
 
 	fmt.Println("loading allowed ips")
 
-	// loads default first
-	for _, ip := range defaultIps {
-		a.allowedIps[ip] = true
-		a.addIpToLogs("allowed", "unknown", ip)
-	}
+	mergedIps := append(defaultIps, ips...)
 
-	file, err := os.Open(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Printf("No %s file found, using defaults only\n", filename)
-			return nil
+	for _, ip := range mergedIps {
+		if(ip == "") {
+			continue
 		}
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// fmt.Printf("line: %s", line)
-		_, cidr, err := net.ParseCIDR(line)
+		fmt.Printf("IP: %s\n", ip)
+		_, cidr, err := net.ParseCIDR(ip)
 		if err == nil {
 			fmt.Printf("CIDR: %s\n", cidr)
 			a.allowedCIDR = append(a.allowedCIDR, cidr)
-		} else {
-			fmt.Printf("error parsing CIDR: %v\n", err)
-			a.allowedIps[line] = true
-			a.addIpToLogs("allowed", "unknown", line)
+			continue
+		} 
+
+		netIp := net.ParseIP(ip)
+		if netIp != nil {
+			a.allowedIps[ip] = true
+			a.addIpToLogs("allowed", "unknown", ip)
+			continue
 		}
+		fmt.Printf("Failed to parse IP: %s. Skipping.\n", ip)
 	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (a *Agent) addToFirewall(ips map[string]bool, cidr []*net.IPNet) error {
@@ -378,7 +348,6 @@ func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
 	return ACCEPT_REQUEST
 }
 
-// TODO: split this function
 func (a *Agent) processPacket(packet gopacket.Packet) uint8 {
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
 
