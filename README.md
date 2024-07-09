@@ -11,7 +11,7 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 ```yaml
 # This action should be the first step of your job, and should be loaded on every separate job.
 # If this action is not loaded first, it will not be able to see or block any requests that occured prior to the action running.
-- uses: bullfrogsec/bullfrog@<version>
+- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
   with:
     # List of IPs to allow outbound connections to.
     # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
