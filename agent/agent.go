@@ -19,8 +19,12 @@ var (
 )
 
 const (
-	ACCEPT_REQUEST uint8 = 0
-	DROP_REQUEST   uint8 = 1
+	ACCEPT_REQUEST                  uint8 = 0
+	DROP_REQUEST                    uint8 = 1
+	EGRESS_POLICY_BLOCK                   = "block"
+	EGRESS_POLICY_AUDIT                   = "audit"
+	DNS_POLICY_ALLOWED_DOMAINS_ONLY       = "allowed-domains-only"
+	DNS_POLICY_ANY                        = "any"
 )
 
 type AgentConfig struct {
@@ -35,6 +39,7 @@ type AgentConfig struct {
 
 type Agent struct {
 	blockDNS          bool
+	blocking          bool
 	allowedDomains    map[string]bool
 	allowedIps        map[string]bool
 	allowedDNSServers map[string]bool
@@ -47,6 +52,7 @@ type Agent struct {
 func NewAgent(config AgentConfig) *Agent {
 	agent := &Agent{
 		blockDNS:          false,
+		blocking:          false,
 		allowedDomains:    make(map[string]bool),
 		allowedIps:        make(map[string]bool),
 		allowedDNSServers: make(map[string]bool),
@@ -65,15 +71,15 @@ func (a *Agent) init(config AgentConfig) error {
 	fmt.Printf("Allowed domains: %v\n", config.AllowedDomains)
 	fmt.Printf("Allowed IPs: %v\n", config.AllowedIPs)
 
-	if config.EgressPolicy == "block" {
-		blocking = true
+	if config.EgressPolicy == EGRESS_POLICY_BLOCK {
+		a.blocking = true
 		fmt.Println("Blocking mode enabled")
 	} else {
 		fmt.Println("Audit mode enabled")
 	}
 
-	if blocking {
-		if config.DNSPolicy == "allowed-domains-only" {
+	if a.blocking {
+		if config.DNSPolicy == DNS_POLICY_ALLOWED_DOMAINS_ONLY {
 			a.blockDNS = true
 			fmt.Println("DNS queries to unallowed domains will be blocked")
 		}
@@ -89,7 +95,7 @@ func (a *Agent) init(config AgentConfig) error {
 
 	err = a.addToFirewall(a.allowedIps, a.allowedCIDR)
 	if err != nil {
-		log.Fatalf("Error adding to nftables: %v", err)
+		log.Fatalf("Error adding to firewall: %v", err)
 	}
 	return nil
 }
@@ -102,6 +108,9 @@ func (a *Agent) loadAllowedDomain(domains []string) {
 
 	// loads default first
 	for _, domain := range mergedDomains {
+		if domain == "" {
+			continue
+		}
 		fmt.Printf("Domain: %s\n", domain)
 		a.allowedDomains[domain] = true
 	}
@@ -136,7 +145,7 @@ func (a *Agent) loadAllowedIp(ips []string) {
 }
 
 func (a *Agent) addToFirewall(ips map[string]bool, cidr []*net.IPNet) error {
-	if !blocking {
+	if !a.blocking {
 		return nil
 	}
 	for ip := range ips {
@@ -266,7 +275,7 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 			err := a.firewall.AddIp(ip)
 			a.addIpToLogs("allowed", domain, ip)
 			if err != nil {
-				fmt.Printf("failed to add %s to NFT tables", ip)
+				fmt.Printf("failed to add %s to firewall", ip)
 			} else {
 				a.allowedIps[ip] = true
 			}
@@ -311,14 +320,10 @@ func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
 	return ACCEPT_REQUEST
 }
 
-func (a *Agent) processPacket(packet gopacket.Packet) uint8 {
+func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
 
 		dns, _ := dnsLayer.(*layers.DNS)
-		fmt.Println("DNS ID: ", dns.ID)
-		fmt.Println("DNS QR: ", dns.QR) // true if this is a response, false if it's a query
-		fmt.Println("DNS OpCode: ", dns.OpCode)
-		fmt.Println("DNS ResponseCode: ", dns.ResponseCode)
 		for _, q := range dns.Questions {
 			fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 		}

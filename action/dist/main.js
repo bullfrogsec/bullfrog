@@ -19195,12 +19195,6 @@ async function main() {
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
   const pkg = require(`${actionDirectory}/../package.json`);
   await import_promises3.default.mkdir(logDirectory, { recursive: true });
-  if (allowedDomains.length !== 0) {
-    await import_promises3.default.writeFile("allowed_domains.txt", allowedDomains.join("\n"));
-  }
-  if (allowedIps.length !== 0) {
-    await import_promises3.default.writeFile("allowed_ips.txt", allowedIps.join("\n"));
-  }
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   const tetragonLogFilepath = import_node_path.default.join(logDirectory, TETRAGON_LOG_FILENAME);
   installPackages();

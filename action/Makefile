@@ -16,3 +16,7 @@ fix:
 .PHONY: test.lint
 test.lint:
 	npx eslint .
+
+.PHONY: test.unit
+test.unit:
+	echo "No unit tests"

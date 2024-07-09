@@ -32,17 +32,14 @@ func main() {
 	allowedIPs := flag.String("allowed-ips", "", "Comma-separated list of allowed IPs or IP ranges in CIDR notation")
 	flag.Parse()
 
-	nft := NFTFirewall{}
-	linuxNetInfoProvider := LinuxNetInfoProvider{}
-	fileSystem := FileSystem{}
 	agent := NewAgent(AgentConfig{
 		DNSPolicy:       *dnsPolicy,
 		EgressPolicy:    *egressPolicy,
 		AllowedDomains:  strings.Split(*allowedDomains, ","),
 		AllowedIPs:      strings.Split(*allowedIPs, ","),
-		Firewall:        &nft,
-		NetInfoProvider: &linuxNetInfoProvider,
-		FileSystem:      &fileSystem},
+		Firewall:        &NFTFirewall{},
+		NetInfoProvider: &LinuxNetInfoProvider{},
+		FileSystem:      &FileSystem{}},
 	)
 
 	nfq, err := netfilter.NewNFQueue(0, 1000, netfilter.NF_DEFAULT_PACKET_SIZE)
@@ -57,7 +54,7 @@ func main() {
 	setAgentIsReady()
 
 	for p := range packets {
-		verdict := agent.processPacket(p.Packet)
+		verdict := agent.ProcessPacket(p.Packet)
 		if verdict == ACCEPT_REQUEST {
 			p.SetVerdict(netfilter.Verdict(netfilter.NF_ACCEPT))
 		} else if verdict == DROP_REQUEST {

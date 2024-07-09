@@ -211,14 +211,6 @@ async function main() {
 
   await fs.mkdir(logDirectory, { recursive: true });
 
-  if (allowedDomains.length !== 0) {
-    await fs.writeFile("allowed_domains.txt", allowedDomains.join("\n"));
-  }
-
-  if (allowedIps.length !== 0) {
-    await fs.writeFile("allowed_ips.txt", allowedIps.join("\n"));
-  }
-
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
   const tetragonLogFilepath = path.join(logDirectory, TETRAGON_LOG_FILENAME);
 

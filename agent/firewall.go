@@ -13,9 +13,6 @@ type NFTFirewall struct {
 }
 
 func (nft *NFTFirewall) AddIp(ip string) error {
-	if !blocking {
-		return nil
-	}
 	ip_str := fmt.Sprintf("{ %s }", ip)
 
 	{

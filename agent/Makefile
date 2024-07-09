@@ -18,3 +18,12 @@ test.lint:
 		echo "$(GOFMT_OUTPUT)"; \
 		exit 1; \
 	fi
+
+.PHONY: test.unit
+test.unit:
+	go test
+
+.PHONY: test.generate-coverage
+test.generate-coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
