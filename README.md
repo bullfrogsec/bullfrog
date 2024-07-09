@@ -50,13 +50,13 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 The default usage will run in audit mode and will not block any request.
 
 ```yaml
-- uses: bullfrogsec/bullfrog@<version>
+- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
 ```
 
 ### Block every outbound connections
 
 ```yaml
-- uses: bullfrogsec/bullfrog@<version>
+- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
   with:
     egress-policy: block
 ```
@@ -64,7 +64,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to domains required for pulling a docker image from the docker hub
 
 ```yaml
-- uses: bullfrogsec/bullfrog@<version>
+- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
   with:
     egress-policy: block
     allowed-domains: |
@@ -76,7 +76,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to a specific IP address without blocking DNS requests
 
 ```yaml
-- uses: bullfrogsec/bullfrog@<version>
+- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
   with:
     egress-policy: block
     allowed-ips: |
