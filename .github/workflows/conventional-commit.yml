@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@v0
+        uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
         with:
           egress-policy: block
 
       - name: PR Conventional Commit Validation
-        uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5
+        uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5 # v1.2.0
 
         with:
           task_types: '["feat","fix","docs","test","ci","refactor","perf","chore","revert"]'
