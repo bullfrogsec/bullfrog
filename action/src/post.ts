@@ -8,7 +8,7 @@ import {
   BLOCK,
   TETRAGON_EVENTS_LOG_PATH,
 } from "./constants";
-import { getFileTimestamp, waitForFile } from "./util";
+import { getFileTimestamp } from "./util";
 
 const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
 
