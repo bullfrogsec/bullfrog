@@ -18986,11 +18986,27 @@ var ANY = "any";
 
 // src/inputs.ts
 var core = __toESM(require_core());
+function validateIps(ips) {
+  ips.forEach((ip) => {
+    if (!ip.match(/^[0-9.\/]+$/)) {
+      throw new Error(`Invalid IP: ${ip}`);
+    }
+  });
+}
+function validateDomains(domains) {
+  domains.forEach((domain) => {
+    if (!domain.match(/^[A-Za-z0-9.\-\*]+$/)) {
+      throw new Error(`Invalid domain: ${domain}`);
+    }
+  });
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
+  validateIps(allowedIps);
   const rawAllowedDomains = core.getInput("allowed-domains");
   const allowedDomains = rawAllowedDomains.length !== 0 ? rawAllowedDomains.split("\n") : [];
+  validateDomains(allowedDomains);
   const egressPolicy = core.getInput("egress-policy");
   if (egressPolicy !== AUDIT && egressPolicy !== BLOCK) {
     throw new Error(`egress-policy must be '${AUDIT}' or '${BLOCK}'`);
