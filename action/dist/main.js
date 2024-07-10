@@ -18988,14 +18988,14 @@ var ANY = "any";
 var core = __toESM(require_core());
 function validateIps(ips) {
   ips.forEach((ip) => {
-    if (!ip.match(/^[0-9.\/]+$/)) {
+    if (!ip.match(/^[0-9./]+$/)) {
       throw new Error(`Invalid IP: ${ip}`);
     }
   });
 }
 function validateDomains(domains) {
   domains.forEach((domain) => {
-    if (!domain.match(/^[A-Za-z0-9.\-\*]+$/)) {
+    if (!domain.match(/^[A-Za-z0-9.\-*]+$/)) {
       throw new Error(`Invalid domain: ${domain}`);
     }
   });

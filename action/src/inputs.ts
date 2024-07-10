@@ -17,7 +17,7 @@ export interface Inputs {
 function validateIps(ips: Array<string>): void {
   ips.forEach((ip) => {
     // validate the ip is valid
-    if (!ip.match(/^[0-9.\/]+$/)) {
+    if (!ip.match(/^[0-9./]+$/)) {
       throw new Error(`Invalid IP: ${ip}`);
     }
   });
@@ -26,7 +26,7 @@ function validateIps(ips: Array<string>): void {
 function validateDomains(domains: Array<string>): void {
   domains.forEach((domain) => {
     // validate the domain is valid
-    if (!domain.match(/^[A-Za-z0-9.\-\*]+$/)) {
+    if (!domain.match(/^[A-Za-z0-9.\-*]+$/)) {
       throw new Error(`Invalid domain: ${domain}`);
     }
   });
