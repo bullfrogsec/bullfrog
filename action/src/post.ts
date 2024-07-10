@@ -4,9 +4,11 @@ import { parseInputs } from "./inputs";
 import path from "node:path";
 import {
   AGENT_LOG_FILENAME,
+  AGENT_READY_PATH,
   BLOCK,
   TETRAGON_EVENTS_LOG_PATH,
 } from "./constants";
+import { getFileTimestamp, waitForFile } from "./util";
 
 const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
 
@@ -69,6 +71,8 @@ async function getOutboundConnections(): Promise<TetragonLog[]> {
   try {
     const connections: TetragonLog[] = [];
 
+    const agentReadyTimestamp = await getFileTimestamp(AGENT_READY_PATH);
+
     const tetragonLogFile = await fs.open(TETRAGON_EVENTS_LOG_PATH);
 
     const functionsToTrack = ["tcp_connect"];
@@ -76,19 +80,28 @@ async function getOutboundConnections(): Promise<TetragonLog[]> {
     for await (const line of tetragonLogFile.readLines()) {
       const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
 
+      // Skip entries that are not related to the connect policy
       if (processEntry?.["policy_name"] !== "connect") {
         continue;
       }
 
-      if (functionsToTrack.includes(processEntry.function_name)) {
-        connections.push({
-          ts: new Date(processEntry.process.start_time),
-          destIp: processEntry.args[0].sock_arg.daddr,
-          destPort: processEntry.args[0].sock_arg.dport,
-          binary: processEntry.process.binary,
-          args: processEntry.process.arguments,
-        });
+      // Skip connection entries that were logged before the agent was ready
+      if (processEntry.process.start_time < agentReadyTimestamp) {
+        continue;
       }
+
+      // Skip entries that are not related to the functions we are tracking
+      if (!functionsToTrack.includes(processEntry.function_name)) {
+        continue;
+      }
+
+      connections.push({
+        ts: new Date(processEntry.process.start_time),
+        destIp: processEntry.args[0].sock_arg.daddr,
+        destPort: processEntry.args[0].sock_arg.dport,
+        binary: processEntry.process.binary,
+        args: processEntry.process.arguments,
+      });
     }
 
     return connections;

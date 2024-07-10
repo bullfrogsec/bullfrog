@@ -51,3 +51,13 @@ export async function waitForStringInFile({
 
   throw new Error(`Couldn't find ${str} in file ${filePath}`);
 }
+
+export async function getFileTimestamp(filePath: string): Promise<number> {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.mtime.getTime();
+  } catch (err) {
+    core.debug(`Error getting ${filePath} file timestamp: ${err}`);
+    return 0;
+  }
+}

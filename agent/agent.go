@@ -195,7 +195,7 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 }
 
 func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
-	content := fmt.Sprintf("%d|%s|%s|%s\n", time.Now().Unix(), decision, domain, ip)
+	content := fmt.Sprintf("%d|%s|%s|%s\n", time.Now().UnixMilli(), decision, domain, ip)
 	a.filesystem.Append("/var/log/gha-agent/decisions.log", content)
 }
 
