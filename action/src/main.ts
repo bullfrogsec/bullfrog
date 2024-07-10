@@ -126,12 +126,16 @@ async function startAgent({
   agentDirectory,
   dnsPolicy,
   egressPolicy,
+  allowedDomains,
+  allowedIps,
   agentLogFilepath,
   agentPath,
 }: {
   agentDirectory: string;
   dnsPolicy: DnsPolicy;
   egressPolicy: EgressPolicy;
+  allowedDomains: string[];
+  allowedIps: string[];
   agentLogFilepath: string;
   agentPath: string;
 }) {
@@ -159,9 +163,20 @@ async function startAgent({
   // make agent executable
   await exec(`sudo chmod +x ${agentPath}`);
 
+  const allowedDomainsFlag =
+    allowedDomains.length > 0
+      ? `--allowed-domains ${allowedDomains.join(",")}`
+      : "";
+  const allowedIpsFlag =
+    allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
+
   spawn(
     "sudo",
-    [agentPath, "--dns-policy", dnsPolicy, "--egress-policy", egressPolicy],
+    [
+      "sh",
+      "-c",
+      `${agentPath} --dns-policy ${dnsPolicy} --egress-policy ${egressPolicy} ${allowedDomainsFlag} ${allowedIpsFlag}`,
+    ],
     {
       stdio: ["ignore", agentOut.fd, agentOut.fd],
       detached: true,
@@ -196,14 +211,6 @@ async function main() {
 
   await fs.mkdir(logDirectory, { recursive: true });
 
-  if (allowedDomains.length !== 0) {
-    await fs.writeFile("allowed_domains.txt", allowedDomains.join("\n"));
-  }
-
-  if (allowedIps.length !== 0) {
-    await fs.writeFile("allowed_ips.txt", allowedIps.join("\n"));
-  }
-
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
   const tetragonLogFilepath = path.join(logDirectory, TETRAGON_LOG_FILENAME);
 
@@ -222,6 +229,8 @@ async function main() {
     agentDirectory,
     dnsPolicy,
     egressPolicy,
+    allowedDomains,
+    allowedIps,
     agentLogFilepath,
     agentPath,
   });
