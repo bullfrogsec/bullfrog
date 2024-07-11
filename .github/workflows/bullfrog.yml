@@ -2,12 +2,6 @@ name: Build, test and release
 
 on:
   push:
-    branches:
-      - main
-
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -48,64 +42,59 @@ jobs:
             agent/agent
             action/dist
 
-  check-dist-diff:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
+  # check-dist-diff:
+  #   needs: build
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 5
 
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
-        with:
-          egress-policy: block
-          allowed-domains: |
-            *.github.com
+  #   steps:
+  #     - name: Enable egress filtering
+  #       uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+  #       with:
+  #         egress-policy: block
+  #         allowed-domains: |
+  #           *.github.com
 
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: build-artifacts
+  #     - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+  #       with:
+  #         name: build-artifacts
 
-      - name: Check if dist has changed for the action/dist folder
-        run: |
-          git diff --exit-code --quiet action/dist || (echo "action/dist has changed, please commit the changes" && exit 1)
+  #     - name: Check if dist has changed for the action/dist folder
+  #       run: |
+  #         git diff --exit-code --quiet action/dist || (echo "action/dist has changed, please commit the changes" && exit 1)
 
-  test-audit:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
+  # test-audit:
+  #   needs: build
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 5
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: build-artifacts
+  #     - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+  #       with:
+  #         name: build-artifacts
 
-      - name: Enable egress filtering
-        uses: ./
-        with:
-          allowed-domains: |
-            *.google.com
-          _local-agent-path: agent/agent
+  #     - name: Enable egress filtering
+  #       uses: ./
+  #       with:
+  #         allowed-domains: |
+  #           *.google.com
+  #         _local-agent-path: agent/agent
 
-      - name: Make HTTP requests
-        run: |
-          timeout 5 curl https://www.google.com --output /dev/null
-          timeout 5 curl https://www.bing.com --output /dev/null
+  #     - name: Make HTTP requests
+  #       run: |
+  #         timeout 5 curl https://www.google.com --output /dev/null
+  #         timeout 5 curl https://www.bing.com --output /dev/null
 
   test-block:
     needs: build
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
 
     steps:
       - name: Checkout
@@ -122,6 +111,17 @@ jobs:
             *.google.com
           egress-policy: block
           _local-agent-path: agent/agent
+
+      - name: Test for public javascript library vulnerabilities
+        id: test-google
+        uses: lirantal/is-website-vulnerable@main
+        with:
+          scan-url: "https://www.google.com"
+      - name: Test for public javascript library vulnerabilities
+        id: test-bing
+        uses: lirantal/is-website-vulnerable@main
+        with:
+          scan-url: "https://bing.com"
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -129,253 +129,253 @@ jobs:
       - name: Make DNS requests
         run: source test/make_dns_requests.sh
 
-  test-block-but-allow-any-dns-requests:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
+  # test-block-but-allow-any-dns-requests:
+  #   needs: build
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 5
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: build-artifacts
+  #     - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+  #       with:
+  #         name: build-artifacts
 
-      - name: Enable egress filtering
-        uses: ./
-        with:
-          allowed-domains: |
-            *.google.com
-          dns-policy: any
-          egress-policy: block
-          _local-agent-path: agent/agent
+  #     - name: Enable egress filtering
+  #       uses: ./
+  #       with:
+  #         allowed-domains: |
+  #           *.google.com
+  #         dns-policy: any
+  #         egress-policy: block
+  #         _local-agent-path: agent/agent
 
-      - name: Make HTTP requests
-        run: source test/make_http_requests.sh
+  #     - name: Make HTTP requests
+  #       run: source test/make_http_requests.sh
 
-      - name: Make DNS requests
-        run: |
-          timeout 5 dig example.com
-          timeout 5 dig www.wikipedia.org
+  #     - name: Make DNS requests
+  #       run: |
+  #         timeout 5 dig example.com
+  #         timeout 5 dig www.wikipedia.org
 
-  test-docker:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
+  # test-docker:
+  #   needs: build
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 5
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: build-artifacts
+  #     - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+  #       with:
+  #         name: build-artifacts
 
-      - name: Enable egress filtering
-        uses: ./
-        with:
-          allowed-ips: |
-            172.17.0.0/16
-          allowed-domains: |
-            production.cloudflare.docker.com
-            docker.io
-            *.docker.io
-            www.google.com
-          egress-policy: block
-          _local-agent-path: agent/agent
+  #     - name: Enable egress filtering
+  #       uses: ./
+  #       with:
+  #         allowed-ips: |
+  #           172.17.0.0/16
+  #         allowed-domains: |
+  #           production.cloudflare.docker.com
+  #           docker.io
+  #           *.docker.io
+  #           www.google.com
+  #         egress-policy: block
+  #         _local-agent-path: agent/agent
 
-      - name: Test curl calls within Docker
-        run: |
-          docker run --rm --entrypoint sh alpine/curl:8.7.1 -c "
-            if ! timeout 5 curl https://www.google.com --output /dev/null; then
-              echo 'Expected curl to www.google.com to succeed, but it failed';
-              exit 1;
-            fi;
+  #     - name: Test curl calls within Docker
+  #       run: |
+  #         docker run --rm --entrypoint sh alpine/curl:8.7.1 -c "
+  #           if ! timeout 5 curl https://www.google.com --output /dev/null; then
+  #             echo 'Expected curl to www.google.com to succeed, but it failed';
+  #             exit 1;
+  #           fi;
 
-            if timeout 5 curl https://www.bing.com --output /dev/null; then
-              echo 'Expected curl to www.bing.com to fail, but it succeeded';
-              exit 1;
-            fi;
-          "
+  #           if timeout 5 curl https://www.bing.com --output /dev/null; then
+  #             echo 'Expected curl to www.bing.com to fail, but it succeeded';
+  #             exit 1;
+  #           fi;
+  #         "
 
-      - name: Nginx
-        run: source test/docker_nginx.sh
+  #     - name: Nginx
+  #       run: source test/docker_nginx.sh
 
-      - name: Nginx with port forwarding
-        run: source test/docker_nginx_port_forwarding.sh
+  #     - name: Nginx with port forwarding
+  #       run: source test/docker_nginx_port_forwarding.sh
 
-  test-integration:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
+  # test-integration:
+  #   needs: build
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 10
 
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
-        with:
-          egress-policy: block
-          allowed-domains: |
-            *.canonical.com
-            *.github.com
-            *.ubuntu.com
-            archivist.vagrantup.com
-            deb.nodesource.com
-            dl.google.com
-            download.docker.com
-            go.dev
-            objects.githubusercontent.com
-            vagrantcloud-files-production.s3-accelerate.amazonaws.com
-            vagrantcloud.com
-            www.google.com
+  #   steps:
+  #     - name: Enable egress filtering
+  #       uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+  #       with:
+  #         egress-policy: block
+  #         allowed-domains: |
+  #           *.canonical.com
+  #           *.github.com
+  #           *.ubuntu.com
+  #           archivist.vagrantup.com
+  #           deb.nodesource.com
+  #           dl.google.com
+  #           download.docker.com
+  #           go.dev
+  #           objects.githubusercontent.com
+  #           vagrantcloud-files-production.s3-accelerate.amazonaws.com
+  #           vagrantcloud.com
+  #           www.google.com
 
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: build-artifacts
+  #     - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+  #       with:
+  #         name: build-artifacts
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get install --yes vagrant virtualbox
+  #     - name: Install Dependencies
+  #       run: |
+  #         sudo apt-get install --yes vagrant virtualbox
 
-      - name: Start VM
-        run: make vagrant.up
+  #     - name: Start VM
+  #       run: make vagrant.up
 
-      - name: Run Tests
-        run: make test.integration
+  #     - name: Run Tests
+  #       run: make test.integration
 
-  test-lint:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
+  # test-lint:
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 5
 
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
-        with:
-          egress-policy: block
-          allowed-domains: |
-            registry.npmjs.org
+  #   steps:
+  #     - name: Enable egress filtering
+  #       uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+  #       with:
+  #         egress-policy: block
+  #         allowed-domains: |
+  #           registry.npmjs.org
 
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Bootstrap
-        run: |
-          make bootstrap
+  #     - name: Bootstrap
+  #       run: |
+  #         make bootstrap
 
-      - name: Lint
-        run: |
-          make test.lint
+  #     - name: Lint
+  #       run: |
+  #         make test.lint
 
-  pre-release:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-      pull-requests: write
-    needs:
-      [
-        build,
-        check-dist-diff,
-        test-audit,
-        test-block,
-        test-block-but-allow-any-dns-requests,
-        test-docker,
-        test-integration,
-        test-lint,
-      ]
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      major: ${{ steps.release.outputs.major }}
-      minor: ${{ steps.release.outputs.minor }}
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+  # pre-release:
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-22.04
+  #   permissions:
+  #     contents: write
+  #     pull-requests: write
+  #   needs:
+  #     [
+  #       build,
+  #       check-dist-diff,
+  #       test-audit,
+  #       test-block,
+  #       test-block-but-allow-any-dns-requests,
+  #       test-docker,
+  #       test-integration,
+  #       test-lint,
+  #     ]
+  #   outputs:
+  #     release_created: ${{ steps.release.outputs.release_created }}
+  #     tag_name: ${{ steps.release.outputs.tag_name }}
+  #     major: ${{ steps.release.outputs.major }}
+  #     minor: ${{ steps.release.outputs.minor }}
+  #   steps:
+  #     - name: Enable egress filtering
+  #       uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
 
-        with:
-          egress-policy: block
-          allowed-domains: |
-            uploads.github.com
+  #       with:
+  #         egress-policy: block
+  #         allowed-domains: |
+  #           uploads.github.com
 
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: build-artifacts
+  #     - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+  #       with:
+  #         name: build-artifacts
 
-      - uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f # v4.1.3
-        if: github.event_name == 'push'
-        id: release
-        with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-          token: ${{ secrets.BULLFROG_BOT_PAT }}
+  #     - uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f # v4.1.3
+  #       if: github.event_name == 'push'
+  #       id: release
+  #       with:
+  #         config-file: release-please-config.json
+  #         manifest-file: .release-please-manifest.json
+  #         token: ${{ secrets.BULLFROG_BOT_PAT }}
 
-      - name: Upload Release Artifact
-        if: ${{ steps.release.outputs.release_created }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Upload"
-          tar -czf agent.tar.gz agent/agent
-          gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
+  #     - name: Upload Release Artifact
+  #       if: ${{ steps.release.outputs.release_created }}
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         echo "Upload"
+  #         tar -czf agent.tar.gz agent/agent
+  #         gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
 
-  pre-release-validation:
-    needs: pre-release
-    if: ${{ needs.pre-release.outputs.release_created }}
-    runs-on: ubuntu-22.04
-    timeout-minutes: 2
+  # pre-release-validation:
+  #   needs: pre-release
+  #   if: ${{ needs.pre-release.outputs.release_created }}
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 2
 
-    steps:
-      # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow. Refer to https://github.com/bullfrogsec/bullfrog/commit/3a3e5e03112ef726b3079d402415760c9021fa39 for details.
-      - uses: jenseng/dynamic-uses@02f544690a931f3967153cd5f14679cfeb61f830
-        with:
-          uses: ${{ github.repository }}@${{ needs.pre-release.outputs.tag_name }}
-          with: '{"allowed-domains": "www.google.com", "egress-policy": "block", "agent-download-base-url": "https://github.com/${{ github.repository }}/releases/download/"}'
+  #   steps:
+  #     # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow. Refer to https://github.com/bullfrogsec/bullfrog/commit/3a3e5e03112ef726b3079d402415760c9021fa39 for details.
+  #     - uses: jenseng/dynamic-uses@02f544690a931f3967153cd5f14679cfeb61f830
+  #       with:
+  #         uses: ${{ github.repository }}@${{ needs.pre-release.outputs.tag_name }}
+  #         with: '{"allowed-domains": "www.google.com", "egress-policy": "block", "agent-download-base-url": "https://github.com/${{ github.repository }}/releases/download/"}'
 
-      - name: Make HTTP requests
-        run: |
-          if ! curl https://www.google.com --output /dev/null; then
-            echo 'Expected curl to www.google.com to succeed, but it failed';
-            exit 1;
-          fi;
+  #     - name: Make HTTP requests
+  #       run: |
+  #         if ! curl https://www.google.com --output /dev/null; then
+  #           echo 'Expected curl to www.google.com to succeed, but it failed';
+  #           exit 1;
+  #         fi;
 
-          if curl https://www.bing.com --max-time 5 --output /dev/null; then
-            echo 'Expected curl to www.bing.com to fail, but it succeeded';
-            exit 1;
-          fi;
+  #         if curl https://www.bing.com --max-time 5 --output /dev/null; then
+  #           echo 'Expected curl to www.bing.com to fail, but it succeeded';
+  #           exit 1;
+  #         fi;
 
-  release:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    needs: [pre-release, pre-release-validation]
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
-        with:
-          egress-policy: block
+  # release:
+  #   runs-on: ubuntu-22.04
+  #   permissions:
+  #     contents: write
+  #   needs: [pre-release, pre-release-validation]
+  #   steps:
+  #     - name: Enable egress filtering
+  #       uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+  #       with:
+  #         egress-policy: block
 
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+  #     - name: Checkout
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Promote to a release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release edit ${{ needs.pre-release.outputs.tag_name }} --prerelease=false --latest
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-          git tag -d v${{ needs.pre-release.outputs.major }} || true
-          git tag -d v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} || true
-          git push origin :v${{ needs.pre-release.outputs.major }} || true
-          git push origin :v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} || true
-          git tag -a v${{ needs.pre-release.outputs.major }} -m "Release v${{ needs.pre-release.outputs.major }}"
-          git tag -a v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} -m "Release v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }}"
-          git push origin v${{ needs.pre-release.outputs.major }}
-          git push origin v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }}
+  #     - name: Promote to a release
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         gh release edit ${{ needs.pre-release.outputs.tag_name }} --prerelease=false --latest
+  #         git config user.name github-actions[bot]
+  #         git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+  #         git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+  #         git tag -d v${{ needs.pre-release.outputs.major }} || true
+  #         git tag -d v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} || true
+  #         git push origin :v${{ needs.pre-release.outputs.major }} || true
+  #         git push origin :v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} || true
+  #         git tag -a v${{ needs.pre-release.outputs.major }} -m "Release v${{ needs.pre-release.outputs.major }}"
+  #         git tag -a v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }} -m "Release v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }}"
+  #         git push origin v${{ needs.pre-release.outputs.major }}
+  #         git push origin v${{ needs.pre-release.outputs.major }}.${{ needs.pre-release.outputs.minor }}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	psutilnet "github.com/shirou/gopsutil/net"
+	"github.com/shirou/gopsutil/process"
 )
 
 var (
@@ -333,6 +335,116 @@ func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 		} else if dns.QR {
 			return a.processDNSResponse(packet)
 		}
+	} else {
+		destIp, err := a.getDestinationIP(packet)
+		if err != nil {
+			fmt.Println("Failed to get destination IP")
+			return DROP_REQUEST
+		}
+
+		sourcePort, dstPort, err := getPorts(packet)
+		if err != nil {
+			fmt.Printf("Failed to get ports: %v\n", err)
+		}
+		fmt.Printf("Source Port: %d, Destination Port: %d\n", sourcePort, dstPort)
+		err = printProcInfoByPort(sourcePort)
+		if err != nil {
+			fmt.Printf("Failed to get process info: %v\n", err)
+		}
+
+		fmt.Printf("Destination IP: %s\n", destIp)
+		if a.isIpAllowed(destIp) {
+			a.addIpToLogs("allowed", "unknown", destIp)
+			return ACCEPT_REQUEST
+		} else {
+			fmt.Printf("Blocked request to %s\n", destIp)
+			a.addIpToLogs("blocked", "unknown", destIp)
+			return DROP_REQUEST
+		}
 	}
 	return ACCEPT_REQUEST
+}
+
+func getPorts(packet gopacket.Packet) (uint16, uint16, error) {
+	tcpLayer := packet.Layer(layers.LayerTypeTCP)
+	if tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		if tcp == nil {
+			return 0, 0, fmt.Errorf("Failed to get TCP layer")
+		}
+		return uint16(tcp.SrcPort), uint16(tcp.DstPort), nil
+	}
+
+	udpLayer := packet.Layer(layers.LayerTypeUDP)
+	if udpLayer != nil {
+		udp, _ := udpLayer.(*layers.UDP)
+		if udp == nil {
+			return 0, 0, fmt.Errorf("Failed to get UDP layer")
+		}
+		return uint16(udp.SrcPort), uint16(udp.DstPort), nil
+	}
+	return 0, 0, fmt.Errorf("Failed to get TCP or UDP layer")
+}
+
+func getProcessByPort(port uint16) ([]*process.Process, error) {
+	connections, err := psutilnet.Connections("inet")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, conn := range connections {
+		if uint16(conn.Laddr.Port) == port {
+			pid := conn.Pid
+			ancestors, err := getAncestorProcesses(pid)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to get ancestor processes: %v\n", err)
+			}
+			var ancestorsProc []*process.Process
+			for _, ancestor := range ancestors {
+				proc, err := process.NewProcess(ancestor)
+				if err != nil {
+					return nil, fmt.Errorf("Failed to get process: %v\n", err)
+				}
+				ancestorsProc = append(ancestorsProc, proc)
+			}
+			return ancestorsProc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no process found for port %d", port)
+}
+
+func printProcInfo(procs []*process.Process) error {
+	fmt.Printf("ancestor processes:\n")
+	if len(procs) == 0 {
+		return fmt.Errorf("no process found")
+	}
+	for _, proc := range procs {
+
+		cmdline, err := proc.Cmdline()
+		if err != nil {
+			log.Fatalf("Failed to get process command line: %v", err)
+		}
+
+		exe, err := proc.Exe()
+		if err != nil {
+			log.Fatalf("Failed to get process executable: %v", err)
+		}
+
+		cwd, err := proc.Cwd()
+		if err != nil {
+			log.Fatalf("Failed to get process working directory: %v", err)
+		}
+
+		fmt.Printf("\tcmdline: %s, exe: %s, cwd: %s\n", cmdline, exe, cwd)
+	}
+	return nil
+}
+
+func printProcInfoByPort(port uint16) error {
+	procs, err := getProcessByPort(port)
+	if err != nil {
+		return err
+	}
+	return printProcInfo(procs)
 }

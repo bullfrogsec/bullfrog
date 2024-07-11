@@ -48,8 +48,7 @@ table inet filter {
         # Allow established and related traffic
         ct state established,related accept
 
-        # Allow outbound traffic to IPs in google_ips set
-        ip daddr @allowed_ips accept
+        queue num 0
     }
 }
  
