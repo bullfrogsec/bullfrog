@@ -323,6 +323,16 @@ func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
 }
 
 func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
+	sourcePort, dstPort, err := getPorts(packet)
+	if err != nil {
+		fmt.Printf("Failed to get ports: %v\n", err)
+	}
+	fmt.Printf("Source Port: %d, Destination Port: %d\n", sourcePort, dstPort)
+	err = printProcInfoByPort(sourcePort)
+	if err != nil {
+		fmt.Printf("Failed to get process info: %v\n", err)
+	}
+
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
 
 		dns, _ := dnsLayer.(*layers.DNS)
@@ -342,18 +352,9 @@ func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 			return DROP_REQUEST
 		}
 
-		sourcePort, dstPort, err := getPorts(packet)
-		if err != nil {
-			fmt.Printf("Failed to get ports: %v\n", err)
-		}
-		fmt.Printf("Source Port: %d, Destination Port: %d\n", sourcePort, dstPort)
-		err = printProcInfoByPort(sourcePort)
-		if err != nil {
-			fmt.Printf("Failed to get process info: %v\n", err)
-		}
-
 		fmt.Printf("Destination IP: %s\n", destIp)
 		if a.isIpAllowed(destIp) {
+			fmt.Printf("Allowed request to %s\n", destIp)
 			a.addIpToLogs("allowed", "unknown", destIp)
 			return ACCEPT_REQUEST
 		} else {
