@@ -7,8 +7,7 @@ table ip filter {
     }
 }
 
-insert rule ip filter DOCKER-USER iifname "docker0" counter drop
-insert rule ip filter DOCKER-USER iifname "docker0" ip daddr @allowed_ips counter accept
+insert rule ip filter DOCKER-USER iifname "docker0" queue num 0
 
 # Match DNS request (dest port 53) and enqueue to userspace
 # Block DNS queries for unallowed domains, preventing DNS exfiltration
