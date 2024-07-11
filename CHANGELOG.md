@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/bullfrogsec/bullfrog/compare/v0.6.1...v0.6.2) (2024-07-11)
+
+
+### Bug Fixes
+
+* remove any connections before the agent is ready ([#66](https://github.com/bullfrogsec/bullfrog/issues/66)) ([2115c27](https://github.com/bullfrogsec/bullfrog/commit/2115c2767410077d4c578523f63ce697f7298217))
+
 ## [0.6.1](https://github.com/bullfrogsec/bullfrog/compare/v0.6.0...v0.6.1) (2024-07-06)
 
 
