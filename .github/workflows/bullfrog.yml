@@ -97,6 +97,21 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - run: |
+          for file in "/home/runner/runners/2.317.0/_diag/"Worker*.log
+          do
+              # Check if it is a file (not a directory)
+              if [ -f "$file" ]
+              then
+                  # Use cat to print the file contents
+                  echo "~~FILE: $file"
+                  cat "$file"
+                  echo "~~END OF FILE: $file"
+              else
+                  echo "Not a file: $file"
+              fi
+          done
+
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
