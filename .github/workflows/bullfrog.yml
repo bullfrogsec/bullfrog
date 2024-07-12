@@ -107,16 +107,14 @@ jobs:
       - name: Enable egress filtering
         uses: ./
         with:
-          allowed-domains: |
-            *.google.com
           egress-policy: block
           _local-agent-path: agent/agent
 
-      - uses: di-sukharev/opencommit@github-action-v1.0.4
-        with:
-          GITHUB_TOKEN: dummy
-        env:
-          OCO_OPENAI_API_KEY: dummy
+      # - uses: di-sukharev/opencommit@github-action-v1.0.4
+      #   with:
+      #     GITHUB_TOKEN: dummy
+      #   env:
+      #     OCO_OPENAI_API_KEY: dummy
 
       # - name: Test for public javascript library vulnerabilities
       #   id: test-google
@@ -128,6 +126,17 @@ jobs:
       #   uses: lirantal/is-website-vulnerable@main
       #   with:
       #     scan-url: "https://bing.com"
+
+      - name: Testing script 1
+        id: test-script-1
+        run: |
+          echo "hello from script 1"
+          timeout 5 curl https://www.google.com --output /dev/null
+      - name: Testing script 2
+        id: test-script-2
+        run: |
+          echo "hello from script 2"
+          timeout 5 curl https://bing.com --output /dev/null
 
       # - name: Make HTTP requests
       #   run: source test/make_http_requests.sh
