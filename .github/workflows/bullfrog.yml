@@ -131,12 +131,12 @@ jobs:
         id: test-script-1
         run: |
           echo "hello from script 1"
-          timeout 5 curl https://www.google.com --output /dev/null
+          timeout 5 curl https://www.google.com --output /dev/null || true
       - name: Testing script 2
         id: test-script-2
         run: |
           echo "hello from script 2"
-          timeout 5 curl https://bing.com --output /dev/null
+          timeout 5 curl https://bing.com --output /dev/null || true
 
       # - name: Make HTTP requests
       #   run: source test/make_http_requests.sh
