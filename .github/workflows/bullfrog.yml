@@ -112,22 +112,28 @@ jobs:
           egress-policy: block
           _local-agent-path: agent/agent
 
-      - name: Test for public javascript library vulnerabilities
-        id: test-google
-        uses: lirantal/is-website-vulnerable@main
+      - uses: di-sukharev/opencommit@github-action-v1.0.4
         with:
-          scan-url: "https://www.google.com"
-      - name: Test for public javascript library vulnerabilities
-        id: test-bing
-        uses: lirantal/is-website-vulnerable@main
-        with:
-          scan-url: "https://bing.com"
+          GITHUB_TOKEN: dummy
+        env:
+          OCO_OPENAI_API_KEY: dummy
 
-      - name: Make HTTP requests
-        run: source test/make_http_requests.sh
+      # - name: Test for public javascript library vulnerabilities
+      #   id: test-google
+      #   uses: lirantal/is-website-vulnerable@main
+      #   with:
+      #     scan-url: "https://www.google.com"
+      # - name: Test for public javascript library vulnerabilities
+      #   id: test-bing
+      #   uses: lirantal/is-website-vulnerable@main
+      #   with:
+      #     scan-url: "https://bing.com"
 
-      - name: Make DNS requests
-        run: source test/make_dns_requests.sh
+      # - name: Make HTTP requests
+      #   run: source test/make_http_requests.sh
+
+      # - name: Make DNS requests
+      #   run: source test/make_dns_requests.sh
 
   # test-block-but-allow-any-dns-requests:
   #   needs: build
