@@ -11,7 +11,7 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 ```yaml
 # This action should be the first step of your job, and should be loaded on every separate job.
 # If this action is not loaded first, it will not be able to see or block any requests that occured prior to the action running.
-- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+- uses: bullfrogsec/bullfrog@931dc0cf68188ce1f6ddece4ab921bbf104fadc7 # v0.6.1
   with:
     # List of IPs to allow outbound connections to.
     # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
@@ -50,13 +50,13 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 The default usage will run in audit mode and will not block any request.
 
 ```yaml
-- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+- uses: bullfrogsec/bullfrog@931dc0cf68188ce1f6ddece4ab921bbf104fadc7 # v0.6.1
 ```
 
 ### Block every outbound connections
 
 ```yaml
-- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+- uses: bullfrogsec/bullfrog@931dc0cf68188ce1f6ddece4ab921bbf104fadc7 # v0.6.1
   with:
     egress-policy: block
 ```
@@ -64,7 +64,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to domains required for pulling a docker image from the docker hub
 
 ```yaml
-- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+- uses: bullfrogsec/bullfrog@931dc0cf68188ce1f6ddece4ab921bbf104fadc7 # v0.6.1
   with:
     egress-policy: block
     allowed-domains: |
@@ -76,7 +76,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to a specific IP address without blocking DNS requests
 
 ```yaml
-- uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
+- uses: bullfrogsec/bullfrog@931dc0cf68188ce1f6ddece4ab921bbf104fadc7 # v0.6.1
   with:
     egress-policy: block
     allowed-ips: |
