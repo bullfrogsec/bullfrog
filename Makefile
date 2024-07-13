@@ -41,6 +41,17 @@ test.lint.action:
 test.lint.agent:
 	cd $(AGENT_DIRECTORY) && make test.lint
 
+.PHONY: test.types
+test.types: test.types.action test.types.agent
+
+.PHONY: test.types.action
+test.types.action:
+	cd $(ACTION_DIRECTORY) && make test.types
+
+.PHONY: test.types.agent
+test.types.agent:
+	cd $(AGENT_DIRECTORY) && make test.types
+
 .PHONY: test.unit
 test.unit: test.unit.action test.unit.agent
 

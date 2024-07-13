@@ -26,10 +26,12 @@ func setAgentIsReady() {
 }
 
 func main() {
-	dnsPolicy := flag.String("dns-policy", "allowed-domains-only", "DNS policy: allowed-domains-only or any")
-	egressPolicy := flag.String("egress-policy", "audit", "Egress policy: audit or block")
 	allowedDomains := flag.String("allowed-domains", "", "Comma-separated list of allowed domains")
 	allowedIPs := flag.String("allowed-ips", "", "Comma-separated list of allowed IPs or IP ranges in CIDR notation")
+	dnsPolicy := flag.String("dns-policy", "allowed-domains-only", "DNS policy: allowed-domains-only or any")
+	egressPolicy := flag.String("egress-policy", "audit", "Egress policy: audit or block")
+	enableSudo := flag.Bool("enable-sudo", true, "Enable sudo: true or false")
+
 	flag.Parse()
 
 	agent := NewAgent(AgentConfig{
@@ -37,6 +39,7 @@ func main() {
 		EgressPolicy:    *egressPolicy,
 		AllowedDomains:  strings.Split(*allowedDomains, ","),
 		AllowedIPs:      strings.Split(*allowedIPs, ","),
+		EnableSudo:      *enableSudo,
 		Firewall:        &NFTFirewall{},
 		NetInfoProvider: &LinuxNetInfoProvider{},
 		FileSystem:      &FileSystem{}},

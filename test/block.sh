@@ -21,6 +21,8 @@ sudo rm -f /var/run/bullfrog/agent-ready
 sudo rm -f $POST_WARNINGS_FILEPATH
 sudo rm -f /var/log/tetragon/tetragon.log
 
+sudo touch /etc/sudoers.d/runner
+
 sudo NODE_OPTIONS=--enable-source-maps node \
   --require /vagrant/test/block.env.js \
   /vagrant/action/dist/main.js
@@ -28,7 +30,7 @@ sudo NODE_OPTIONS=--enable-source-maps node \
 source /vagrant/test/make_http_requests.sh
 source /vagrant/test/make_dns_requests.sh
 
-sudo NODE_OPTIONS=--enable-source-maps node \
+NODE_OPTIONS=--enable-source-maps node \
   --require /vagrant/test/block.env.js \
   /vagrant/action/dist/post.js | grep "^::warning::" |  sed 's/%0A/\n/g' > $POST_WARNINGS_FILEPATH
 
