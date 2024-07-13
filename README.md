@@ -34,6 +34,11 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
     # The egress policy to enforce. Valid values are `audit` and `block`.
     # Default: audit
     egress-policy:
+
+    # Enable this option to allow steps to execute commands with sudo.
+    # This is useful for workflows that require elevated privileges to perform certain tasks.
+    # Options: `true` (default) or `false`.
+    enable-sudo:
 ```
 
 <!-- end usage -->

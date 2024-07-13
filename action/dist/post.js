@@ -18853,7 +18853,7 @@ var require_core = __commonJS({
       return inputs.map((input) => input.trim());
     }
     exports2.getMultilineInput = getMultilineInput;
-    function getBooleanInput(name, options) {
+    function getBooleanInput2(name, options) {
       const trueValue = ["true", "True", "TRUE"];
       const falseValue = ["false", "False", "FALSE"];
       const val = getInput2(name, options);
@@ -18864,7 +18864,7 @@ var require_core = __commonJS({
       throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}
 Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
-    exports2.getBooleanInput = getBooleanInput;
+    exports2.getBooleanInput = getBooleanInput2;
     function setOutput(name, value) {
       const filePath = process.env["GITHUB_OUTPUT"] || "";
       if (filePath) {
@@ -19017,6 +19017,7 @@ function parseInputs() {
     allowedDomains,
     allowedIps,
     dnsPolicy,
+    enableSudo: core.getBooleanInput("enable-sudo"),
     egressPolicy,
     logDirectory: core.getInput("_log-directory", { required: true }),
     localAgentPath: core.getInput("_local-agent-path"),

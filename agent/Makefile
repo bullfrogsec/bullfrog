@@ -19,6 +19,9 @@ test.lint:
 		exit 1; \
 	fi
 
+.PHONY: test.types
+test.types: build
+
 .PHONY: test.unit
 test.unit:
 	go test

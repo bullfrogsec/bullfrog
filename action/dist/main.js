@@ -18853,7 +18853,7 @@ var require_core = __commonJS({
       return inputs.map((input) => input.trim());
     }
     exports2.getMultilineInput = getMultilineInput;
-    function getBooleanInput(name, options) {
+    function getBooleanInput2(name, options) {
       const trueValue = ["true", "True", "TRUE"];
       const falseValue = ["false", "False", "FALSE"];
       const val = getInput2(name, options);
@@ -18864,7 +18864,7 @@ var require_core = __commonJS({
       throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}
 Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     }
-    exports2.getBooleanInput = getBooleanInput;
+    exports2.getBooleanInput = getBooleanInput2;
     function setOutput(name, value) {
       const filePath = process.env["GITHUB_OUTPUT"] || "";
       if (filePath) {
@@ -19019,6 +19019,7 @@ function parseInputs() {
     allowedDomains,
     allowedIps,
     dnsPolicy,
+    enableSudo: core.getBooleanInput("enable-sudo"),
     egressPolicy,
     logDirectory: core.getInput("_log-directory", { required: true }),
     localAgentPath: core.getInput("_local-agent-path"),
@@ -19151,12 +19152,13 @@ async function downloadAgent({
 }
 async function startAgent({
   agentDirectory,
-  dnsPolicy,
-  egressPolicy,
+  agentPath,
+  agentLogFilepath,
   allowedDomains,
   allowedIps,
-  agentLogFilepath,
-  agentPath
+  dnsPolicy,
+  egressPolicy,
+  enableSudo
 }) {
   const blockingMode = egressPolicy === BLOCK;
   console.log("Loading nftables rules");
@@ -19178,18 +19180,21 @@ async function startAgent({
   await exec(`sudo chmod +x ${agentPath}`);
   const allowedDomainsFlag = allowedDomains.length > 0 ? `--allowed-domains ${allowedDomains.join(",")}` : "";
   const allowedIpsFlag = allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
-  (0, import_node_child_process.spawn)(
-    "sudo",
-    [
-      "sh",
-      "-c",
-      `${agentPath} --dns-policy ${dnsPolicy} --egress-policy ${egressPolicy} ${allowedDomainsFlag} ${allowedIpsFlag}`
-    ],
-    {
-      stdio: ["ignore", agentOut.fd, agentOut.fd],
-      detached: true
-    }
-  ).unref();
+  const enableSudoFlag = enableSudo ? "true" : "false";
+  const agentCommand = [
+    agentPath,
+    "--dns-policy",
+    dnsPolicy,
+    "--egress-policy",
+    egressPolicy,
+    `--enable-sudo=${enableSudoFlag}`,
+    allowedDomainsFlag,
+    allowedIpsFlag
+  ].join(" ");
+  (0, import_node_child_process.spawn)("sudo", ["sh", "-c", agentCommand], {
+    stdio: ["ignore", agentOut.fd, agentOut.fd],
+    detached: true
+  }).unref();
   await agentOut.close();
   const agentReady = await waitForFile(AGENT_READY_PATH);
   if (!agentReady) {
@@ -19199,13 +19204,14 @@ async function startAgent({
 }
 async function main() {
   const {
+    agentDownloadBaseURL,
     allowedDomains,
     allowedIps,
     dnsPolicy,
     egressPolicy,
-    logDirectory,
+    enableSudo,
     localAgentPath,
-    agentDownloadBaseURL
+    logDirectory
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
@@ -19225,13 +19231,14 @@ async function main() {
     agentDownloadBaseURL
   });
   await startAgent({
+    agentLogFilepath,
+    agentPath,
     agentDirectory,
-    dnsPolicy,
-    egressPolicy,
     allowedDomains,
     allowedIps,
-    agentLogFilepath,
-    agentPath
+    dnsPolicy,
+    enableSudo,
+    egressPolicy
   });
 }
 main().catch((error) => {

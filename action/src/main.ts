@@ -124,20 +124,22 @@ async function downloadAgent({
 
 async function startAgent({
   agentDirectory,
-  dnsPolicy,
-  egressPolicy,
+  agentPath,
+  agentLogFilepath,
   allowedDomains,
   allowedIps,
-  agentLogFilepath,
-  agentPath,
+  dnsPolicy,
+  egressPolicy,
+  enableSudo,
 }: {
   agentDirectory: string;
-  dnsPolicy: DnsPolicy;
-  egressPolicy: EgressPolicy;
+  agentPath: string;
   allowedDomains: string[];
   allowedIps: string[];
   agentLogFilepath: string;
-  agentPath: string;
+  dnsPolicy: DnsPolicy;
+  egressPolicy: EgressPolicy;
+  enableSudo: boolean;
 }) {
   const blockingMode = egressPolicy === BLOCK;
 
@@ -167,21 +169,27 @@ async function startAgent({
     allowedDomains.length > 0
       ? `--allowed-domains ${allowedDomains.join(",")}`
       : "";
+
   const allowedIpsFlag =
     allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
 
-  spawn(
-    "sudo",
-    [
-      "sh",
-      "-c",
-      `${agentPath} --dns-policy ${dnsPolicy} --egress-policy ${egressPolicy} ${allowedDomainsFlag} ${allowedIpsFlag}`,
-    ],
-    {
-      stdio: ["ignore", agentOut.fd, agentOut.fd],
-      detached: true,
-    },
-  ).unref();
+  const enableSudoFlag = enableSudo ? "true" : "false";
+
+  const agentCommand = [
+    agentPath,
+    "--dns-policy",
+    dnsPolicy,
+    "--egress-policy",
+    egressPolicy,
+    `--enable-sudo=${enableSudoFlag}`,
+    allowedDomainsFlag,
+    allowedIpsFlag,
+  ].join(" ");
+
+  spawn("sudo", ["sh", "-c", agentCommand], {
+    stdio: ["ignore", agentOut.fd, agentOut.fd],
+    detached: true,
+  }).unref();
 
   await agentOut.close();
 
@@ -194,13 +202,14 @@ async function startAgent({
 
 async function main() {
   const {
+    agentDownloadBaseURL,
     allowedDomains,
     allowedIps,
     dnsPolicy,
     egressPolicy,
-    logDirectory,
+    enableSudo,
     localAgentPath,
-    agentDownloadBaseURL,
+    logDirectory,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -226,13 +235,14 @@ async function main() {
     agentDownloadBaseURL,
   });
   await startAgent({
-    agentDirectory,
-    dnsPolicy,
-    egressPolicy,
-    allowedDomains,
-    allowedIps,
     agentLogFilepath,
     agentPath,
+    agentDirectory,
+    allowedDomains,
+    allowedIps,
+    dnsPolicy,
+    enableSudo,
+    egressPolicy,
   });
 }
 

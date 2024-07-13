@@ -17,6 +17,10 @@ fix:
 test.lint:
 	npx eslint .
 
+.PHONY: test.types
+test.types:
+	npx tsc --noEmit
+
 .PHONY: test.unit
 test.unit:
 	echo "No unit tests"

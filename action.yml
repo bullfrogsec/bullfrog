@@ -4,23 +4,34 @@ description: Controls outbound traffic (egress) to secure GitHub Actions workflo
 inputs:
   allowed-ips:
     description: "List of allowed IP addresses for outbound connections."
+
   allowed-domains:
     description: "List of allowed domains for outbound connections."
+
   dns-policy:
     description: "DNS policy to enforce when egress-policy is set to 'block'. Options: 'allowed-domains-only' (default) or 'any'."
     default: "allowed-domains-only"
+
   egress-policy:
     description: "The egress policy to enforce. Options: 'audit' (default) or 'block'."
     type: string
     default: "audit"
+
+  enable-sudo:
+    description: "Enable this option to allow steps to execute commands with sudo. Options: 'true' (default) or 'false'."
+    type: boolean
+    default: true
+
   _agent-download-base-url:
     description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork. The URL should end with a slash."
     type: string
     default: "https://github.com/bullfrogsec/bullfrog/releases/download/"
+
   _log-directory:
     description: "(Internal) Directory to store log files."
     type: string
     default: ${{ runner.temp }}/agent-logs
+
   _local-agent-path:
     description: "(Internal) Path to a local agent binary to use instead of fetching it from Github. This is useful for testing changes to the agent without releasing it. The path is relative to the root action directory (where this action.yml is located)."
     type: string

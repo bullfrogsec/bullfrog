@@ -8,6 +8,7 @@ export interface Inputs {
   allowedDomains: Array<string>;
   allowedIps: Array<string>;
   dnsPolicy: DnsPolicy;
+  enableSudo: boolean;
   egressPolicy: EgressPolicy;
   logDirectory: string;
   localAgentPath: string;
@@ -62,6 +63,7 @@ export function parseInputs(): Inputs {
     allowedDomains,
     allowedIps,
     dnsPolicy,
+    enableSudo: core.getBooleanInput("enable-sudo"),
     egressPolicy,
     logDirectory: core.getInput("_log-directory", { required: true }),
     localAgentPath: core.getInput("_local-agent-path"),

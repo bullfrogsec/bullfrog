@@ -56,6 +56,9 @@ jobs:
         run: |
           make bootstrap
           make build
+
+      - name: Run Unit Tests
+        run: |
           make test.unit
 
       - uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
@@ -138,6 +141,7 @@ jobs:
           allowed-domains: |
             *.google.com
           egress-policy: block
+          enable-sudo: false
           _local-agent-path: agent/agent
 
       - name: Make HTTP requests
@@ -145,6 +149,9 @@ jobs:
 
       - name: Make DNS requests
         run: source test/make_dns_requests.sh
+
+      - name: Run sudo commands
+        run: source test/run_sudo_commands.sh
 
   test-block-but-allow-any-dns-requests:
     needs: build
@@ -263,6 +270,7 @@ jobs:
       - name: Run Tests
         run: make test.integration
 
+  # TODO: Rename to something else since it runs test.lint and test.types
   test-lint:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
@@ -273,7 +281,9 @@ jobs:
         with:
           egress-policy: block
           allowed-domains: |
+            *.golang.org
             registry.npmjs.org
+            storage.googleapis.com
 
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -285,6 +295,10 @@ jobs:
       - name: Lint
         run: |
           make test.lint
+
+      - name: Types
+        run: |
+          make test.types
 
   pre-release:
     if: github.ref == 'refs/heads/main'

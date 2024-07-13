@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"path"
 	"time"
 
@@ -33,6 +34,7 @@ type AgentConfig struct {
 	AllowedDomains  []string
 	AllowedIPs      []string
 	Firewall        IFirewall
+	EnableSudo      bool
 	NetInfoProvider INetInfoProvider
 	FileSystem      IFileSystem
 }
@@ -87,6 +89,12 @@ func (a *Agent) init(config AgentConfig) error {
 
 	a.loadAllowedIp(config.AllowedIPs)
 	a.loadAllowedDomain(config.AllowedDomains)
+
+	if !config.EnableSudo {
+		if err := a.disableSudo(); err != nil {
+			log.Fatalln("Could not disable sudo")
+		}
+	}
 
 	err := a.loadAllowedDNSServers()
 	if err != nil {
@@ -335,4 +343,8 @@ func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 		}
 	}
 	return ACCEPT_REQUEST
+}
+
+func (a *Agent) disableSudo() error {
+	return os.Remove("/etc/sudoers.d/runner")
 }
