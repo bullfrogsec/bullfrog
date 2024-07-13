@@ -4,6 +4,8 @@ Increase the security of your Github Actions workflows using Bullfrog! With Bull
 
 Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode to get a list of all outbound network connections, without impacting your existing workflows.
 
+This should not trigger a full build
+
 ## Usage
 
 <!-- start usage -->
