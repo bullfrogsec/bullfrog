@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/bullfrogsec/bullfrog/compare/v0.6.2...v0.7.0) (2024-07-13)
+
+
+### Features
+
+* Add `enable-sudo` input ([#71](https://github.com/bullfrogsec/bullfrog/issues/71)) ([5a33725](https://github.com/bullfrogsec/bullfrog/commit/5a3372537f0c8c521cb794a1e08da54b57ec27cc))
+
 ## [0.6.2](https://github.com/bullfrogsec/bullfrog/compare/v0.6.1...v0.6.2) (2024-07-11)
 
 
