@@ -13,10 +13,27 @@ permissions:
   contents: read
 
 jobs:
+  check-diff:
+    runs-on: ubuntu-22.04
+    outputs:
+      diff: ${{ steps.changes.outputs.src }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: fallard84/paths-filter@dfb4213208eb30382ee3e27b8a810fc3fb8cc911 # v3.0.3
+        id: changes
+        with:
+          predicate-quantifier: "every"
+          filters: |
+            src:
+              - '**/*'
+              - '!**/*.md'
+
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
-
+    needs: check-diff
+    if: ${{ needs.check-diff.outputs.diff == 'true' }}
     steps:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@37cbe3f08b15d9595789d51874dd7468fef1b8d9 # v0.6.1
