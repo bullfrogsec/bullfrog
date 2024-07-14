@@ -1,5 +1,5 @@
 name: Bullfrog Secure Runner
-description: Controls outbound traffic (egress) to secure GitHub Actions workflows.
+description: "Block unauthorized outbound traffic (egress) in your Github workflows"
 
 inputs:
   allowed-ips:
@@ -41,3 +41,7 @@ runs:
   using: "node20"
   main: "action/dist/main.js"
   post: "action/dist/post.js"
+
+branding:
+  icon: "shield"
+  color: "green"
