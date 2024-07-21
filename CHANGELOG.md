@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/bullfrogsec/bullfrog/compare/v0.7.0...v0.8.0) (2024-07-21)
+
+
+### Features
+
+* Verify agent checksum ([#79](https://github.com/bullfrogsec/bullfrog/issues/79)) ([e5b087d](https://github.com/bullfrogsec/bullfrog/commit/e5b087dbb65dc18b4f9960f83a8da69f79253fe5))
+
 ## [0.7.0](https://github.com/bullfrogsec/bullfrog/compare/v0.6.2...v0.7.0) (2024-07-13)
 
 
