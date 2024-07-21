@@ -19015,14 +19015,15 @@ function parseInputs() {
   if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
+  const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
   return {
     allowedDomains,
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
     egressPolicy,
+    localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    localAgentPath: core.getInput("_local-agent-path"),
     agentDownloadBaseURL: core.getInput("_agent-download-base-url")
   };
 }
@@ -19067,6 +19068,54 @@ async function waitForStringInFile({
 
 // src/main.ts
 var exec = import_node_util.default.promisify(import_node_child_process.exec);
+async function copyLocalAgent({ agentDirectory }) {
+  await import_promises3.default.mkdir(import_node_path.default.dirname(AGENT_INSTALL_PATH), { recursive: true });
+  await import_promises3.default.cp(import_node_path.default.join(agentDirectory, "agent"), AGENT_INSTALL_PATH);
+}
+async function downloadAgent({
+  actionDirectory,
+  agentDirectory,
+  version: version2,
+  agentDownloadBaseURL
+}) {
+  console.log(`Downloading agent v${version2}`);
+  const { status } = (0, import_node_child_process.spawnSync)(
+    "bash",
+    [
+      import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh"),
+      `v${version2}`,
+      agentDownloadBaseURL
+    ],
+    {
+      env: {
+        AGENT_DIRECTORY: agentDirectory
+      },
+      stdio: "inherit"
+    }
+  );
+  if (status !== 0) {
+    throw new Error("Couldn't download agent");
+  }
+}
+async function installAgent({
+  actionDirectory,
+  agentDirectory,
+  localAgent,
+  version: version2,
+  agentDownloadBaseURL
+}) {
+  if (localAgent) {
+    await copyLocalAgent({ agentDirectory });
+  } else {
+    await downloadAgent({
+      actionDirectory,
+      agentDirectory,
+      agentDownloadBaseURL,
+      version: version2
+    });
+  }
+  await verifyAgent({ agentDirectory });
+}
 function installPackages() {
   console.log("Installing packages");
   const { status } = (0, import_node_child_process.spawnSync)(
@@ -19124,35 +19173,8 @@ async function startTetragon({
   });
   console.timeEnd("Tetragon startup time");
 }
-async function downloadAgent({
-  actionDirectory,
-  localAgentPath,
-  version: version2,
-  agentDownloadBaseURL
-}) {
-  if (localAgentPath !== "") {
-    const absolutePath = import_node_path.default.join(actionDirectory, "..", localAgentPath);
-    core3.debug(`Using local agent from ${absolutePath}`);
-    return absolutePath;
-  }
-  console.log(`Downloading agent v${version2}`);
-  const { status } = (0, import_node_child_process.spawnSync)(
-    "bash",
-    [
-      import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh"),
-      `v${version2}`,
-      agentDownloadBaseURL
-    ],
-    { stdio: "inherit" }
-  );
-  if (status !== 0) {
-    throw new Error("Couldn't download agent");
-  }
-  return AGENT_INSTALL_PATH;
-}
 async function startAgent({
   agentDirectory,
-  agentPath,
   agentLogFilepath,
   allowedDomains,
   allowedIps,
@@ -19175,14 +19197,14 @@ async function startAgent({
     console.log("loaded audit rules");
   }
   const agentOut = await import_promises3.default.open(agentLogFilepath, "a");
-  console.log(`Starting agent from ${agentPath}`);
+  console.log(`Starting agent from ${AGENT_INSTALL_PATH}`);
   console.time("Agent startup time");
-  await exec(`sudo chmod +x ${agentPath}`);
+  await exec(`sudo chmod +x ${AGENT_INSTALL_PATH}`);
   const allowedDomainsFlag = allowedDomains.length > 0 ? `--allowed-domains ${allowedDomains.join(",")}` : "";
   const allowedIpsFlag = allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
   const enableSudoFlag = enableSudo ? "true" : "false";
   const agentCommand = [
-    agentPath,
+    AGENT_INSTALL_PATH,
     "--dns-policy",
     dnsPolicy,
     "--egress-policy",
@@ -19202,6 +19224,15 @@ async function startAgent({
   }
   console.timeEnd("Agent startup time");
 }
+async function verifyAgent({ agentDirectory }) {
+  const agentDirName = import_node_path.default.dirname(AGENT_INSTALL_PATH);
+  const src = import_node_path.default.join(agentDirectory, "agent.sha256");
+  const dest = import_node_path.default.join(agentDirName, "agent.sha256");
+  await import_promises3.default.cp(src, dest);
+  await exec("sha256sum --check --strict agent.sha256", {
+    cwd: agentDirName
+  });
+}
 async function main() {
   const {
     agentDownloadBaseURL,
@@ -19210,7 +19241,7 @@ async function main() {
     dnsPolicy,
     egressPolicy,
     enableSudo,
-    localAgentPath,
+    localAgent,
     logDirectory
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
@@ -19224,15 +19255,15 @@ async function main() {
   await startTetragon({
     tetragonLogFilepath
   });
-  const agentPath = await downloadAgent({
+  await installAgent({
     actionDirectory,
-    localAgentPath,
+    agentDirectory,
+    localAgent,
     version: pkg.version,
     agentDownloadBaseURL
   });
   await startAgent({
     agentLogFilepath,
-    agentPath,
     agentDirectory,
     allowedDomains,
     allowedIps,

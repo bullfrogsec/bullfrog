@@ -10,8 +10,8 @@ export interface Inputs {
   dnsPolicy: DnsPolicy;
   enableSudo: boolean;
   egressPolicy: EgressPolicy;
+  localAgent: boolean;
   logDirectory: string;
-  localAgentPath: string;
   agentDownloadBaseURL: string;
 }
 
@@ -59,14 +59,16 @@ export function parseInputs(): Inputs {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
 
+  const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
+
   return {
     allowedDomains,
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
     egressPolicy,
+    localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    localAgentPath: core.getInput("_local-agent-path"),
     agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
   };
 }

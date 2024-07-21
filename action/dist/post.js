@@ -19013,14 +19013,15 @@ function parseInputs() {
   if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
+  const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
   return {
     allowedDomains,
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
     egressPolicy,
+    localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    localAgentPath: core.getInput("_local-agent-path"),
     agentDownloadBaseURL: core.getInput("_agent-download-base-url")
   };
 }

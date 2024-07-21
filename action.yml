@@ -32,11 +32,6 @@ inputs:
     type: string
     default: ${{ runner.temp }}/agent-logs
 
-  _local-agent-path:
-    description: "(Internal) Path to a local agent binary to use instead of fetching it from Github. This is useful for testing changes to the agent without releasing it. The path is relative to the root action directory (where this action.yml is located)."
-    type: string
-    default: ""
-
 runs:
   using: "node20"
   main: "action/dist/main.js"

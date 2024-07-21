@@ -16,6 +16,7 @@ if [ -f "$AGENT_FILE" ]; then
 else
     curl -L ${DOWNLOAD_URL}/${VERSION}/agent.tar.gz -o "$AGENT_FILE"
 fi
+
 tar -xvf "$AGENT_FILE" -C $TMP_DIR
 
 mkdir -p "$FINAL_BIN_DIR"

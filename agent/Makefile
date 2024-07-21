@@ -3,12 +3,24 @@ bootstrap:
 
 .PHONY: build
 build:
-	go build -trimpath -ldflags=-buildid=
+	docker build --tag agent-build-image --build-arg BUILDOS=linux --build-arg BUILDARCH=amd64 .
+
+	docker rm --force agent-build
+	docker run --name agent-build agent-build-image
+
+	docker cp agent-build:/agent/agent .
+
+	docker rm --force agent-build
+
+	sha256sum agent | tee agent.sha256
 
 .PHONY: fix
 fix:
 	go fmt
 
+.PHONY: test.artifacts
+test.artifacts:
+	sha256sum --check --strict agent.sha256
 
 GOFMT_OUTPUT = $(shell gofmt -l .)
 
@@ -20,7 +32,8 @@ test.lint:
 	fi
 
 .PHONY: test.types
-test.types: build
+test.types:
+	echo "We don't need it since `go build` verifies the types"
 
 .PHONY: test.unit
 test.unit:
