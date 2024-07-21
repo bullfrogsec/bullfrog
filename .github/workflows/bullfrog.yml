@@ -40,17 +40,17 @@ jobs:
         with:
           egress-policy: block
           allowed-domains: |
-            registry.npmjs.org
-            *.golang.org
-            storage.googleapis.com
-            *.github.com
             *.blob.core.windows.net
+            *.docker.io
+            *.golang.org
+            *.github.com
+            deb.debian.org
+            production.cloudflare.docker.com
+            registry.npmjs.org
+            storage.googleapis.com
 
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - name: Install deps
-        run: sudo apt-get install libnetfilter-queue-dev
 
       - name: Build
         run: |
@@ -68,7 +68,7 @@ jobs:
             agent/agent
             action/dist
 
-  check-dist-diff:
+  check-artifacts:
     needs: build
     runs-on: ubuntu-22.04
     timeout-minutes: 5
@@ -88,9 +88,9 @@ jobs:
         with:
           name: build-artifacts
 
-      - name: Check if dist has changed for the action/dist folder
+      - name: Check Artifact Build
         run: |
-          git diff --exit-code --quiet action/dist || (echo "action/dist has changed, please commit the changes" && exit 1)
+          make test.artifacts
 
   test-audit:
     needs: build
@@ -107,10 +107,11 @@ jobs:
 
       - name: Enable egress filtering
         uses: ./
+        env:
+          _LOCAL_AGENT: true
         with:
           allowed-domains: |
             *.google.com
-          _local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: |
@@ -137,12 +138,13 @@ jobs:
 
       - name: Enable egress filtering
         uses: ./
+        env:
+          _LOCAL_AGENT: true
         with:
           allowed-domains: |
             *.google.com
           egress-policy: block
           enable-sudo: false
-          _local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -168,12 +170,13 @@ jobs:
 
       - name: Enable egress filtering
         uses: ./
+        env:
+          _LOCAL_AGENT: true
         with:
           allowed-domains: |
             *.google.com
           dns-policy: any
           egress-policy: block
-          _local-agent-path: agent/agent
 
       - name: Make HTTP requests
         run: source test/make_http_requests.sh
@@ -198,16 +201,16 @@ jobs:
 
       - name: Enable egress filtering
         uses: ./
+        env:
+          _LOCAL_AGENT: true
         with:
           allowed-ips: |
             172.17.0.0/16
           allowed-domains: |
-            production.cloudflare.docker.com
-            docker.io
             *.docker.io
+            production.cloudflare.docker.com
             www.google.com
           egress-policy: block
-          _local-agent-path: agent/agent
 
       - name: Test curl calls within Docker
         run: |
@@ -249,6 +252,7 @@ jobs:
             download.docker.com
             go.dev
             objects.githubusercontent.com
+            packages.microsoft.com
             vagrantcloud-files-production.s3-accelerate.amazonaws.com
             vagrantcloud.com
             www.google.com
@@ -262,6 +266,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install --yes vagrant virtualbox
 
       - name: Start VM
@@ -309,7 +314,7 @@ jobs:
     needs:
       [
         build,
-        check-dist-diff,
+        check-artifacts,
         test-audit,
         test-block,
         test-block-but-allow-any-dns-requests,

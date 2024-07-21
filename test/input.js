@@ -12,6 +12,6 @@ bing.com
 `;
 
 // uncomment to test with local agent or download release
-process.env["INPUT__LOCAL-AGENT-PATH"] = "agent/agent";
+process.env["_LOCAL_AGENT"] = "true";
 // process.env["INPUT__AGENT-DOWNLOAD-BASE-URL"] =
 // ("https://github.com/bullfrogsec/bullfrog/releases/download/");

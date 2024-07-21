@@ -13,6 +13,10 @@ build:
 fix:
 	npx eslint --fix .
 
+.PHONY: test.artifacts
+test.artifacts:
+	git diff --exit-code --quiet dist || (echo "dist has changed, please commit the changes" && exit 1)
+
 .PHONY: test.lint
 test.lint:
 	npx eslint .
