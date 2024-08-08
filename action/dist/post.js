@@ -19081,7 +19081,10 @@ async function printAnnotations() {
 async function getOutboundConnections() {
   try {
     const connections = [];
-    const agentReadyTimestamp = await getFileTimestamp(AGENT_READY_PATH);
+    const agentReadyTimestamp = new Date(
+      await getFileTimestamp(AGENT_READY_PATH)
+    );
+    console.log("Agent ready timestamp: ", agentReadyTimestamp);
     const tetragonLogFile = await import_promises2.default.open(TETRAGON_EVENTS_LOG_PATH);
     const functionsToTrack = ["tcp_connect"];
     for await (const line of tetragonLogFile.readLines()) {
@@ -19089,7 +19092,7 @@ async function getOutboundConnections() {
       if (processEntry?.["policy_name"] !== "connect") {
         continue;
       }
-      if (processEntry.process.start_time < agentReadyTimestamp) {
+      if (new Date(processEntry.process.start_time) < agentReadyTimestamp) {
         continue;
       }
       if (!functionsToTrack.includes(processEntry.function_name)) {
