@@ -71,7 +71,10 @@ async function getOutboundConnections(): Promise<TetragonLog[]> {
   try {
     const connections: TetragonLog[] = [];
 
-    const agentReadyTimestamp = await getFileTimestamp(AGENT_READY_PATH);
+    const agentReadyTimestamp = new Date(
+      await getFileTimestamp(AGENT_READY_PATH),
+    );
+    console.log("Agent ready timestamp: ", agentReadyTimestamp);
 
     const tetragonLogFile = await fs.open(TETRAGON_EVENTS_LOG_PATH);
 
@@ -86,7 +89,7 @@ async function getOutboundConnections(): Promise<TetragonLog[]> {
       }
 
       // Skip connection entries that were logged before the agent was ready
-      if (processEntry.process.start_time < agentReadyTimestamp) {
+      if (new Date(processEntry.process.start_time) < agentReadyTimestamp) {
         continue;
       }
 
