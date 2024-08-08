@@ -119,19 +119,25 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 			want:   ACCEPT_REQUEST,
 		},
 		{
-			name:   "Block DNS query to blocked.com",
+			name:   "Drop DNS query to blocked.com",
 			packet: testingUtils.GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53}),
 			agent:  blockDNSAgent,
 			want:   DROP_REQUEST,
 		},
 		{
-			name:   "Block DNS query using untrusted DNS server but trusted domain",
+			name:   "Drop DNS query using untrusted DNS server but trusted domain",
 			packet: testingUtils.GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8}),
 			agent:  blockDNSAgent,
 			want:   DROP_REQUEST,
 		},
 		{
-			name:   "Allow DNS query to blocked.com when not blocking DNS",
+			name:   "Acccept DNS SRV query to _https._tcp.trusted.com",
+			packet: testingUtils.GenerateDNSTypeSRVRequestPacket("_https._tcp.trusted.com", net.IP{127, 0, 0, 53}),
+			agent:  blockDNSAgent,
+			want:   ACCEPT_REQUEST,
+		},
+		{
+			name:   "Acccept DNS query to blocked.com when not blocking DNS",
 			packet: testingUtils.GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53}),
 			agent:  noBlockDNSAgent,
 			want:   ACCEPT_REQUEST,
@@ -259,6 +265,34 @@ func TestProcessDNSResponseCNAMEPacket(t *testing.T) {
 			}
 			if agent.allowedDomains[tt.want.domain] != tt.want.allowListPresent {
 				t.Errorf("ProcessPacket() = %v, want %v", agent.allowedDomains[tt.want.domain], tt.want.allowListPresent)
+			}
+		})
+	}
+}
+
+func TestExtractDomainFromSRVRequest(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+		want   string
+	}{
+		{
+			name:   "Extract domain from https request",
+			domain: "_https._tcp.example.com",
+			want:   "example.com",
+		},
+		{
+			name:   "Extract domain from http request",
+			domain: "_http._tcp.example.com",
+			want:   "example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractDomainFromSRV(tt.domain)
+			if got != tt.want {
+				t.Errorf("extractDomainFromSRV() = %v, want %v", got, tt.want)
 			}
 		})
 	}

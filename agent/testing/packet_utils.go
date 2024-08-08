@@ -33,6 +33,32 @@ func GenerateDNSRequestPacket(domain string, nameserver net.IP) gopacket.Packet 
 	return GenerateDNSPacket(dns, udp, ip)
 }
 
+func GenerateDNSTypeSRVRequestPacket(domain string, nameserver net.IP) gopacket.Packet {
+	dns := layers.DNS{
+		ID:           0x22,
+		QR:           false,
+		OpCode:       layers.DNSOpCodeQuery,
+		ResponseCode: layers.DNSResponseCodeNoErr,
+		Questions: []layers.DNSQuestion{
+			{
+				Name: []byte(domain),
+				Type: layers.DNSTypeSRV,
+			},
+		},
+	}
+	udp := layers.UDP{
+		SrcPort: layers.UDPPort(1234),
+		DstPort: layers.UDPPort(53),
+	}
+	ip := layers.IPv4{
+		Protocol: layers.IPProtocolUDP, // must to decode next
+		SrcIP:    net.IP{127, 0, 0, 1},
+		DstIP:    nameserver,
+		Version:  4,
+	}
+	return GenerateDNSPacket(dns, udp, ip)
+}
+
 func GenerateDNSTypeAResponsePacket(domain string, answerIp net.IP, nameserver net.IP) gopacket.Packet {
 	question := layers.DNSQuestion{
 		Name: []byte(domain),

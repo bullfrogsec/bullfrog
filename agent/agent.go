@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"regexp"
 	"time"
 
 	"github.com/google/gopacket"
@@ -222,7 +223,7 @@ func (a *Agent) loadAllowedDNSServers() error {
 	return nil
 }
 
-func (a *Agent) getDestinationIP(packet gopacket.Packet) (string, error) {
+func getDestinationIP(packet gopacket.Packet) (string, error) {
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
 		ipLayer = packet.Layer(layers.LayerTypeIPv6)
@@ -241,32 +242,44 @@ func (a *Agent) getDestinationIP(packet gopacket.Packet) (string, error) {
 	return ip.DstIP.String(), nil
 }
 
+func extractDomainFromSRV(domain string) string {
+	// drop the protocol and transport layer subdomains from the SRV DNS query domain
+	// only _http._tcp. and _https._tcp are supported for now
+	regex := `^_http\._tcp\.|^_https\._tcp\.`
+	re := regexp.MustCompile(regex)
+	return re.ReplaceAllString(domain, "")
+}
+
 func (a *Agent) processDNSQuery(packet gopacket.Packet) uint8 {
 	dnsLayer := packet.Layer(layers.LayerTypeDNS)
 	dns, _ := dnsLayer.(*layers.DNS)
 	for _, q := range dns.Questions {
 		domain := string(q.Name)
 		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
-		fmt.Print(domain)
 
 		// making sure the DNS query is using a trusted DNS server
-		destinationIP, err := a.getDestinationIP(packet)
+		destinationIP, err := getDestinationIP(packet)
 		if err != nil {
 			fmt.Println("Failed to get destination IP")
 			a.addIpToLogs("blocked", domain, "unknown")
 			return DROP_REQUEST
 		}
 		if !a.allowedDNSServers[destinationIP] {
-			fmt.Printf("-> Blocked DNS Query. Untrusted DNS server %s\n", destinationIP)
+			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, destinationIP)
 			a.addIpToLogs("blocked", domain, "unknown")
 			return DROP_REQUEST
 		}
-
+		if q.Type == layers.DNSTypeSRV {
+			originalDomain := domain
+			domain = extractDomainFromSRV(domain)
+			fmt.Printf("%s -> Converting domain from SRV query: %s\n", originalDomain, domain)
+		}
 		if a.isDomainAllowed(domain) {
-			fmt.Println("-> Allowed DNS Query")
+			fmt.Printf("%s -> Allowed DNS Query\n", domain)
 			return ACCEPT_REQUEST
 		}
-		fmt.Println("-> Blocked DNS Query")
+
+		fmt.Printf("%s -> Blocked DNS Query\n", domain)
 		a.addIpToLogs("blocked", domain, "unknown")
 		return DROP_REQUEST
 	}
@@ -314,6 +327,20 @@ func (a *Agent) processDNSTypeCNAMEResponse(domain string, answer *layers.DNSRes
 	}
 }
 
+func (a *Agent) processDNSTypeSRVResponse(domain string, answer *layers.DNSResourceRecord) {
+	srvDomain := string(answer.SRV.Name)
+	fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, srvDomain)
+	fmt.Printf("%s:%s", answer.Name, srvDomain)
+	domain = extractDomainFromSRV(domain)
+	if a.isDomainAllowed(domain) {
+		fmt.Println("-> Allowed request")
+		if !a.allowedDomains[srvDomain] {
+			fmt.Printf("Adding %s to the allowed domains list\n", srvDomain)
+			a.allowedDomains[srvDomain] = true
+		}
+	}
+}
+
 func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
 	dnsLayer := packet.Layer(layers.LayerTypeDNS)
 	dns, _ := dnsLayer.(*layers.DNS)
@@ -323,6 +350,12 @@ func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
 			a.processDNSTypeAResponse(domain, &answer)
 		} else if answer.Type == layers.DNSTypeCNAME {
 			a.processDNSTypeCNAMEResponse(domain, &answer)
+		} else if answer.Type == layers.DNSTypeSRV {
+			a.processDNSTypeSRVResponse(domain, &answer)
+		} else if answer.Type == layers.DNSTypeAAAA {
+			fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
+		} else {
+			fmt.Printf("DNS Answer (others): %s %s %s\n", answer.Name, answer.Type, answer.IP)
 		}
 	}
 	return ACCEPT_REQUEST

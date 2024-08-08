@@ -21,8 +21,9 @@ func setAgentIsReady() {
 		return
 	}
 	defer f.Close()
-
-	fmt.Fprintf(f, "%d\n", time.Now().Unix())
+	now := time.Now().Unix()
+	fmt.Printf("Agent is ready at %d\n", now)
+	fmt.Fprintf(f, "%d\n", now)
 }
 
 func main() {
