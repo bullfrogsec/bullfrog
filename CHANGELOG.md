@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/bullfrogsec/bullfrog/compare/v0.8.0...v0.8.1) (2024-08-08)
+
+
+### Bug Fixes
+
+* remove any connections before the agent is ready (again) ([#95](https://github.com/bullfrogsec/bullfrog/issues/95)) ([e735a66](https://github.com/bullfrogsec/bullfrog/commit/e735a662e59d14e2f5ee855e49459d6feb2bc465))
+* support SRV query type ([#94](https://github.com/bullfrogsec/bullfrog/issues/94)) ([0cd63f1](https://github.com/bullfrogsec/bullfrog/commit/0cd63f1915fa53d83dcba46f7037c7e35ad77b7b))
+
 ## [0.8.0](https://github.com/bullfrogsec/bullfrog/compare/v0.7.0...v0.8.0) (2024-07-21)
 
 
