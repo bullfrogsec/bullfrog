@@ -44,11 +44,10 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 <!-- end usage -->
 
 ## Scenarios
-
-- [Default](#Default)
-- [Block every outbound connections](#Block-every-outbound-connections)
-- [Only allow requests to domains required for pulling a docker image from the docker hub](#Only-allow-requests-to-domains-required-for-pulling-a-docker-image-from-the-docker-hub)
-- [Only allow requests to a specific IP address without blocking DNS requests](#Only-allow-requests-to-a-specific-IP-address-without-blocking-DNS-requests)
+- [Default](#default)
+- [Block every outbound connections](#block-every-outbound-connections)
+- [Only allow requests to domains required for pulling a docker image from the docker hub](#only-allow-requests-to-domains-required-for-pulling-a-docker-image-from-the-docker-hub)
+- [Only allow requests to a specific IP address without blocking DNS requests](#only-allow-requests-to-a-specific-ip-address-without-blocking-dns-requests)
 
 ### Default
 
@@ -97,6 +96,9 @@ You can view blocked or unallowed outbound requests in the workflow summary.
 ## Runners compability
 
 This action is currently only supporting Github-hosted runners on Ubuntu (`ubuntu-latest`, `ubuntu-22.04` and `ubuntu-24.04`).
+
+## Support or Feedback
+If you need support or have any feedback to share, join us on [Slack](https://join.slack.com/t/bullfogsec/shared_invite/zt-2mbf603gn-TRfhXvf_x8J7yB9fJ3Os7Q). And if you find Bullfrog useful, please leave a star ⭐️.
 
 ## License
 
