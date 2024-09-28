@@ -22,6 +22,10 @@ func (m *NetInfoProvider) GetDNSServer() (string, error) {
 	return "127.0.0.125", nil
 }
 
+func (m *NetInfoProvider) FlushDNSCache() error {
+	return nil
+}
+
 type FileSystem struct {
 }
 

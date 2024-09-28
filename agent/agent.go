@@ -106,6 +106,10 @@ func (a *Agent) init(config AgentConfig) error {
 	if err != nil {
 		log.Fatalf("Error adding to firewall: %v", err)
 	}
+	err = a.netInfoProvider.FlushDNSCache()
+	if err != nil {
+		log.Printf("Error flushing DNS cache: %v", err)
+	}
 	return nil
 }
 

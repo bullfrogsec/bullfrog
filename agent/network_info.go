@@ -7,6 +7,7 @@ import (
 
 type INetInfoProvider interface {
 	GetDNSServer() (string, error)
+	FlushDNSCache() error
 }
 
 type LinuxNetInfoProvider struct {
@@ -33,4 +34,13 @@ func (l *LinuxNetInfoProvider) GetDNSServer() (string, error) {
 	dnsServer = dnsServer[:len(dnsServer)-1]
 	fmt.Printf("DNS server: %s\n", dnsServer)
 	return string(dnsServer), nil
+}
+
+func(l *LinuxNetInfoProvider) FlushDNSCache() error {
+	_, err := exec.Command("sh", "-c", "resolvectl flush-caches").Output()
+	if err != nil {
+		fmt.Println("Error flushing DNS cache: ", err)
+		return err
+	}
+	return nil
 }
