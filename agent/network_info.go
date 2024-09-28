@@ -36,7 +36,7 @@ func (l *LinuxNetInfoProvider) GetDNSServer() (string, error) {
 	return string(dnsServer), nil
 }
 
-func(l *LinuxNetInfoProvider) FlushDNSCache() error {
+func (l *LinuxNetInfoProvider) FlushDNSCache() error {
 	_, err := exec.Command("sh", "-c", "resolvectl flush-caches").Output()
 	if err != nil {
 		fmt.Println("Error flushing DNS cache: ", err)
