@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/bullfrogsec/bullfrog/compare/v0.8.1...v0.8.2) (2024-09-28)
+
+
+### Bug Fixes
+
+* **agent:** flush dns cache during initialization ([#120](https://github.com/bullfrogsec/bullfrog/issues/120)) ([90306e1](https://github.com/bullfrogsec/bullfrog/commit/90306e1384b0b1a3ef6dd941349385ae3be49f9a))
+
 ## [0.8.1](https://github.com/bullfrogsec/bullfrog/compare/v0.8.0...v0.8.1) (2024-08-08)
 
 
