@@ -15,7 +15,7 @@ import (
 
 var (
 	blocking          = false
-	defaultDomains    = []string{"github.com", "api.github.com", "*.actions.githubusercontent.com", "results-receiver.actions.githubusercontent.com", "*.blob.core.windows.net"}
+	defaultDomains    = []string{}
 	defaultIps        = []string{"168.63.129.16", "169.254.169.254", "127.0.0.1"}
 	defaultDNSServers = []string{"127.0.0.53"}
 )
