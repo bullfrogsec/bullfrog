@@ -18,7 +18,7 @@ jobs:
           egress-policy: block
 
       - name: PR Conventional Commit Validation
-        uses: ytanikin/PRConventionalCommits@8d258b54939f6769fcd935a52b96d6b0383a00c5 # v1.2.0
+        uses: ytanikin/PRConventionalCommits@b628c5a234cc32513014b7bfdd1e47b532124d98 # v1.3.0
 
         with:
           task_types: '["feat","fix","docs","test","ci","refactor","perf","chore","revert"]'
