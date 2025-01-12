@@ -256,7 +256,8 @@ async function main() {
   const actionDirectory = path.join(__dirname, "..");
 
   const agentDirectory = path.join(actionDirectory, "..", "agent");
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pkg = require(`${actionDirectory}/../package.json`);
 
   await fs.mkdir(logDirectory, { recursive: true });

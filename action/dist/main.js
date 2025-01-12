@@ -19862,7 +19862,7 @@ async function waitForFile(filePath, timeout = 15e3, interval = 500) {
       await import_promises.default.access(filePath);
       core2.debug(`File ${filePath} is available!`);
       return true;
-    } catch (err) {
+    } catch {
       await (0, import_promises2.setTimeout)(interval);
     }
   }
@@ -19879,7 +19879,7 @@ async function waitForStringInFile({
     let content = "";
     try {
       content = await import_promises.default.readFile(filePath, { encoding: "utf-8" });
-    } catch (err) {
+    } catch {
     }
     if (content.includes(str)) {
       return;

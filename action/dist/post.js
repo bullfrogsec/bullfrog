@@ -19897,7 +19897,7 @@ async function printAnnotations() {
     });
     core3.warning(annotations.join("\n"));
     return;
-  } catch (error) {
+  } catch {
     core3.debug("No annotations found");
   }
 }
