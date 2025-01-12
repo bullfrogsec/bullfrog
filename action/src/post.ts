@@ -45,7 +45,7 @@ async function printAnnotations() {
     });
     core.warning(annotations.join("\n"));
     return;
-  } catch (error) {
+  } catch {
     core.debug("No annotations found");
   }
 }

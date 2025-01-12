@@ -14,7 +14,7 @@ export async function waitForFile(
       await fs.access(filePath);
       core.debug(`File ${filePath} is available!`);
       return true;
-    } catch (err) {
+    } catch {
       // File is not available yet
       await setTimeout(interval);
     }
@@ -40,7 +40,7 @@ export async function waitForStringInFile({
     try {
       content = await fs.readFile(filePath, { encoding: "utf-8" });
       // eslint-disable-next-line no-empty
-    } catch (err) {}
+    } catch {}
 
     if (content.includes(str)) {
       return;
