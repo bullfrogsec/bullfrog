@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3](https://github.com/bullfrogsec/bullfrog/compare/v0.8.2...v0.8.3) (2025-05-11)
+
+
+### Bug Fixes
+
+* agent not starting in private repo ([#167](https://github.com/bullfrogsec/bullfrog/issues/167)) ([f1e6a31](https://github.com/bullfrogsec/bullfrog/commit/f1e6a310fc2ce91e0e0fe5728e5d587239e25596))
+* **deps:** bump undici from 5.28.4 to 5.28.5 in /action in the npm_and_yarn group ([#156](https://github.com/bullfrogsec/bullfrog/issues/156)) ([0afb8b5](https://github.com/bullfrogsec/bullfrog/commit/0afb8b5f34e004205016174108511b95c50deaa5))
+
 ## [0.8.2](https://github.com/bullfrogsec/bullfrog/compare/v0.8.1...v0.8.2) (2024-09-28)
 
 
