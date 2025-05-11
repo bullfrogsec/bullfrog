@@ -20024,6 +20024,7 @@ async function startAgent({
     await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_audit.nft")}`);
     console.log("loaded audit rules");
   }
+  await exec(`sudo sed -i 's/^-e //' /etc/hosts`);
   const agentOut = await import_promises3.default.open(agentLogFilepath, "a");
   console.log(`Starting agent from ${AGENT_INSTALL_PATH}`);
   console.time("Agent startup time");

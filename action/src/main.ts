@@ -186,6 +186,10 @@ async function startAgent({
     console.log("loaded audit rules");
   }
 
+  // fix buggy /etc/hosts entry in Github private repo runners
+  // this misconfiguration causes the agent to fail to start
+  await exec(`sudo sed -i 's/^-e //' /etc/hosts`);
+
   const agentOut = await fs.open(agentLogFilepath, "a");
   console.log(`Starting agent from ${AGENT_INSTALL_PATH}`);
   console.time("Agent startup time");
