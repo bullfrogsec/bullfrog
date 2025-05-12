@@ -377,7 +377,7 @@ jobs:
 
     steps:
       # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow. Refer to https://github.com/bullfrogsec/bullfrog/commit/3a3e5e03112ef726b3079d402415760c9021fa39 for details.
-      - uses: jenseng/dynamic-uses@02f544690a931f3967153cd5f14679cfeb61f830
+      - uses: jenseng/dynamic-uses@f972650db6e7523890d27533271417f58681cf5b
         with:
           uses: ${{ github.repository }}@${{ needs.pre-release.outputs.tag_name }}
           with: '{"allowed-domains": "www.google.com", "egress-policy": "block", "agent-download-base-url": "https://github.com/${{ github.repository }}/releases/download/"}'
