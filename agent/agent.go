@@ -27,6 +27,7 @@ const (
 	EGRESS_POLICY_AUDIT                   = "audit"
 	DNS_POLICY_ALLOWED_DOMAINS_ONLY       = "allowed-domains-only"
 	DNS_POLICY_ANY                        = "any"
+	DNS_PORT                              = layers.TCPPort(53)
 )
 
 type AgentConfig struct {
@@ -362,11 +363,6 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 	}
 
-	// if we are not blocking DNS queries, just accept the query request
-	if !a.blockDNS && !dns.QR {
-		return ACCEPT_REQUEST
-	}
-
 	domain := string(dns.Questions[0].Name)
 	// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 	if !dns.QR {
@@ -382,6 +378,11 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 			a.addIpToLogs("blocked", domain, destinationIP)
 			return DROP_REQUEST
 		}
+	}
+
+	// if we are not blocking DNS queries, just accept the query request
+	if !a.blockDNS && !dns.QR {
+		return ACCEPT_REQUEST
 	}
 	return a.processDNSLayer(dns)
 }
@@ -410,20 +411,10 @@ func (a *Agent) processDNSOverTCPPayload(payload []byte) uint8 {
 func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 	tcpLayer := packet.Layer(layers.LayerTypeTCP)
 	tcp, _ := tcpLayer.(*layers.TCP)
-	dstPort, srcPort := tcp.DstPort, tcp.SrcPort
-
-	// if we are not blocking DNS queries, just accept the query request
-	if !a.blockDNS && dstPort != layers.TCPPort(53) {
-		return ACCEPT_REQUEST
-	}
-
-	if dstPort != layers.TCPPort(53) && srcPort != layers.TCPPort(53) {
-		fmt.Println("Warning: Not a DNS over TCP packet. This shouldn't be happening. Dropping request.")
-		return DROP_REQUEST
-	}
+	dstPort, srcPort, payload := tcp.DstPort, tcp.SrcPort, tcp.Payload
 
 	// Validate DNS server IP
-	if tcp.DstPort == layers.TCPPort(53) {
+	if dstPort == DNS_PORT {
 		destinationIP, err := getDestinationIP(packet)
 		if err != nil {
 			fmt.Printf("Failed to get destination IP: %v\n", err)
@@ -436,7 +427,17 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 			return DROP_REQUEST
 		}
 	}
-	payload := tcp.Payload
+
+	if dstPort != DNS_PORT && srcPort != DNS_PORT {
+		fmt.Println("Warning: Destination and source port are not DNS ports. Dropping request")
+		return DROP_REQUEST
+	}
+
+	// if we are not blocking DNS queries, just accept the query request
+	if !a.blockDNS && dstPort == DNS_PORT {
+		return ACCEPT_REQUEST
+	}
+
 	if len(payload) == 0 {
 		// We only accept DNS over TCP packets with no payload since they are only used for initiating a connection
 		return ACCEPT_REQUEST
