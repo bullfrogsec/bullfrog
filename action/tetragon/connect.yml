@@ -15,6 +15,7 @@ spec:
               operator: "NotDAddr"
               values:
                 - 127.0.0.1
+                - 127.0.0.53
     - call: "udp_sendmsg"
       syscall: false
       args:
@@ -26,6 +27,7 @@ spec:
               operator: "NotDAddr"
               values:
                 - 127.0.0.1
+                - 127.0.0.53
     - call: "udp_recvmsg"
       syscall: false
       args:
@@ -33,15 +35,3 @@ spec:
         type: "sock"
       - index: 2
         type: "size_t"
-    # - call: "tcp_close"
-    #   syscall: false
-    #   args:
-    #     - index: 0
-    #       type: "sock"
-    # - call: "tcp_sendmsg"
-    #   syscall: false
-    #   args:
-    #     - index: 0
-    #       type: "sock"
-    #     - index: 2
-    #       type: int
