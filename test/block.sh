@@ -38,6 +38,8 @@ grep --quiet 'Blocked DNS request to www.bing.com from unknown process' $POST_WA
 grep --quiet 'Blocked request to 93.184.215.14:443 from processs `/usr/bin/curl https://93.184.215.14 --output /dev/null' $POST_WARNINGS_FILEPATH
 grep --quiet 'Blocked DNS request to registry-1.docker.io from unknown process' $POST_WARNINGS_FILEPATH
 grep --quiet 'Blocked DNS request to www.wikipedia.org from unknown process' $POST_WARNINGS_FILEPATH
-grep --quiet 'Blocked DNS request to www.google.com from unknown process' $POST_WARNINGS_FILEPATH
+grep --quiet 'Blocked DNS request to tcp.example.com from unknown process' $POST_WARNINGS_FILEPATH
+grep --quiet 'Blocked request to www.google.com (8.8.8.8:53) from process `/usr/bin/dig @8.8.8.8 www.google.com`' $POST_WARNINGS_FILEPATH
+grep --quiet 'Blocked request to www.google.com (8.8.8.8:53) from process `/usr/bin/dig @8.8.8.8 www.google.com +tcp`' $POST_WARNINGS_FILEPATH
 
 echo "Tests passed successfully"

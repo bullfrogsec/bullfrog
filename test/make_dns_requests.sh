@@ -5,8 +5,8 @@ if timeout 5 dig example.com; then
   exit 1
 fi
 
-if timeout 5 dig example.com +tcp; then
-  echo 'Expected 'dig example.com +tcp' to fail, but it succeeded'
+if timeout 5 dig tcp.example.com +tcp; then
+  echo 'Expected 'dig tcp.example.com +tcp' to fail, but it succeeded'
   exit 1
 fi
 
