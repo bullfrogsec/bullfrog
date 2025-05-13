@@ -1,6 +1,7 @@
 process.env["INPUT_EGRESS-POLICY"] = "block";
 process.env["INPUT_DNS-POLICY"] = "allowed-domains-only";
 process.env["INPUT__LOG-DIRECTORY"] = "/tmp/gha-agent/logs";
+process.env["INPUT_ENABLE-SUDO"] = "true";
 
 process.env["INPUT_ALLOWED-IPS"] = `
 10.0.0.0/24
