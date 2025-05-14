@@ -93,9 +93,10 @@ The default usage will run in audit mode and will not block any request.
 You can view blocked or unallowed outbound requests in the workflow summary.
 ![blocked or unallowed outbound requests are available in the workflow summary](.github/assets/annotations.png)
 
-## Runners compability
-
-This action is currently only supporting Github-hosted runners on Ubuntu (`ubuntu-latest`, `ubuntu-22.04` and `ubuntu-24.04`).
+## Limitations
+- This action is currently only supporting Github-hosted runners on Ubuntu (`ubuntu-latest`, `ubuntu-22.04` and `ubuntu-24.04`).
+- Jobs running in [containers](https://docs.github.com/en/actions/writing-workflows/choosing-where-your-workflow-runs/running-jobs-in-a-container) are not supported.
+- Packets sent using the raw IP layer will bypass the agent responsible for the egress filtering. For this reason, we highly recommend using the `enable-sudo: false` to prevent usage of the raw IP layer.
 
 ## Support or Feedback
 If you need support or have any feedback to share, join us on [Slack](https://join.slack.com/t/bullfogsec/shared_invite/zt-2mbf603gn-TRfhXvf_x8J7yB9fJ3Os7Q). And if you find Bullfrog useful, please leave a star ⭐️.
