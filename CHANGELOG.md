@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4](https://github.com/bullfrogsec/bullfrog/compare/v0.8.3...v0.8.4) (2025-05-14)
+
+
+### Bug Fixes
+
+* dns over tcp bypasses domain filtering ([#175](https://github.com/bullfrogsec/bullfrog/issues/175)) ([ae7744a](https://github.com/bullfrogsec/bullfrog/commit/ae7744ae4b3a6f8ffc2e49f501e30bf1a43d4671))
+
 ## [0.8.3](https://github.com/bullfrogsec/bullfrog/compare/v0.8.2...v0.8.3) (2025-05-11)
 
 
