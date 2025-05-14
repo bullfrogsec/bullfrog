@@ -1,5 +1,14 @@
 # Changelog
 
+
+## [0.8.4](https://github.com/bullfrogsec/bullfrog/compare/v0.8.3...v0.8.4) (2025-05-14)
+
+
+### Bug Fixes
+
+* dns over tcp bypasses domain filtering ([343b323](https://github.com/bullfrogsec/bullfrog/commit/343b3232daf1b30dc5f5a01de2d8f34c0e3be64d))
+* untrusted dns servers IP addresses are now showing in annotations ([343b323](https://github.com/bullfrogsec/bullfrog/commit/343b3232daf1b30dc5f5a01de2d8f34c0e3be64d))
+
 ## [0.8.3](https://github.com/bullfrogsec/bullfrog/compare/v0.8.2...v0.8.3) (2025-05-11)
 
 
