@@ -15,7 +15,7 @@ import (
 
 var (
 	blocking          = false
-	defaultDomains    = []string{"github.com", "api.github.com", "*.actions.githubusercontent.com", "results-receiver.actions.githubusercontent.com", "*.blob.core.windows.net"}
+	defaultDomains    = []string{"github.com", "api.github.com", "*.actions.githubusercontent.com", "results-receiver.actions.githubusercontent.com", "*.blob.core.windows.net", "*.githubapp.com"}
 	defaultIps        = []string{"168.63.129.16", "169.254.169.254", "127.0.0.1"}
 	defaultDNSServers = []string{"127.0.0.53"}
 )
@@ -27,6 +27,7 @@ const (
 	EGRESS_POLICY_AUDIT                   = "audit"
 	DNS_POLICY_ALLOWED_DOMAINS_ONLY       = "allowed-domains-only"
 	DNS_POLICY_ANY                        = "any"
+	DNS_PORT                              = layers.TCPPort(53)
 )
 
 type AgentConfig struct {
@@ -63,6 +64,7 @@ func NewAgent(config AgentConfig) *Agent {
 		netInfoProvider:   config.NetInfoProvider,
 		filesystem:        config.FileSystem,
 	}
+
 	agent.init(config)
 	return agent
 }
@@ -153,7 +155,7 @@ func (a *Agent) loadAllowedIp(ips []string) {
 			a.addIpToLogs("allowed", "unknown", ip)
 			continue
 		}
-		fmt.Printf("Failed to parse IP: %s. Skipping.\n", ip)
+		fmt.Printf("failed to parse ip: %s. skipping.\n", ip)
 	}
 }
 
@@ -164,13 +166,13 @@ func (a *Agent) addToFirewall(ips map[string]bool, cidr []*net.IPNet) error {
 	for ip := range ips {
 		err := a.firewall.AddIp(ip)
 		if err != nil {
-			return fmt.Errorf("Error adding %s to firewall: %v\n", ip, err)
+			return fmt.Errorf("error adding %s to firewall: %v", ip, err)
 		}
 	}
 	for _, c := range cidr {
 		err := a.firewall.AddIp(c.String())
 		if err != nil {
-			return fmt.Errorf("Error adding %s to firewall: %v\n", c.String(), err)
+			return fmt.Errorf("error adding %s to firewall: %v", c.String(), err)
 		}
 	}
 	return nil
@@ -228,22 +230,19 @@ func (a *Agent) loadAllowedDNSServers() error {
 }
 
 func getDestinationIP(packet gopacket.Packet) (string, error) {
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer == nil {
-		ipLayer = packet.Layer(layers.LayerTypeIPv6)
+	netLayer := packet.NetworkLayer()
+	if netLayer == nil {
+		return "", fmt.Errorf("failed to get network layer")
 	}
-	if ipLayer == nil {
-		return "", fmt.Errorf("Failed to get IP layer")
+
+	switch v := netLayer.(type) {
+	case *layers.IPv4:
+		return v.DstIP.String(), nil
+	case *layers.IPv6:
+		return v.DstIP.String(), nil
+	default:
+		return "", fmt.Errorf("unknown network layer type")
 	}
-	ip, _ := ipLayer.(*layers.IPv4)
-	if ip == nil {
-		ip6, _ := ipLayer.(*layers.IPv6)
-		if ip6 == nil {
-			return "", fmt.Errorf("Failed to get IP layer")
-		}
-		return ip6.DstIP.String(), nil
-	}
-	return ip.DstIP.String(), nil
 }
 
 func extractDomainFromSRV(domain string) string {
@@ -254,25 +253,18 @@ func extractDomainFromSRV(domain string) string {
 	return re.ReplaceAllString(domain, "")
 }
 
-func (a *Agent) processDNSQuery(packet gopacket.Packet) uint8 {
-	dnsLayer := packet.Layer(layers.LayerTypeDNS)
-	dns, _ := dnsLayer.(*layers.DNS)
+func (a *Agent) processDNSLayer(dns *layers.DNS) uint8 {
+	if !dns.QR {
+		return a.processDNSQuery(dns)
+	}
+	return a.processDNSResponse(dns)
+}
+
+func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 	for _, q := range dns.Questions {
 		domain := string(q.Name)
 		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 
-		// making sure the DNS query is using a trusted DNS server
-		destinationIP, err := getDestinationIP(packet)
-		if err != nil {
-			fmt.Println("Failed to get destination IP")
-			a.addIpToLogs("blocked", domain, "unknown")
-			return DROP_REQUEST
-		}
-		if !a.allowedDNSServers[destinationIP] {
-			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, destinationIP)
-			a.addIpToLogs("blocked", domain, "unknown")
-			return DROP_REQUEST
-		}
 		if q.Type == layers.DNSTypeSRV {
 			originalDomain := domain
 			domain = extractDomainFromSRV(domain)
@@ -345,11 +337,10 @@ func (a *Agent) processDNSTypeSRVResponse(domain string, answer *layers.DNSResou
 	}
 }
 
-func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
-	dnsLayer := packet.Layer(layers.LayerTypeDNS)
-	dns, _ := dnsLayer.(*layers.DNS)
+func (a *Agent) processDNSResponse(dns *layers.DNS) uint8 {
 	domain := string(dns.Questions[0].Name)
 	for _, answer := range dns.Answers {
+		fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
 		if answer.Type == layers.DNSTypeA {
 			a.processDNSTypeAResponse(domain, &answer)
 		} else if answer.Type == layers.DNSTypeCNAME {
@@ -365,21 +356,108 @@ func (a *Agent) processDNSResponse(packet gopacket.Packet) uint8 {
 	return ACCEPT_REQUEST
 }
 
-func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
-	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
+func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
+	dnsLayer := packet.Layer(layers.LayerTypeDNS)
+	dns, _ := dnsLayer.(*layers.DNS)
+	for _, q := range dns.Questions {
+		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
+	}
 
-		dns, _ := dnsLayer.(*layers.DNS)
-		for _, q := range dns.Questions {
-			fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
+	domain := string(dns.Questions[0].Name)
+	// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
+	if !dns.QR {
+		// making sure the DNS query is using a trusted DNS server
+		destinationIP, err := getDestinationIP(packet)
+		if err != nil {
+			fmt.Printf("Failed to get destination IP: %v\n", err)
+			a.addIpToLogs("blocked", domain, "unknown")
+			return DROP_REQUEST
 		}
-		// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
-		if a.blockDNS && !dns.QR {
-			return a.processDNSQuery(packet)
-		} else if dns.QR {
-			return a.processDNSResponse(packet)
+		if !a.allowedDNSServers[destinationIP] {
+			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, destinationIP)
+			a.addIpToLogs("blocked", domain, destinationIP)
+			return DROP_REQUEST
 		}
 	}
-	return ACCEPT_REQUEST
+
+	// if we are not blocking DNS queries, just accept the query request
+	if !a.blockDNS && !dns.QR {
+		return ACCEPT_REQUEST
+	}
+	return a.processDNSLayer(dns)
+}
+
+func (a *Agent) processDNSOverTCPPayload(payload []byte) uint8 {
+	// Extract message length from first 2 bytes
+	// - First byte shifted left 8 bits + second byte
+	// - Creates 16-bit length prefix
+	messageLen := int(payload[0])<<8 | int(payload[1])
+	if messageLen == 0 || len(payload) < messageLen+2 {
+		fmt.Println("Invalid DNS over TCP payload")
+		return DROP_REQUEST
+	}
+
+	// We attempt to decode the DNS over TCP payload
+	// The only way we can accept the request is if the DNS query is contained within a single TCP packet payload
+	dns := &layers.DNS{}
+	err := dns.DecodeFromBytes(payload[2:messageLen+2], gopacket.NilDecodeFeedback)
+	if err != nil {
+		fmt.Println("Failed to decode DNS over TCP payload", err)
+		return DROP_REQUEST
+	}
+	return a.processDNSLayer(dns)
+}
+
+func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
+	tcpLayer := packet.Layer(layers.LayerTypeTCP)
+	tcp, _ := tcpLayer.(*layers.TCP)
+	dstPort, srcPort, payload := tcp.DstPort, tcp.SrcPort, tcp.Payload
+
+	// Validate DNS server IP
+	if dstPort == DNS_PORT {
+		destinationIP, err := getDestinationIP(packet)
+		if err != nil {
+			fmt.Printf("Failed to get destination IP: %v\n", err)
+			a.addIpToLogs("blocked", "unknown", "unknown")
+			return DROP_REQUEST
+		}
+		if !a.allowedDNSServers[destinationIP] {
+			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", destinationIP)
+			a.addIpToLogs("blocked", "unknown", destinationIP)
+			return DROP_REQUEST
+		}
+	}
+
+	if dstPort != DNS_PORT && srcPort != DNS_PORT {
+		fmt.Println("Warning: Destination and source port are not DNS ports. Dropping request")
+		return DROP_REQUEST
+	}
+
+	// if we are not blocking DNS queries, just accept the query request
+	if !a.blockDNS && dstPort == DNS_PORT {
+		return ACCEPT_REQUEST
+	}
+
+	if len(payload) == 0 {
+		// We only accept DNS over TCP packets with no payload since they are only used for initiating a connection
+		return ACCEPT_REQUEST
+	}
+
+	// Now we have a payload in the TCP packet, we need to make sure it is a valid DNS over TCP payload and the DNS query is for a known domain. We don't want to exfiltrate data over DNS over TCP
+	return a.processDNSOverTCPPayload(payload)
+
+}
+
+func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
+	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
+		return a.processDNSPacket(packet)
+	}
+	// check dns over tcp
+	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		return a.processTCPPacket(packet)
+	}
+	fmt.Println("Warning: Packet is not DNS or TCP. Dropping request, this shouldn't be happening.")
+	return DROP_REQUEST
 }
 
 func (a *Agent) disableSudo() error {

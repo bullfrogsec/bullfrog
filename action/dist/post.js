@@ -19914,7 +19914,7 @@ async function getOutboundConnections() {
     );
     console.log("Agent ready timestamp: ", agentReadyTimestamp);
     const tetragonLogFile = await import_promises2.default.open(TETRAGON_EVENTS_LOG_PATH);
-    const functionsToTrack = ["tcp_connect"];
+    const functionsToTrack = ["tcp_connect", "udp_sendmsg"];
     for await (const line of tetragonLogFile.readLines()) {
       const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
       if (processEntry?.["policy_name"] !== "connect") {
