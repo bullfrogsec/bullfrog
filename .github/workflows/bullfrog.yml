@@ -22,7 +22,7 @@ jobs:
       diff: ${{ steps.changes.outputs.src }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: audit
       - name: Checkout
@@ -43,7 +43,7 @@ jobs:
     if: ${{ needs.check-diff.outputs.diff == 'true' }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: block
           allowed-domains: |
@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: block
           allowed-domains: |
@@ -246,7 +246,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: block
           allowed-domains: |
@@ -292,7 +292,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: block
           allowed-domains: |
@@ -339,7 +339,7 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: block
           allowed-domains: |
@@ -401,7 +401,7 @@ jobs:
     needs: [pre-release, pre-release-validation]
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db
+        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: block
 
