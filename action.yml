@@ -33,7 +33,7 @@ inputs:
     default: ${{ runner.temp }}/agent-logs
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "action/dist/main.js"
   post: "action/dist/post.js"
 
