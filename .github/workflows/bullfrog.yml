@@ -258,7 +258,7 @@ jobs:
             dl.google.com
             download.docker.com
             go.dev
-            objects.githubusercontent.com
+            *.githubusercontent.com
             packages.microsoft.com
             vagrantcloud-files-production.s3-accelerate.amazonaws.com
             vagrantcloud.com
