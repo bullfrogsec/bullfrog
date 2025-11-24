@@ -10,7 +10,115 @@ import {
 } from "./constants";
 import { getFileTimestamp } from "./util";
 
+interface WorkflowActionResult {
+  workflowRunId: string;
+  jobName?: string; // Human-readable job name
+  organization: string;
+  repo: string;
+  connections: Array<{
+    domain?: string;
+    ip?: string;
+    port?: number;
+    blocked: boolean;
+    authorized: boolean;
+    timestamp: Date;
+  }>;
+  createdAt: Date;
+}
+
 const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
+
+function getGitHubContext(): {
+  workflowRunId: string;
+  jobName?: string;
+  organization: string;
+  repo: string;
+} {
+  const repo = process.env.GITHUB_REPOSITORY || "";
+  const [organization] = repo.split("/");
+  const workflowRunId = process.env.GITHUB_RUN_ID || "";
+  const jobName = process.env.GITHUB_JOB || undefined;
+
+  if (!organization || !repo || !workflowRunId) {
+    throw new Error(
+      "Missing GitHub context: GITHUB_REPOSITORY or GITHUB_RUN_ID not set",
+    );
+  }
+
+  return { workflowRunId, jobName, organization, repo };
+}
+
+async function submitResultsToControlPlane(
+  correlatedData: CorrelatedData[],
+  apiToken: string,
+  controlPlaneBaseUrl: string,
+): Promise<void> {
+  try {
+    const { workflowRunId, jobName, organization, repo } = getGitHubContext();
+    const { egressPolicy } = parseInputs();
+
+    const connections = correlatedData.map((data) => ({
+      domain: data.domain !== "unknown" ? data.domain : undefined,
+      ip: data.destIp !== "unknown" ? data.destIp : undefined,
+      port: data.destPort !== "unknown" ? parseInt(data.destPort) : undefined,
+      blocked: data.decision === "blocked" && egressPolicy === BLOCK,
+      authorized: data.decision === "allowed",
+      timestamp: data.ts,
+    }));
+
+    const payload: WorkflowActionResult = {
+      workflowRunId,
+      jobName,
+      organization,
+      repo,
+      connections,
+      createdAt: new Date(),
+    };
+
+    core.debug(
+      `Submitting results to control plane: ${JSON.stringify(payload)}`,
+    );
+
+    // Ensure the base URL ends with a slash
+    const baseUrl = controlPlaneBaseUrl.endsWith("/")
+      ? controlPlaneBaseUrl
+      : `${controlPlaneBaseUrl}/`;
+    const apiUrl = `${baseUrl}api/action/results`;
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`,
+      );
+    }
+
+    core.info(
+      `Results successfully submitted to control plane for workflow run ${workflowRunId}`,
+    );
+
+    // Add a link to the control plane workflow run in the summary
+    await core.summary
+      .addHeading("Bullfrog Control Plane", 3)
+      .addLink(
+        "View detailed results",
+        `${baseUrl}workflow-run/${workflowRunId}`,
+      )
+      .write();
+  } catch (error) {
+    core.warning(
+      `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
 
 async function printAnnotations() {
   try {
@@ -201,11 +309,27 @@ async function printAgentLogs({
 }
 
 async function main() {
-  const { logDirectory } = parseInputs();
+  const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   await printAnnotations();
   await printAgentLogs({ agentLogFilepath });
+
+  // Submit results to control plane if API token is provided
+  if (apiToken) {
+    try {
+      const correlatedData = await getCorrelateData();
+      await submitResultsToControlPlane(
+        correlatedData,
+        apiToken,
+        controlPlaneBaseUrl,
+      );
+    } catch (error) {
+      core.warning(
+        `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 }
 
 main().catch((error) => {
