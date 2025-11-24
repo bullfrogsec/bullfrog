@@ -19887,6 +19887,51 @@ function getGitHubContext() {
   }
   return { workflowRunId, jobName, organization, repo };
 }
+async function displaySummary(correlatedData, controlPlaneBaseUrl) {
+  const { egressPolicy } = parseInputs();
+  const connections = correlatedData.map((data) => ({
+    domain: data.domain !== "unknown" ? data.domain : void 0,
+    ip: data.destIp !== "unknown" ? data.destIp : void 0,
+    port: data.destPort !== "unknown" ? parseInt(data.destPort) : void 0,
+    blocked: data.decision === "blocked" && egressPolicy === BLOCK,
+    authorized: data.decision === "allowed",
+    timestamp: data.ts
+  }));
+  const summary2 = core3.summary;
+  if (controlPlaneBaseUrl) {
+    const { workflowRunId } = getGitHubContext();
+    const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
+    summary2.addHeading("Bullfrog Control Plane", 3).addLink(
+      "View detailed results",
+      `${baseUrl}workflow-run/${workflowRunId}`
+    );
+  } else {
+    summary2.addHeading("Bullfrog Results", 3);
+  }
+  if (connections.length > 0) {
+    summary2.addHeading("Connection Results", 4);
+    const tableData = [
+      [
+        { data: "Timestamp", header: true },
+        { data: "Domain", header: true },
+        { data: "IP", header: true },
+        { data: "Port", header: true },
+        { data: "Status", header: true }
+      ],
+      ...connections.map((conn) => [
+        conn.timestamp.toISOString(),
+        conn.domain || "-",
+        conn.ip || "-",
+        conn.port?.toString() || "-",
+        conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized"
+      ])
+    ];
+    summary2.addTable(tableData);
+  } else {
+    summary2.addRaw("\n\nNo outbound connections detected.\n");
+  }
+  await summary2.write();
+}
 async function submitResultsToControlPlane(correlatedData, apiToken, controlPlaneBaseUrl) {
   try {
     const { workflowRunId, jobName, organization, repo } = getGitHubContext();
@@ -19929,48 +19974,10 @@ async function submitResultsToControlPlane(correlatedData, apiToken, controlPlan
     core3.info(
       `Results successfully submitted to control plane for workflow run ${workflowRunId}`
     );
-    await core3.summary.addHeading("Bullfrog Control Plane", 3).addLink(
-      "View detailed results",
-      `${baseUrl}workflow-run/${workflowRunId}`
-    ).write();
   } catch (error) {
     core3.warning(
       `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`
     );
-  }
-}
-async function printAnnotations() {
-  try {
-    const correlatedData = await getCorrelateData();
-    const { egressPolicy } = parseInputs();
-    const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
-    core3.debug("\n\nCorrelated data:\n");
-    const annotations = [];
-    correlatedData.forEach((data) => {
-      core3.debug(JSON.stringify(data));
-      if (data.decision !== "blocked") {
-        return;
-      }
-      const time = data.ts.toISOString();
-      if (data.domain === "unknown") {
-        annotations.push(
-          `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``
-        );
-        return;
-      } else if (data.destIp === "unknown") {
-        annotations.push(
-          `[${time}] ${result} DNS request to ${data.domain} from unknown process`
-        );
-      } else {
-        annotations.push(
-          `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``
-        );
-      }
-    });
-    core3.warning(annotations.join("\n"));
-    return;
-  } catch {
-    core3.debug("No annotations found");
   }
 }
 async function getOutboundConnections() {
@@ -20013,9 +20020,27 @@ async function getDecisions() {
     const log = await import_promises2.default.readFile(DECISISONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
     for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
       const values = line.split("|");
+      if (values.length < 4) {
+        continue;
+      }
+      const timestamp = parseInt(values[0], 10);
+      if (isNaN(timestamp)) {
+        continue;
+      }
+      let date;
+      if (timestamp > 1e15) {
+        date = new Date(timestamp / 1e6);
+      } else if (timestamp > 1e12) {
+        date = new Date(timestamp);
+      } else {
+        date = new Date(timestamp * 1e3);
+      }
       decisions.push({
-        ts: new Date(parseInt(values[0]) * 1e3),
+        ts: date,
         decision: values[1],
         domain: values[2],
         destIp: values[3]
@@ -20083,21 +20108,24 @@ async function printAgentLogs({
 async function main() {
   const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
-  await printAnnotations();
   await printAgentLogs({ agentLogFilepath });
-  if (apiToken) {
-    try {
-      const correlatedData = await getCorrelateData();
+  try {
+    const correlatedData = await getCorrelateData();
+    await displaySummary(
+      correlatedData,
+      apiToken ? controlPlaneBaseUrl : void 0
+    );
+    if (apiToken) {
       await submitResultsToControlPlane(
         correlatedData,
         apiToken,
         controlPlaneBaseUrl
       );
-    } catch (error) {
-      core3.warning(
-        `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`
-      );
     }
+  } catch (error) {
+    core3.warning(
+      `Failed to process results: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 main().catch((error) => {

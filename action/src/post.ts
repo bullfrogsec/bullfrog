@@ -48,6 +48,73 @@ function getGitHubContext(): {
   return { workflowRunId, jobName, organization, repo };
 }
 
+async function displaySummary(
+  correlatedData: CorrelatedData[],
+  controlPlaneBaseUrl?: string,
+): Promise<void> {
+  const { egressPolicy } = parseInputs();
+
+  const connections = correlatedData.map((data) => ({
+    domain: data.domain !== "unknown" ? data.domain : undefined,
+    ip: data.destIp !== "unknown" ? data.destIp : undefined,
+    port: data.destPort !== "unknown" ? parseInt(data.destPort) : undefined,
+    blocked: data.decision === "blocked" && egressPolicy === BLOCK,
+    authorized: data.decision === "allowed",
+    timestamp: data.ts,
+  }));
+
+  const summary = core.summary;
+
+  // Add control plane link if available
+  if (controlPlaneBaseUrl) {
+    const { workflowRunId } = getGitHubContext();
+    const baseUrl = controlPlaneBaseUrl.endsWith("/")
+      ? controlPlaneBaseUrl
+      : `${controlPlaneBaseUrl}/`;
+
+    summary
+      .addHeading("Bullfrog Control Plane", 3)
+      .addLink(
+        "View detailed results",
+        `${baseUrl}workflow-run/${workflowRunId}`,
+      );
+  } else {
+    summary.addHeading("Bullfrog Results", 3);
+  }
+
+  // Add connection results table if there are any connections
+  if (connections.length > 0) {
+    summary.addHeading("Connection Results", 4);
+
+    const tableData = [
+      [
+        { data: "Timestamp", header: true },
+        { data: "Domain", header: true },
+        { data: "IP", header: true },
+        { data: "Port", header: true },
+        { data: "Status", header: true },
+      ],
+      ...connections.map((conn) => [
+        conn.timestamp.toISOString(),
+        conn.domain || "-",
+        conn.ip || "-",
+        conn.port?.toString() || "-",
+        conn.blocked
+          ? "🚫 Blocked"
+          : conn.authorized
+            ? "✅ Authorized"
+            : "⚠️ Unauthorized",
+      ]),
+    ];
+
+    summary.addTable(tableData);
+  } else {
+    summary.addRaw("\n\nNo outbound connections detected.\n");
+  }
+
+  await summary.write();
+}
+
 async function submitResultsToControlPlane(
   correlatedData: CorrelatedData[],
   apiToken: string,
@@ -104,57 +171,10 @@ async function submitResultsToControlPlane(
     core.info(
       `Results successfully submitted to control plane for workflow run ${workflowRunId}`,
     );
-
-    // Add a link to the control plane workflow run in the summary
-    await core.summary
-      .addHeading("Bullfrog Control Plane", 3)
-      .addLink(
-        "View detailed results",
-        `${baseUrl}workflow-run/${workflowRunId}`,
-      )
-      .write();
   } catch (error) {
     core.warning(
       `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`,
     );
-  }
-}
-
-async function printAnnotations() {
-  try {
-    const correlatedData = await getCorrelateData();
-    const { egressPolicy } = parseInputs();
-    const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
-
-    core.debug("\n\nCorrelated data:\n");
-
-    const annotations: string[] = [];
-
-    correlatedData.forEach((data) => {
-      core.debug(JSON.stringify(data));
-      if (data.decision !== "blocked") {
-        return;
-      }
-      const time = data.ts.toISOString();
-      if (data.domain === "unknown") {
-        annotations.push(
-          `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``,
-        );
-        return;
-      } else if (data.destIp === "unknown") {
-        annotations.push(
-          `[${time}] ${result} DNS request to ${data.domain} from unknown process`,
-        );
-      } else {
-        annotations.push(
-          `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``,
-        );
-      }
-    });
-    core.warning(annotations.join("\n"));
-    return;
-  } catch {
-    core.debug("No annotations found");
   }
 }
 
@@ -228,9 +248,35 @@ async function getDecisions(): Promise<Decision[]> {
     const log = await fs.readFile(DECISISONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
     for (const line of lines) {
+      if (!line.trim()) {
+        continue; // Skip empty lines
+      }
       const values = line.split("|");
+      if (values.length < 4) {
+        continue; // Skip malformed lines
+      }
+      const timestamp = parseInt(values[0], 10);
+      if (isNaN(timestamp)) {
+        continue; // Skip invalid timestamps
+      }
+
+      // Determine if timestamp is in seconds, milliseconds, or nanoseconds
+      // If timestamp > 1e12, it's likely in milliseconds or nanoseconds
+      // Timestamps in seconds for current dates are around 1.7e9
+      let date: Date;
+      if (timestamp > 1e15) {
+        // Likely nanoseconds, divide by 1e6
+        date = new Date(timestamp / 1e6);
+      } else if (timestamp > 1e12) {
+        // Likely milliseconds
+        date = new Date(timestamp);
+      } else {
+        // Likely seconds
+        date = new Date(timestamp * 1000);
+      }
+
       decisions.push({
-        ts: new Date(parseInt(values[0]) * 1000),
+        ts: date,
         decision: values[1] as "allowed" | "blocked",
         domain: values[2],
         destIp: values[3],
@@ -312,23 +358,29 @@ async function main() {
   const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
-  await printAnnotations();
   await printAgentLogs({ agentLogFilepath });
 
-  // Submit results to control plane if API token is provided
-  if (apiToken) {
-    try {
-      const correlatedData = await getCorrelateData();
+  try {
+    const correlatedData = await getCorrelateData();
+
+    // Always display the summary
+    await displaySummary(
+      correlatedData,
+      apiToken ? controlPlaneBaseUrl : undefined,
+    );
+
+    // Submit results to control plane if API token is provided
+    if (apiToken) {
       await submitResultsToControlPlane(
         correlatedData,
         apiToken,
         controlPlaneBaseUrl,
       );
-    } catch (error) {
-      core.warning(
-        `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
+  } catch (error) {
+    core.warning(
+      `Failed to process results: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
