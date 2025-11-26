@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/bullfrogsec/bullfrog/compare/v0.8.4...v1.0.0) (2025-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* update action to use node 24 ([#200](https://github.com/bullfrogsec/bullfrog/issues/200))
+
+### Features
+
+* update action to use node 24 ([#200](https://github.com/bullfrogsec/bullfrog/issues/200)) ([ba336b2](https://github.com/bullfrogsec/bullfrog/commit/ba336b2fc6ecde98b446b5e6a65c46a044c37ef2))
+
 ## [0.8.4](https://github.com/bullfrogsec/bullfrog/compare/v0.8.3...v0.8.4) (2025-05-14)
 
 
