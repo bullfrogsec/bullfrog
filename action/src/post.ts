@@ -12,6 +12,7 @@ import { getFileTimestamp } from "./util";
 
 interface WorkflowActionResult {
   workflowRunId: string;
+  runAttempt: number;
   jobName?: string; // Human-readable job name
   organization: string;
   repo: string;
@@ -30,6 +31,7 @@ const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
 
 function getGitHubContext(): {
   workflowRunId: string;
+  runAttempt: number;
   jobName?: string;
   organization: string;
   repo: string;
@@ -37,6 +39,7 @@ function getGitHubContext(): {
   const repo = process.env.GITHUB_REPOSITORY || "";
   const [organization] = repo.split("/");
   const workflowRunId = process.env.GITHUB_RUN_ID || "";
+  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1")
   const jobName = process.env.GITHUB_JOB || undefined;
 
   if (!organization || !repo || !workflowRunId) {
@@ -45,7 +48,7 @@ function getGitHubContext(): {
     );
   }
 
-  return { workflowRunId, jobName, organization, repo };
+  return { workflowRunId, runAttempt, jobName, organization, repo };
 }
 
 async function displaySummary(
@@ -121,7 +124,7 @@ async function submitResultsToControlPlane(
   controlPlaneBaseUrl: string,
 ): Promise<void> {
   try {
-    const { workflowRunId, jobName, organization, repo } = getGitHubContext();
+    const { workflowRunId, runAttempt, jobName, organization, repo } = getGitHubContext();
     const { egressPolicy } = parseInputs();
 
     const connections = correlatedData.map((data) => ({
@@ -135,6 +138,7 @@ async function submitResultsToControlPlane(
 
     const payload: WorkflowActionResult = {
       workflowRunId,
+      runAttempt,
       jobName,
       organization,
       repo,
