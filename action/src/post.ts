@@ -230,9 +230,16 @@ async function getOutboundConnections(): Promise<TetragonLog[]> {
         continue;
       }
 
+      const destIp = processEntry.args[0].sock_arg.daddr;
+
+      // Skip connections to 0.0.0.0
+      if (destIp === "0.0.0.0") {
+        continue;
+      }
+
       connections.push({
         ts: new Date(processEntry.process.start_time),
-        destIp: processEntry.args[0].sock_arg.daddr,
+        destIp,
         destPort: processEntry.args[0].sock_arg.dport,
         binary: processEntry.process.binary,
         args: processEntry.process.arguments,
