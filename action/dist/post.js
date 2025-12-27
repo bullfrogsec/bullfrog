@@ -19958,7 +19958,7 @@ async function submitResultsToControlPlane(correlatedData, apiToken, controlPlan
       `Submitting results to control plane: ${JSON.stringify(payload)}`
     );
     const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
-    const apiUrl = `${baseUrl}api/action/results`;
+    const apiUrl = `${baseUrl}v1/events`;
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
