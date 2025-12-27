@@ -33,7 +33,7 @@ inputs:
   _control-plane-base-url:
     description: "(Internal) Base URL for the Bullfrog control plane API. This is useful for testing changes in a fork. The URL should end with a slash."
     type: string
-    default: "https://app.bullfrogsec.com/"
+    default: "https://api.bullfrogsec.com/"
 
   _log-directory:
     description: "(Internal) Directory to store log files."
