@@ -1,20 +1,49 @@
 # Docker mod
-# Match DNS responses (source port 53) and enqueue to userspace
-insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0
-insert rule ip filter DOCKER-USER oif "docker0" tcp sport 53 counter queue num 0
+# Accept established/related connections automatically (no need to queue)
+insert rule ip filter DOCKER-USER iifname "docker0" ct state established,related counter accept
+insert rule ip filter DOCKER-USER oif "docker0" ct state established,related counter accept
+
+# Match DNS packets (port 53) and enqueue to userspace - ALL DNS traffic
+insert rule ip filter DOCKER-USER iifname "docker0" udp dport 53 counter queue num 0 bypass
+insert rule ip filter DOCKER-USER iifname "docker0" tcp dport 53 counter queue num 0 bypass
+insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0 bypass
+insert rule ip filter DOCKER-USER oif "docker0" tcp sport 53 counter queue num 0 bypass
+
+# Queue new connections (non-DNS) for Go agent logging
+insert rule ip filter DOCKER-USER iifname "docker0" ct state new counter queue num 0 bypass
+
+# Accept everything else (audit mode - log but don't block)
+insert rule ip filter DOCKER-USER iifname "docker0" counter accept
 # End of Docker mod
 
 table inet filter {
-
     chain input {
         type filter hook input priority 0; policy accept;
 
-        # Match DNS responses (source port 53) and enqueue to userspace
-        udp sport 53 queue num 0
-        tcp sport 53 queue num 0
+        # Match DNS responses FIRST (before conntrack check)
+        # Otherwise established DNS responses would bypass the queue
+        udp sport 53 counter queue num 0 bypass
+        tcp sport 53 counter queue num 0 bypass
+
+        # Accept established/related connections automatically
+        ct state established,related counter accept
+
+        # Queue new connections for Go agent logging
+        ct state new counter queue num 0 bypass
     }
 
     chain output {
         type filter hook output priority 0; policy accept;
+
+        # Match DNS requests FIRST (before conntrack check)
+        # Otherwise established DNS queries would bypass the queue
+        udp dport 53 counter queue num 0 bypass
+        tcp dport 53 counter queue num 0 bypass
+
+        # Accept established/related connections automatically
+        ct state established,related counter accept
+
+        # Queue new connections for Go agent logging
+        ct state new counter queue num 0 bypass
     }
 }
