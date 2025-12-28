@@ -5,14 +5,13 @@ import { exec as execCb, spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import {
   AGENT_LOG_FILENAME,
-  TETRAGON_LOG_FILENAME,
   BLOCK,
   ALLOWED_DOMAINS_ONLY,
   AGENT_INSTALL_PATH,
   AGENT_READY_PATH,
 } from "./constants";
 import { parseInputs, EgressPolicy, DnsPolicy } from "./inputs";
-import { waitForFile, waitForStringInFile } from "./util";
+import { waitForFile } from "./util";
 
 const exec = util.promisify(execCb);
 
@@ -93,63 +92,6 @@ function installPackages() {
   if (status !== 0) {
     throw new Error("Couldn't install packages");
   }
-}
-
-function installTetragon({ actionDirectory }: { actionDirectory: string }) {
-  console.log("Installing Tetragon");
-
-  const { status } = spawnSync(
-    "bash",
-    [path.join(actionDirectory, "scripts", "install_tetragon.sh")],
-    {
-      stdio: "inherit",
-      env: {
-        TETRAGON_POLICIES_DIRECTORY: path.join(actionDirectory, "tetragon"),
-      },
-    },
-  );
-
-  if (status !== 0) {
-    throw new Error("Couldn't install Tetragon");
-  }
-}
-
-async function startTetragon({
-  tetragonLogFilepath,
-}: {
-  tetragonLogFilepath: string;
-}) {
-  const out = await fs.open(tetragonLogFilepath, "a");
-
-  core.debug("Starting Tetragon");
-  console.time("Tetragon startup time");
-
-  spawn(
-    "sudo",
-    [
-      "tetragon",
-      "--export-file-max-size-mb",
-      "1000",
-      "--export-file-perm",
-      "644",
-      "--export-allowlist",
-      '{"event_set": ["PROCESS_KPROBE"], "policy_names": ["connect"]}',
-    ],
-    {
-      stdio: ["ignore", out.fd, out.fd],
-      detached: true,
-    },
-  ).unref();
-
-  await out.close();
-
-  await waitForStringInFile({
-    filePath: tetragonLogFilepath,
-    str: "Listening for events...",
-    timeoutMs: 15_000,
-  });
-
-  console.timeEnd("Tetragon startup time");
 }
 
 async function startAgent({
@@ -288,15 +230,8 @@ async function main() {
   await fs.mkdir(logDirectory, { recursive: true });
 
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
-  const tetragonLogFilepath = path.join(logDirectory, TETRAGON_LOG_FILENAME);
 
   installPackages();
-
-  installTetragon({ actionDirectory });
-
-  await startTetragon({
-    tetragonLogFilepath,
-  });
 
   await installAgent({
     actionDirectory,

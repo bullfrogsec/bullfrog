@@ -9,17 +9,14 @@ set -e
 POST_WARNINGS_FILEPATH=/tmp/post.warnings
 
 sudo pkill --signal 9 agent || true
-sudo pkill --signal 9 tetragon || true
 
 sudo nft flush ruleset || true
 # TODO: disable nftables
 sudo systemctl restart docker
-# TODO: remove tetragon (and all other files we install)
+# TODO: remove all other files we install
 
 sudo rm -f /var/run/bullfrog/agent-ready
-# sudo rm -f /tmp/tetragon.tar.gz
 sudo rm -f $POST_WARNINGS_FILEPATH
-sudo rm -f /var/log/tetragon/tetragon.log
 
 sudo touch /etc/sudoers.d/runner
 

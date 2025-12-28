@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import fs from "node:fs/promises";
 import { parseInputs } from "./inputs";
 import path from "node:path";
-import {
-  AGENT_LOG_FILENAME,
-  AGENT_READY_PATH,
-  BLOCK,
-  TETRAGON_EVENTS_LOG_PATH,
-} from "./constants";
-import { getFileTimestamp } from "./util";
+import { AGENT_LOG_FILENAME, CONNECTIONS_LOG_PATH, BLOCK } from "./constants";
 
 interface WorkflowActionResult {
   workflowRunId: string;
@@ -27,8 +21,6 @@ interface WorkflowActionResult {
   createdAt: Date;
 }
 
-const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
-
 function getGitHubContext(): {
   workflowRunId: string;
   runAttempt: number;
@@ -39,7 +31,7 @@ function getGitHubContext(): {
   const repo = process.env.GITHUB_REPOSITORY || "";
   const [organization] = repo.split("/");
   const workflowRunId = process.env.GITHUB_RUN_ID || "";
-  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1")
+  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1");
   const jobName = process.env.GITHUB_JOB || undefined;
 
   if (!organization || !repo || !workflowRunId) {
@@ -52,20 +44,9 @@ function getGitHubContext(): {
 }
 
 async function displaySummary(
-  correlatedData: CorrelatedData[],
+  connections: Connection[],
   controlPlaneBaseUrl?: string,
 ): Promise<void> {
-  const { egressPolicy } = parseInputs();
-
-  const connections = correlatedData.map((data) => ({
-    domain: data.domain !== "unknown" ? data.domain : undefined,
-    ip: data.destIp !== "unknown" ? data.destIp : undefined,
-    port: data.destPort !== "unknown" ? parseInt(data.destPort) : undefined,
-    blocked: data.decision === "blocked" && egressPolicy === BLOCK,
-    authorized: data.decision === "allowed",
-    timestamp: data.ts,
-  }));
-
   const summary = core.summary;
 
   // Add control plane link if available
@@ -119,22 +100,13 @@ async function displaySummary(
 }
 
 async function submitResultsToControlPlane(
-  correlatedData: CorrelatedData[],
+  connections: Connection[],
   apiToken: string,
   controlPlaneBaseUrl: string,
 ): Promise<void> {
   try {
-    const { workflowRunId, runAttempt, jobName, organization, repo } = getGitHubContext();
-    const { egressPolicy } = parseInputs();
-
-    const connections = correlatedData.map((data) => ({
-      domain: data.domain !== "unknown" ? data.domain : undefined,
-      ip: data.destIp !== "unknown" ? data.destIp : undefined,
-      port: data.destPort !== "unknown" ? parseInt(data.destPort) : undefined,
-      blocked: data.decision === "blocked" && egressPolicy === BLOCK,
-      authorized: data.decision === "allowed",
-      timestamp: data.ts,
-    }));
+    const { workflowRunId, runAttempt, jobName, organization, repo } =
+      getGitHubContext();
 
     const payload: WorkflowActionResult = {
       workflowRunId,
@@ -182,98 +154,42 @@ async function submitResultsToControlPlane(
   }
 }
 
-type TetragonLog = {
-  ts: Date;
-  destIp: string;
-  destPort: string;
-  binary: string;
-  args: string;
+type Connection = {
+  timestamp: Date;
+  domain?: string;
+  ip?: string;
+  port?: number;
+  blocked: boolean;
+  authorized: boolean;
 };
 
-type Decision = {
-  ts: Date;
-  decision: "allowed" | "blocked";
-  domain: string;
-  destIp: string;
-};
+async function getConnections(): Promise<Connection[]> {
+  // give some time for the logs to be written
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
-type CorrelatedData = TetragonLog & Decision;
-
-async function getOutboundConnections(): Promise<TetragonLog[]> {
   try {
-    const connections: TetragonLog[] = [];
-
-    const agentReadyTimestamp = new Date(
-      await getFileTimestamp(AGENT_READY_PATH),
-    );
-    console.log("Agent ready timestamp: ", agentReadyTimestamp);
-
-    const tetragonLogFile = await fs.open(TETRAGON_EVENTS_LOG_PATH);
-
-    const functionsToTrack = ["tcp_connect", "udp_sendmsg"];
-
-    for await (const line of tetragonLogFile.readLines()) {
-      const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
-
-      // Skip entries that are not related to the connect policy
-      if (processEntry?.["policy_name"] !== "connect") {
-        continue;
-      }
-
-      // Skip connection entries that were logged before the agent was ready
-      if (new Date(processEntry.process.start_time) < agentReadyTimestamp) {
-        continue;
-      }
-
-      // Skip entries that are not related to the functions we are tracking
-      if (!functionsToTrack.includes(processEntry.function_name)) {
-        continue;
-      }
-
-      const destIp = processEntry.args[0].sock_arg.daddr;
-
-      // Skip connections to 0.0.0.0
-      if (destIp === "0.0.0.0") {
-        continue;
-      }
-
-      connections.push({
-        ts: new Date(processEntry.process.start_time),
-        destIp,
-        destPort: processEntry.args[0].sock_arg.dport,
-        binary: processEntry.process.binary,
-        args: processEntry.process.arguments,
-      });
-    }
-
-    return connections;
-  } catch (error) {
-    console.error("Error reading log file", error);
-    return [];
-  }
-}
-
-async function getDecisions(): Promise<Decision[]> {
-  try {
-    const decisions: Decision[] = [];
-    const log = await fs.readFile(DECISISONS_LOG_PATH, "utf8");
+    const connections: Connection[] = [];
+    const { egressPolicy } = parseInputs();
+    const log = await fs.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
+
     for (const line of lines) {
       if (!line.trim()) {
         continue; // Skip empty lines
       }
+
+      // connections.log format: timestamp|decision|protocol|srcIP|dstIP|dstPort|domain|reason
       const values = line.split("|");
-      if (values.length < 4) {
+      if (values.length < 8) {
         continue; // Skip malformed lines
       }
+
       const timestamp = parseInt(values[0], 10);
       if (isNaN(timestamp)) {
         continue; // Skip invalid timestamps
       }
 
       // Determine if timestamp is in seconds, milliseconds, or nanoseconds
-      // If timestamp > 1e12, it's likely in milliseconds or nanoseconds
-      // Timestamps in seconds for current dates are around 1.7e9
       let date: Date;
       if (timestamp > 1e15) {
         // Likely nanoseconds, divide by 1e6
@@ -286,67 +202,29 @@ async function getDecisions(): Promise<Decision[]> {
         date = new Date(timestamp * 1000);
       }
 
-      decisions.push({
-        ts: date,
-        decision: values[1] as "allowed" | "blocked",
-        domain: values[2],
-        destIp: values[3],
+      const decision = values[1] as "allowed" | "blocked";
+      const destIp = values[4];
+      const destPort = values[5];
+      const domain = values[6];
+
+      connections.push({
+        timestamp: date,
+        domain: domain !== "unknown" ? domain : undefined,
+        ip: destIp !== "unknown" ? destIp : undefined,
+        port: destPort !== "unknown" ? parseInt(destPort) : undefined,
+        blocked: decision === "blocked" && egressPolicy === BLOCK,
+        authorized: decision === "allowed",
       });
     }
-    return decisions;
+
+    core.debug("\n\nConnections:\n");
+    connections.forEach((c) => core.debug(JSON.stringify(c)));
+
+    return connections;
   } catch (error) {
-    console.error("Error reading log file", error);
+    console.error("Error reading connections log file", error);
     return [];
   }
-}
-
-async function getCorrelateData(): Promise<CorrelatedData[]> {
-  // give some time for the logs to be written
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  const connections = await getOutboundConnections();
-
-  core.debug("\n\nConnections:\n");
-  connections.forEach((c) => core.debug(JSON.stringify(c)));
-
-  const decisions = await getDecisions();
-
-  core.debug("\nDecisions:\n");
-  decisions.forEach((d) => core.debug(JSON.stringify(d)));
-
-  const correlatedData: CorrelatedData[] = [];
-
-  for (const connection of connections) {
-    let decision = decisions.find(
-      (d) => connection.destIp === d.destIp && d.domain !== "unknown",
-    );
-    if (decision === undefined) {
-      decision = decisions.find((d) => connection.destIp === d.destIp);
-    }
-    correlatedData.push({
-      ts: connection.ts,
-      decision: decision?.decision ?? "blocked", // if we don't have a decision, assume it's blocked because we use an allowlist
-      domain: decision?.domain ?? "unknown",
-      destIp: connection.destIp,
-      destPort: connection.destPort,
-      binary: connection.binary,
-      args: connection.args,
-    });
-  }
-
-  // Add any decisions that don't have a corresponding connection (blocked DNS queries)
-  for (const decision of decisions.filter((d) => d.destIp === "unknown")) {
-    correlatedData.push({
-      ts: decision.ts,
-      decision: decision.decision,
-      domain: decision.domain,
-      destIp: "unknown",
-      destPort: "unknown",
-      binary: "unknown",
-      args: "unknown",
-    });
-  }
-  return correlatedData;
 }
 
 async function printAgentLogs({
@@ -372,18 +250,18 @@ async function main() {
   await printAgentLogs({ agentLogFilepath });
 
   try {
-    const correlatedData = await getCorrelateData();
+    const connections = await getConnections();
 
     // Always display the summary
     await displaySummary(
-      correlatedData,
+      connections,
       apiToken ? controlPlaneBaseUrl : undefined,
     );
 
     // Submit results to control plane if API token is provided
     if (apiToken) {
       await submitResultsToControlPlane(
-        correlatedData,
+        connections,
         apiToken,
         controlPlaneBaseUrl,
       );
