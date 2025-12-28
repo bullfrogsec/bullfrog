@@ -215,6 +215,14 @@ func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
 }
 
 func (a *Agent) addConnectionLog(decision string, protocol string, srcIP string, dstIP string, dstPort string, domain string, reason string) {
+
+	// Skip logging connections to default IPs (metadata services, etc.)
+	for _, defaultIP := range defaultIps {
+		if dstIP == defaultIP {
+			return
+		}
+	}
+
 	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), decision, protocol, srcIP, dstIP, dstPort, domain, reason)
 	a.filesystem.Append("/var/log/gha-agent/connections.log", content)
 }
