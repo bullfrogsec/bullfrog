@@ -19891,6 +19891,8 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         { data: "Domain", header: true },
         { data: "IP", header: true },
         { data: "Port", header: true },
+        { data: "Protocol", header: true },
+        { data: "Reason", header: true },
         { data: "Status", header: true }
       ],
       ...connections.map((conn) => [
@@ -19898,6 +19900,8 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         conn.domain || "-",
         conn.ip || "-",
         conn.port?.toString() || "-",
+        conn.protocol,
+        conn.reason,
         conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized"
       ])
     ];
@@ -19950,7 +19954,7 @@ async function submitResultsToControlPlane(connections, apiToken, controlPlaneBa
 async function getConnections() {
   await new Promise((resolve) => setTimeout(resolve, 5e3));
   try {
-    const connections = [];
+    const allConnections = [];
     const { egressPolicy } = parseInputs();
     const log = await import_promises.default.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
@@ -19975,25 +19979,108 @@ async function getConnections() {
         date = new Date(timestamp * 1e3);
       }
       const decision = values[1];
+      const protocol = values[2];
       const destIp = values[4];
       const destPort = values[5];
       const domain = values[6];
-      connections.push({
+      const reason = values[7];
+      allConnections.push({
         timestamp: date,
         domain: domain !== "unknown" ? domain : void 0,
         ip: destIp !== "unknown" ? destIp : void 0,
         port: destPort !== "unknown" ? parseInt(destPort) : void 0,
         blocked: decision === "blocked" && egressPolicy === BLOCK,
-        authorized: decision === "allowed"
+        authorized: decision === "allowed",
+        protocol,
+        reason
       });
     }
+    const filtered = filterDNSNoise(allConnections);
     core2.debug("\n\nConnections:\n");
-    connections.forEach((c) => core2.debug(JSON.stringify(c)));
-    return connections;
+    filtered.forEach((c) => core2.debug(JSON.stringify(c)));
+    return filtered;
   } catch (error) {
     console.error("Error reading connections log file", error);
     return [];
   }
+}
+function filterDNSNoise(connections) {
+  const byDomain = /* @__PURE__ */ new Map();
+  for (const conn of connections) {
+    const domain = conn.domain || "unknown";
+    if (!byDomain.has(domain)) {
+      byDomain.set(domain, []);
+    }
+    byDomain.get(domain).push(conn);
+  }
+  const result = [];
+  for (const [, conns] of byDomain) {
+    const hasActualConnection = conns.some(
+      (c) => !["DNS", "DNS-response"].includes(c.protocol) && c.reason === "ip-allowed"
+    );
+    if (hasActualConnection) {
+      const filtered = conns.filter(
+        (c) => c.reason !== "domain-allowed" && c.reason !== "dns-resolved"
+      );
+      result.push(...filtered);
+    } else {
+      const hasDnsResolved = conns.some((c) => c.reason === "dns-resolved");
+      if (hasDnsResolved) {
+        const dnsResolvedOnly = conns.filter(
+          (c) => c.reason === "dns-resolved"
+        );
+        const deduplicated = deduplicateByDomainAndIP(dnsResolvedOnly);
+        result.push(...deduplicated);
+      } else {
+        const hasOnlyDomainAllowed = conns.every(
+          (c) => c.reason === "domain-allowed"
+        );
+        if (hasOnlyDomainAllowed) {
+          const deduplicated = deduplicateByDomain(conns);
+          result.push(...deduplicated);
+        } else {
+          const isBlocked = conns.some((c) => c.blocked);
+          if (isBlocked) {
+            const deduplicated = deduplicateByDomain(conns);
+            result.push(...deduplicated);
+          } else {
+            result.push(...conns);
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+function deduplicateByDomain(connections) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  const sorted = [...connections].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
+  for (const conn of sorted) {
+    const key = conn.domain || "unknown";
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(conn);
+    }
+  }
+  return result;
+}
+function deduplicateByDomainAndIP(connections) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  const sorted = [...connections].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
+  for (const conn of sorted) {
+    const key = `${conn.domain || "unknown"}|${conn.ip || "unknown"}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(conn);
+    }
+  }
+  return result;
 }
 async function printAgentLogs({
   agentLogFilepath
