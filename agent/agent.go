@@ -410,6 +410,7 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 		if !a.allowedDNSServers[destinationIP] {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, destinationIP)
 			a.addIpToLogs("blocked", domain, destinationIP)
+			a.addConnectionLog("blocked", "DNS", "unknown", destinationIP, "53", domain, "untrusted-dns-server")
 			return DROP_REQUEST
 		}
 	}
@@ -458,6 +459,7 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 		if !a.allowedDNSServers[destinationIP] {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", destinationIP)
 			a.addIpToLogs("blocked", "unknown", destinationIP)
+			a.addConnectionLog("blocked", "TCP-DNS", "unknown", destinationIP, "53", "unknown", "untrusted-dns-server")
 			return DROP_REQUEST
 		}
 	}
