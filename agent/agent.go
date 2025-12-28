@@ -15,7 +15,7 @@ import (
 
 var (
 	blocking          = false
-	defaultDomains    = []string{"github.com", "api.github.com", "*.actions.githubusercontent.com", "results-receiver.actions.githubusercontent.com", "*.blob.core.windows.net", "*.githubapp.com"}
+	defaultDomains    = []string{"results-receiver.actions.githubusercontent.com", "productionresultssa1.blob.core.windows.net", "productionresultssa2.blob.core.windows.net", "productionresultssa3.blob.core.windows.net", "productionresultssa4.blob.core.windows.net", "productionresultssa5.blob.core.windows.net", "productionresultssa6.blob.core.windows.net", "productionresultssa7.blob.core.windows.net", "productionresultssa8.blob.core.windows.net", "productionresultssa9.blob.core.windows.net", "productionresultssa10.blob.core.windows.net", "productionresultssa11.blob.core.windows.net", "productionresultssa12.blob.core.windows.net", "productionresultssa13.blob.core.windows.net", "productionresultssa14.blob.core.windows.net", "productionresultssa15.blob.core.windows.net", "productionresultssa16.blob.core.windows.net", "productionresultssa17.blob.core.windows.net", "productionresultssa18.blob.core.windows.net", "productionresultssa19.blob.core.windows.net"}
 	defaultIps        = []string{"168.63.129.16", "169.254.169.254", "127.0.0.1"}
 	defaultDNSServers = []string{"127.0.0.53"}
 )

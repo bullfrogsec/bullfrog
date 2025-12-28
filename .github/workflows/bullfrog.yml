@@ -2,8 +2,8 @@ name: Build, test and release
 
 on:
   push:
-    branches:
-      - main
+    # branches:
+    #   - main
 
   pull_request:
     branches:
