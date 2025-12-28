@@ -71,6 +71,7 @@ type Agent struct {
 	allowedIps        map[string]bool
 	allowedDNSServers map[string]bool
 	allowedCIDR       []*net.IPNet
+	ipToDomain        map[string]string // Reverse mapping: IP -> domain name for logging
 	firewall          IFirewall
 	netInfoProvider   INetInfoProvider
 	filesystem        IFileSystem
@@ -83,6 +84,7 @@ func NewAgent(config AgentConfig) *Agent {
 		allowedDomains:    make(map[string]bool),
 		allowedIps:        make(map[string]bool),
 		allowedDNSServers: make(map[string]bool),
+		ipToDomain:        make(map[string]string),
 		firewall:          config.Firewall,
 		netInfoProvider:   config.NetInfoProvider,
 		filesystem:        config.FileSystem,
@@ -127,10 +129,8 @@ func (a *Agent) init(config AgentConfig) error {
 		log.Fatalf("Loading DNS servers allowlist: %v", err)
 	}
 
-	err = a.addToFirewall(a.allowedIps, a.allowedCIDR)
-	if err != nil {
-		log.Fatalf("Error adding to firewall: %v", err)
-	}
+	// No longer need to add IPs to nftables - Go agent makes all decisions
+	// Just flush DNS cache to ensure fresh resolutions
 	err = a.netInfoProvider.FlushDNSCache()
 	if err != nil {
 		log.Printf("Error flushing DNS cache: %v", err)
@@ -237,6 +237,11 @@ func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
 	a.filesystem.Append("/var/log/gha-agent/decisions.log", content)
 }
 
+func (a *Agent) addConnectionLog(decision string, protocol string, srcIP string, dstIP string, dstPort string, domain string, reason string) {
+	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), decision, protocol, srcIP, dstIP, dstPort, domain, reason)
+	a.filesystem.Append("/var/log/gha-agent/connections.log", content)
+}
+
 func (a *Agent) loadAllowedDNSServers() error {
 
 	dnsServer, err := a.netInfoProvider.GetDNSServer()
@@ -295,11 +300,13 @@ func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 		}
 		if a.isDomainAllowed(domain) {
 			fmt.Printf("%s -> Allowed DNS Query\n", domain)
+			a.addConnectionLog("allowed", "DNS", "unknown", "unknown", "53", domain, "domain-allowed")
 			return ACCEPT_REQUEST
 		}
 
 		fmt.Printf("%s -> Blocked DNS Query\n", domain)
 		a.addIpToLogs("blocked", domain, "unknown")
+		a.addConnectionLog("blocked", "DNS", "unknown", "unknown", "53", domain, "domain-blocked")
 		return DROP_REQUEST
 	}
 	return DROP_REQUEST
@@ -309,22 +316,26 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 	fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
 	fmt.Printf("%s:%s", answer.Name, answer.IP)
 	ip := answer.IP.String()
+
+	// Store IP-to-domain mapping for connection logging
+	a.ipToDomain[ip] = domain
+
 	if a.isDomainAllowed(domain) {
 		fmt.Println("-> Allowed request")
 		if !a.allowedIps[ip] {
-			err := a.firewall.AddIp(ip)
+			// Add to in-memory allowed IPs map
+			// No need to update nftables - Go agent handles all decisions
+			a.allowedIps[ip] = true
 			a.addIpToLogs("allowed", domain, ip)
-			if err != nil {
-				fmt.Printf("failed to add %s to firewall", ip)
-			} else {
-				a.allowedIps[ip] = true
-			}
+			a.addConnectionLog("allowed", "DNS-response", "unknown", ip, "53", domain, "dns-resolved")
 		}
 	} else if a.isIpAllowed(ip) {
 		fmt.Println("-> Allowed request")
 		a.addIpToLogs("allowed", domain, ip)
+		a.addConnectionLog("allowed", "DNS-response", "unknown", ip, "53", domain, "ip-allowed")
 	} else {
 		a.addIpToLogs("blocked", domain, ip)
+		a.addConnectionLog("blocked", "DNS-response", "unknown", ip, "53", domain, "not-allowed")
 		if blocking {
 			fmt.Println("-> Blocked request")
 		} else {
@@ -471,16 +482,84 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 
 }
 
+func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
+	netLayer := packet.NetworkLayer()
+	if netLayer == nil {
+		fmt.Println("No network layer found, dropping packet")
+		a.addConnectionLog("blocked", "unknown", "unknown", "unknown", "unknown", "unknown", "no-network-layer")
+		return DROP_REQUEST
+	}
+
+	var srcIP, dstIP, protocol string
+	var srcPort, dstPort string = "N/A", "N/A"
+
+	// Extract IP addresses
+	switch v := netLayer.(type) {
+	case *layers.IPv4:
+		srcIP = v.SrcIP.String()
+		dstIP = v.DstIP.String()
+		protocol = v.Protocol.String()
+	case *layers.IPv6:
+		srcIP = v.SrcIP.String()
+		dstIP = v.DstIP.String()
+		protocol = v.NextHeader.String()
+	default:
+		fmt.Println("Unknown network layer type, dropping packet")
+		a.addConnectionLog("blocked", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown-network-layer")
+		return DROP_REQUEST
+	}
+
+	// Extract ports if TCP or UDP
+	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp := tcpLayer.(*layers.TCP)
+		srcPort = tcp.SrcPort.String()
+		dstPort = tcp.DstPort.String()
+	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		udp := udpLayer.(*layers.UDP)
+		srcPort = udp.SrcPort.String()
+		dstPort = udp.DstPort.String()
+	}
+
+	// Look up domain for this IP (if it was resolved via DNS)
+	domain, hasDomain := a.ipToDomain[dstIP]
+	if !hasDomain {
+		domain = "unknown"
+	}
+
+	// Check if destination IP is allowed
+	if a.isIpAllowed(dstIP) {
+		fmt.Printf("ALLOW: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
+		a.addConnectionLog("allowed", protocol, srcIP, dstIP, dstPort, domain, "ip-allowed")
+		return ACCEPT_REQUEST
+	}
+
+	// In audit mode, log but allow
+	if !a.blocking {
+		fmt.Printf("AUDIT: %s:%s -> %s:%s (%s) [%s] - would be blocked\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
+		a.addConnectionLog("audit", protocol, srcIP, dstIP, dstPort, domain, "not-in-allowlist")
+		return ACCEPT_REQUEST
+	}
+
+	// Block mode - drop the packet
+	fmt.Printf("BLOCK: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
+	a.addConnectionLog("blocked", protocol, srcIP, dstIP, dstPort, domain, "not-in-allowlist")
+	return DROP_REQUEST
+}
+
 func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
 		return a.processDNSPacket(packet)
 	}
 	// check dns over tcp
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-		return a.processTCPPacket(packet)
+		tcp := tcpLayer.(*layers.TCP)
+		// Only treat as DNS if it's actually on port 53
+		if tcp.DstPort == DNS_PORT || tcp.SrcPort == DNS_PORT {
+			return a.processTCPPacket(packet)
+		}
 	}
-	fmt.Println("Warning: Packet is not DNS or TCP. Dropping request, this shouldn't be happening.")
-	return DROP_REQUEST
+	// Handle all other packets (non-DNS TCP, UDP, ICMP, etc.)
+	return a.processNonDNSPacket(packet)
 }
 
 func (a *Agent) disableSudo() error {
