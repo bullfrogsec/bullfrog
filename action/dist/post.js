@@ -177,7 +177,7 @@ var require_file_command = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto = __importStar(require("crypto"));
-    var fs3 = __importStar(require("fs"));
+    var fs2 = __importStar(require("fs"));
     var os = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueFileCommand(command, message) {
@@ -185,10 +185,10 @@ var require_file_command = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs3.existsSync(filePath)) {
+      if (!fs2.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs3.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os.EOL}`, {
+      fs2.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -380,7 +380,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug3("making CONNECT request");
+      debug2("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -400,7 +400,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug3(
+          debug2(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug3("got illegal response body from proxy");
+          debug2("got illegal response body from proxy");
           socket.destroy();
           var error = new Error("got illegal response body from proxy");
           error.code = "ECONNRESET";
@@ -420,13 +420,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug3("tunneling connection has established");
+        debug2("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug3(
+        debug2(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -488,9 +488,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug3;
+    var debug2;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug3 = function() {
+      debug2 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -500,10 +500,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug3 = function() {
+      debug2 = function() {
       };
     }
-    exports2.debug = debug3;
+    exports2.debug = debug2;
   }
 });
 
@@ -18492,12 +18492,12 @@ var require_io_util = __commonJS({
     var _a;
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getCmdPath = exports2.tryGetExecutablePath = exports2.isRooted = exports2.isDirectory = exports2.exists = exports2.READONLY = exports2.UV_FS_O_EXLOCK = exports2.IS_WINDOWS = exports2.unlink = exports2.symlink = exports2.stat = exports2.rmdir = exports2.rm = exports2.rename = exports2.readlink = exports2.readdir = exports2.open = exports2.mkdir = exports2.lstat = exports2.copyFile = exports2.chmod = void 0;
-    var fs3 = __importStar(require("fs"));
+    var fs2 = __importStar(require("fs"));
     var path2 = __importStar(require("path"));
-    _a = fs3.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
+    _a = fs2.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
     exports2.IS_WINDOWS = process.platform === "win32";
     exports2.UV_FS_O_EXLOCK = 268435456;
-    exports2.READONLY = fs3.constants.O_RDONLY;
+    exports2.READONLY = fs2.constants.O_RDONLY;
     function exists(fsPath) {
       return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -19714,10 +19714,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug3(message) {
+    function debug2(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug3;
+    exports2.debug = debug2;
     function error(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -19796,16 +19796,15 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 });
 
 // src/post.ts
-var core3 = __toESM(require_core());
-var import_promises2 = __toESM(require("node:fs/promises"));
+var core2 = __toESM(require_core());
+var import_promises = __toESM(require("node:fs/promises"));
 
 // src/inputs.ts
 var core = __toESM(require_core());
 
 // src/constants.ts
 var AGENT_LOG_FILENAME = "agent.log";
-var TETRAGON_EVENTS_LOG_PATH = "/var/log/tetragon/tetragon.log";
-var AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";
+var CONNECTIONS_LOG_PATH = "/var/log/gha-agent/connections.log";
 var AUDIT = "audit";
 var BLOCK = "block";
 var ALLOWED_DOMAINS_ONLY = "allowed-domains-only";
@@ -19859,22 +19858,6 @@ function parseInputs() {
 
 // src/post.ts
 var import_node_path = __toESM(require("node:path"));
-
-// src/util.ts
-var core2 = __toESM(require_core());
-var import_promises = __toESM(require("node:fs/promises"));
-async function getFileTimestamp(filePath) {
-  try {
-    const stats = await import_promises.default.stat(filePath);
-    return stats.mtime.getTime();
-  } catch (err) {
-    core2.debug(`Error getting ${filePath} file timestamp: ${err}`);
-    return 0;
-  }
-}
-
-// src/post.ts
-var DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
 function getGitHubContext() {
   const repo = process.env.GITHUB_REPOSITORY || "";
   const [organization] = repo.split("/");
@@ -19888,17 +19871,8 @@ function getGitHubContext() {
   }
   return { workflowRunId, runAttempt, jobName, organization, repo };
 }
-async function displaySummary(correlatedData, controlPlaneBaseUrl) {
-  const { egressPolicy } = parseInputs();
-  const connections = correlatedData.map((data) => ({
-    domain: data.domain !== "unknown" ? data.domain : void 0,
-    ip: data.destIp !== "unknown" ? data.destIp : void 0,
-    port: data.destPort !== "unknown" ? parseInt(data.destPort) : void 0,
-    blocked: data.decision === "blocked" && egressPolicy === BLOCK,
-    authorized: data.decision === "allowed",
-    timestamp: data.ts
-  }));
-  const summary2 = core3.summary;
+async function displaySummary(connections, controlPlaneBaseUrl) {
+  const summary2 = core2.summary;
   if (controlPlaneBaseUrl) {
     const { workflowRunId } = getGitHubContext();
     const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
@@ -19933,18 +19907,9 @@ async function displaySummary(correlatedData, controlPlaneBaseUrl) {
   }
   await summary2.write();
 }
-async function submitResultsToControlPlane(correlatedData, apiToken, controlPlaneBaseUrl) {
+async function submitResultsToControlPlane(connections, apiToken, controlPlaneBaseUrl) {
   try {
     const { workflowRunId, runAttempt, jobName, organization, repo } = getGitHubContext();
-    const { egressPolicy } = parseInputs();
-    const connections = correlatedData.map((data) => ({
-      domain: data.domain !== "unknown" ? data.domain : void 0,
-      ip: data.destIp !== "unknown" ? data.destIp : void 0,
-      port: data.destPort !== "unknown" ? parseInt(data.destPort) : void 0,
-      blocked: data.decision === "blocked" && egressPolicy === BLOCK,
-      authorized: data.decision === "allowed",
-      timestamp: data.ts
-    }));
     const payload = {
       workflowRunId,
       runAttempt,
@@ -19954,7 +19919,7 @@ async function submitResultsToControlPlane(correlatedData, apiToken, controlPlan
       connections,
       createdAt: /* @__PURE__ */ new Date()
     };
-    core3.debug(
+    core2.debug(
       `Submitting results to control plane: ${JSON.stringify(payload)}`
     );
     const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
@@ -19973,64 +19938,28 @@ async function submitResultsToControlPlane(correlatedData, apiToken, controlPlan
         `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`
       );
     }
-    core3.info(
+    core2.info(
       `Results successfully submitted to control plane for workflow run ${workflowRunId}`
     );
   } catch (error) {
-    core3.warning(
+    core2.warning(
       `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
-async function getOutboundConnections() {
+async function getConnections() {
+  await new Promise((resolve) => setTimeout(resolve, 5e3));
   try {
     const connections = [];
-    const agentReadyTimestamp = new Date(
-      await getFileTimestamp(AGENT_READY_PATH)
-    );
-    console.log("Agent ready timestamp: ", agentReadyTimestamp);
-    const tetragonLogFile = await import_promises2.default.open(TETRAGON_EVENTS_LOG_PATH);
-    const functionsToTrack = ["tcp_connect", "udp_sendmsg"];
-    for await (const line of tetragonLogFile.readLines()) {
-      const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
-      if (processEntry?.["policy_name"] !== "connect") {
-        continue;
-      }
-      if (new Date(processEntry.process.start_time) < agentReadyTimestamp) {
-        continue;
-      }
-      if (!functionsToTrack.includes(processEntry.function_name)) {
-        continue;
-      }
-      const destIp = processEntry.args[0].sock_arg.daddr;
-      if (destIp === "0.0.0.0") {
-        continue;
-      }
-      connections.push({
-        ts: new Date(processEntry.process.start_time),
-        destIp,
-        destPort: processEntry.args[0].sock_arg.dport,
-        binary: processEntry.process.binary,
-        args: processEntry.process.arguments
-      });
-    }
-    return connections;
-  } catch (error) {
-    console.error("Error reading log file", error);
-    return [];
-  }
-}
-async function getDecisions() {
-  try {
-    const decisions = [];
-    const log = await import_promises2.default.readFile(DECISISONS_LOG_PATH, "utf8");
+    const { egressPolicy } = parseInputs();
+    const log = await import_promises.default.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
     for (const line of lines) {
       if (!line.trim()) {
         continue;
       }
       const values = line.split("|");
-      if (values.length < 4) {
+      if (values.length < 8) {
         continue;
       }
       const timestamp = parseInt(values[0], 10);
@@ -20045,67 +19974,35 @@ async function getDecisions() {
       } else {
         date = new Date(timestamp * 1e3);
       }
-      decisions.push({
-        ts: date,
-        decision: values[1],
-        domain: values[2],
-        destIp: values[3]
+      const decision = values[1];
+      const destIp = values[4];
+      const destPort = values[5];
+      const domain = values[6];
+      connections.push({
+        timestamp: date,
+        domain: domain !== "unknown" ? domain : void 0,
+        ip: destIp !== "unknown" ? destIp : void 0,
+        port: destPort !== "unknown" ? parseInt(destPort) : void 0,
+        blocked: decision === "blocked" && egressPolicy === BLOCK,
+        authorized: decision === "allowed"
       });
     }
-    return decisions;
+    core2.debug("\n\nConnections:\n");
+    connections.forEach((c) => core2.debug(JSON.stringify(c)));
+    return connections;
   } catch (error) {
-    console.error("Error reading log file", error);
+    console.error("Error reading connections log file", error);
     return [];
   }
-}
-async function getCorrelateData() {
-  await new Promise((resolve) => setTimeout(resolve, 5e3));
-  const connections = await getOutboundConnections();
-  core3.debug("\n\nConnections:\n");
-  connections.forEach((c) => core3.debug(JSON.stringify(c)));
-  const decisions = await getDecisions();
-  core3.debug("\nDecisions:\n");
-  decisions.forEach((d) => core3.debug(JSON.stringify(d)));
-  const correlatedData = [];
-  for (const connection of connections) {
-    let decision = decisions.find(
-      (d) => connection.destIp === d.destIp && d.domain !== "unknown"
-    );
-    if (decision === void 0) {
-      decision = decisions.find((d) => connection.destIp === d.destIp);
-    }
-    correlatedData.push({
-      ts: connection.ts,
-      decision: decision?.decision ?? "blocked",
-      // if we don't have a decision, assume it's blocked because we use an allowlist
-      domain: decision?.domain ?? "unknown",
-      destIp: connection.destIp,
-      destPort: connection.destPort,
-      binary: connection.binary,
-      args: connection.args
-    });
-  }
-  for (const decision of decisions.filter((d) => d.destIp === "unknown")) {
-    correlatedData.push({
-      ts: decision.ts,
-      decision: decision.decision,
-      domain: decision.domain,
-      destIp: "unknown",
-      destPort: "unknown",
-      binary: "unknown",
-      args: "unknown"
-    });
-  }
-  return correlatedData;
 }
 async function printAgentLogs({
   agentLogFilepath
 }) {
   try {
-    const log = await import_promises2.default.readFile(agentLogFilepath, "utf8");
+    const log = await import_promises.default.readFile(agentLogFilepath, "utf8");
     const lines = log.split("\n");
     for (const line of lines) {
-      core3.debug(line);
+      core2.debug(line);
     }
   } catch (error) {
     console.error("Error reading log file", error);
@@ -20116,27 +20013,27 @@ async function main() {
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   await printAgentLogs({ agentLogFilepath });
   try {
-    const correlatedData = await getCorrelateData();
+    const connections = await getConnections();
     await displaySummary(
-      correlatedData,
+      connections,
       apiToken ? controlPlaneBaseUrl : void 0
     );
     if (apiToken) {
       await submitResultsToControlPlane(
-        correlatedData,
+        connections,
         apiToken,
         controlPlaneBaseUrl
       );
     }
   } catch (error) {
-    core3.warning(
+    core2.warning(
       `Failed to process results: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
 main().catch((error) => {
   console.error(error);
-  core3.setFailed(error);
+  core2.setFailed(error);
   process.exit(1);
 });
 /*! Bundled license information:

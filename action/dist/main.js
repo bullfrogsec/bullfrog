@@ -380,7 +380,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug3("making CONNECT request");
+      debug2("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -400,7 +400,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug3(
+          debug2(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug3("got illegal response body from proxy");
+          debug2("got illegal response body from proxy");
           socket.destroy();
           var error = new Error("got illegal response body from proxy");
           error.code = "ECONNRESET";
@@ -420,13 +420,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug3("tunneling connection has established");
+        debug2("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug3(
+        debug2(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -488,9 +488,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug3;
+    var debug2;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug3 = function() {
+      debug2 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -500,10 +500,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug3 = function() {
+      debug2 = function() {
       };
     }
-    exports2.debug = debug3;
+    exports2.debug = debug2;
   }
 });
 
@@ -19714,10 +19714,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug3(message) {
+    function debug2(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug3;
+    exports2.debug = debug2;
     function error(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -19804,7 +19804,6 @@ var import_node_path = __toESM(require("node:path"));
 
 // src/constants.ts
 var AGENT_LOG_FILENAME = "agent.log";
-var TETRAGON_LOG_FILENAME = "tetragon.log";
 var AGENT_INSTALL_PATH = "/opt/bullfrog/agent";
 var AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";
 var AUDIT = "audit";
@@ -19877,25 +19876,6 @@ async function waitForFile(filePath, timeout = 15e3, interval = 500) {
   core2.debug(`Timeout: File ${filePath} is not available.`);
   return false;
 }
-async function waitForStringInFile({
-  filePath,
-  str,
-  timeoutMs
-}) {
-  const startTime = Date.now();
-  while (Date.now() - startTime < timeoutMs) {
-    let content = "";
-    try {
-      content = await import_promises.default.readFile(filePath, { encoding: "utf-8" });
-    } catch {
-    }
-    if (content.includes(str)) {
-      return;
-    }
-    await (0, import_promises2.setTimeout)(500);
-  }
-  throw new Error(`Couldn't find ${str} in file ${filePath}`);
-}
 
 // src/main.ts
 var exec = import_node_util.default.promisify(import_node_child_process.exec);
@@ -19957,52 +19937,6 @@ function installPackages() {
   if (status !== 0) {
     throw new Error("Couldn't install packages");
   }
-}
-function installTetragon({ actionDirectory }) {
-  console.log("Installing Tetragon");
-  const { status } = (0, import_node_child_process.spawnSync)(
-    "bash",
-    [import_node_path.default.join(actionDirectory, "scripts", "install_tetragon.sh")],
-    {
-      stdio: "inherit",
-      env: {
-        TETRAGON_POLICIES_DIRECTORY: import_node_path.default.join(actionDirectory, "tetragon")
-      }
-    }
-  );
-  if (status !== 0) {
-    throw new Error("Couldn't install Tetragon");
-  }
-}
-async function startTetragon({
-  tetragonLogFilepath
-}) {
-  const out = await import_promises3.default.open(tetragonLogFilepath, "a");
-  core3.debug("Starting Tetragon");
-  console.time("Tetragon startup time");
-  (0, import_node_child_process.spawn)(
-    "sudo",
-    [
-      "tetragon",
-      "--export-file-max-size-mb",
-      "1000",
-      "--export-file-perm",
-      "644",
-      "--export-allowlist",
-      '{"event_set": ["PROCESS_KPROBE"], "policy_names": ["connect"]}'
-    ],
-    {
-      stdio: ["ignore", out.fd, out.fd],
-      detached: true
-    }
-  ).unref();
-  await out.close();
-  await waitForStringInFile({
-    filePath: tetragonLogFilepath,
-    str: "Listening for events...",
-    timeoutMs: 15e3
-  });
-  console.timeEnd("Tetragon startup time");
 }
 async function startAgent({
   agentDirectory,
@@ -20100,12 +20034,7 @@ async function main() {
   }
   await import_promises3.default.mkdir(logDirectory, { recursive: true });
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
-  const tetragonLogFilepath = import_node_path.default.join(logDirectory, TETRAGON_LOG_FILENAME);
   installPackages();
-  installTetragon({ actionDirectory });
-  await startTetragon({
-    tetragonLogFilepath
-  });
   await installAgent({
     actionDirectory,
     agentDirectory,
