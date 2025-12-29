@@ -53,6 +53,16 @@ const (
 	DNS_PORT                              = layers.TCPPort(53)
 )
 
+type ConnectionLog struct {
+	Decision string
+	Protocol string
+	SrcIP    string
+	DstIP    string
+	DstPort  string
+	Domain   string
+	Reason   string
+}
+
 type AgentConfig struct {
 	EgressPolicy    string
 	DNSPolicy       string
@@ -172,7 +182,6 @@ func (a *Agent) loadAllowedIp(ips []string) {
 		netIp := net.ParseIP(ip)
 		if netIp != nil {
 			a.allowedIps[ip] = true
-			a.addIpToLogs("allowed", "unknown", ip)
 			continue
 		}
 		fmt.Printf("failed to parse ip: %s. skipping.\n", ip)
@@ -210,21 +219,16 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 	return false
 }
 
-func (a *Agent) addIpToLogs(decision string, domain string, ip string) {
-	content := fmt.Sprintf("%d|%s|%s|%s\n", time.Now().UnixMilli(), decision, domain, ip)
-	a.filesystem.Append("/var/log/gha-agent/decisions.log", content)
-}
-
-func (a *Agent) addConnectionLog(decision string, protocol string, srcIP string, dstIP string, dstPort string, domain string, reason string) {
+func (a *Agent) addConnectionLog(log ConnectionLog) {
 
 	// Skip logging connections to default IPs (metadata services, etc.)
 	for _, defaultIP := range defaultIps {
-		if dstIP == defaultIP {
+		if log.DstIP == defaultIP {
 			return
 		}
 	}
 
-	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), decision, protocol, srcIP, dstIP, dstPort, domain, reason)
+	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), log.Decision, log.Protocol, log.SrcIP, log.DstIP, log.DstPort, log.Domain, log.Reason)
 	a.filesystem.Append("/var/log/gha-agent/connections.log", content)
 }
 
@@ -286,13 +290,28 @@ func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 		}
 		if a.isDomainAllowed(domain) {
 			fmt.Printf("%s -> Allowed DNS Query\n", domain)
-			a.addConnectionLog("allowed", "DNS", "unknown", "unknown", "53", domain, "domain-allowed")
+			a.addConnectionLog(ConnectionLog{
+				Decision: "allowed",
+				Protocol: "DNS",
+				SrcIP:    "unknown",
+				DstIP:    "unknown",
+				DstPort:  "53",
+				Domain:   domain,
+				Reason:   "domain-allowed",
+			})
 			return ACCEPT_REQUEST
 		}
 
 		fmt.Printf("%s -> Blocked DNS Query\n", domain)
-		a.addIpToLogs("blocked", domain, "unknown")
-		a.addConnectionLog("blocked", "DNS", "unknown", "unknown", "53", domain, "domain-not-allowed")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "blocked",
+			Protocol: "DNS",
+			SrcIP:    "unknown",
+			DstIP:    "unknown",
+			DstPort:  "53",
+			Domain:   domain,
+			Reason:   "domain-not-allowed",
+		})
 		return DROP_REQUEST
 	}
 	return DROP_REQUEST
@@ -312,16 +331,37 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 			// Add to in-memory allowed IPs map
 			// No need to update nftables - Go agent handles all decisions
 			a.allowedIps[ip] = true
-			a.addIpToLogs("allowed", domain, ip)
-			a.addConnectionLog("allowed", "DNS-response", "unknown", ip, "53", domain, "dns-resolved")
+			a.addConnectionLog(ConnectionLog{
+				Decision: "allowed",
+				Protocol: "DNS-response",
+				SrcIP:    "unknown",
+				DstIP:    ip,
+				DstPort:  "53",
+				Domain:   domain,
+				Reason:   "dns-resolved",
+			})
 		}
 	} else if a.isIpAllowed(ip) {
 		fmt.Println("-> Allowed request")
-		a.addIpToLogs("allowed", domain, ip)
-		a.addConnectionLog("allowed", "DNS-response", "unknown", ip, "53", domain, "ip-allowed")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "allowed",
+			Protocol: "DNS-response",
+			SrcIP:    "unknown",
+			DstIP:    ip,
+			DstPort:  "53",
+			Domain:   domain,
+			Reason:   "ip-allowed",
+		})
 	} else {
-		a.addIpToLogs("blocked", domain, ip)
-		a.addConnectionLog("blocked", "DNS-response", "unknown", ip, "53", domain, "domain-not-allowed")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "blocked",
+			Protocol: "DNS-response",
+			SrcIP:    "unknown",
+			DstIP:    ip,
+			DstPort:  "53",
+			Domain:   domain,
+			Reason:   "domain-not-allowed",
+		})
 		if blocking {
 			fmt.Println("-> Blocked request")
 		} else {
@@ -390,13 +430,19 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 		destinationIP, err := getDestinationIP(packet)
 		if err != nil {
 			fmt.Printf("Failed to get destination IP: %v\n", err)
-			a.addIpToLogs("blocked", domain, "unknown")
 			return DROP_REQUEST
 		}
 		if !a.allowedDNSServers[destinationIP] {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, destinationIP)
-			a.addIpToLogs("blocked", domain, destinationIP)
-			a.addConnectionLog("blocked", "DNS", "unknown", destinationIP, "53", domain, "untrusted-dns-server")
+			a.addConnectionLog(ConnectionLog{
+				Decision: "blocked",
+				Protocol: "DNS",
+				SrcIP:    "unknown",
+				DstIP:    destinationIP,
+				DstPort:  "53",
+				Domain:   domain,
+				Reason:   "untrusted-dns-server",
+			})
 			return DROP_REQUEST
 		}
 	}
@@ -439,13 +485,19 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 		destinationIP, err := getDestinationIP(packet)
 		if err != nil {
 			fmt.Printf("Failed to get destination IP: %v\n", err)
-			a.addIpToLogs("blocked", "unknown", "unknown")
 			return DROP_REQUEST
 		}
 		if !a.allowedDNSServers[destinationIP] {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", destinationIP)
-			a.addIpToLogs("blocked", "unknown", destinationIP)
-			a.addConnectionLog("blocked", "TCP-DNS", "unknown", destinationIP, "53", "unknown", "untrusted-dns-server")
+			a.addConnectionLog(ConnectionLog{
+				Decision: "blocked",
+				Protocol: "TCP-DNS",
+				SrcIP:    "unknown",
+				DstIP:    destinationIP,
+				DstPort:  "53",
+				Domain:   "unknown",
+				Reason:   "untrusted-dns-server",
+			})
 			return DROP_REQUEST
 		}
 	}
@@ -474,7 +526,15 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	netLayer := packet.NetworkLayer()
 	if netLayer == nil {
 		fmt.Println("No network layer found, dropping packet")
-		a.addConnectionLog("blocked", "unknown", "unknown", "unknown", "unknown", "unknown", "no-network-layer")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "blocked",
+			Protocol: "unknown",
+			SrcIP:    "unknown",
+			DstIP:    "unknown",
+			DstPort:  "unknown",
+			Domain:   "unknown",
+			Reason:   "no-network-layer",
+		})
 		return DROP_REQUEST
 	}
 
@@ -493,7 +553,15 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 		protocol = v.NextHeader.String()
 	default:
 		fmt.Println("Unknown network layer type, dropping packet")
-		a.addConnectionLog("blocked", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown-network-layer")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "blocked",
+			Protocol: "unknown",
+			SrcIP:    "unknown",
+			DstIP:    "unknown",
+			DstPort:  "unknown",
+			Domain:   "unknown",
+			Reason:   "unknown-network-layer",
+		})
 		return DROP_REQUEST
 	}
 
@@ -517,20 +585,44 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	// Check if destination IP is allowed
 	if a.isIpAllowed(dstIP) {
 		fmt.Printf("ALLOW: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
-		a.addConnectionLog("allowed", protocol, srcIP, dstIP, dstPort, domain, "ip-allowed")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "allowed",
+			Protocol: protocol,
+			SrcIP:    srcIP,
+			DstIP:    dstIP,
+			DstPort:  dstPort,
+			Domain:   domain,
+			Reason:   "ip-allowed",
+		})
 		return ACCEPT_REQUEST
 	}
 
 	// In audit mode, log but allow
 	if !a.blocking {
 		fmt.Printf("AUDIT: %s:%s -> %s:%s (%s) [%s] - would be blocked\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
-		a.addConnectionLog("audit", protocol, srcIP, dstIP, dstPort, domain, "ip-not-allowed")
+		a.addConnectionLog(ConnectionLog{
+			Decision: "audit",
+			Protocol: protocol,
+			SrcIP:    srcIP,
+			DstIP:    dstIP,
+			DstPort:  dstPort,
+			Domain:   domain,
+			Reason:   "ip-not-allowed",
+		})
 		return ACCEPT_REQUEST
 	}
 
 	// Block mode - drop the packet
 	fmt.Printf("BLOCK: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
-	a.addConnectionLog("blocked", protocol, srcIP, dstIP, dstPort, domain, "ip-not-allowed")
+	a.addConnectionLog(ConnectionLog{
+		Decision: "blocked",
+		Protocol: protocol,
+		SrcIP:    srcIP,
+		DstIP:    dstIP,
+		DstPort:  dstPort,
+		Domain:   domain,
+		Reason:   "ip-not-allowed",
+	})
 	return DROP_REQUEST
 }
 
