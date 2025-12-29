@@ -19920,7 +19920,9 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         { data: "Port", header: true },
         { data: "Protocol", header: true },
         { data: "Reason", header: true },
-        { data: "Status", header: true }
+        { data: "Status", header: true },
+        { data: "Exe Path", header: true },
+        { data: "Command Line", header: true }
       ],
       ...connections.map((conn) => [
         conn.timestamp.toISOString(),
@@ -19929,7 +19931,9 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         conn.port?.toString() || "-",
         conn.protocol,
         getHumanFriendlyReason(conn.reason),
-        conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized"
+        conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized",
+        conn.exePath || "-",
+        conn.commandLine || "-"
       ])
     ];
     summary2.addTable(tableData);
@@ -19990,7 +19994,7 @@ async function getConnections() {
         continue;
       }
       const values = line.split("|");
-      if (values.length < 9) {
+      if (values.length < 13) {
         continue;
       }
       const timestamp = parseInt(values[0], 10);
@@ -20004,6 +20008,8 @@ async function getConnections() {
       const destPort = values[6];
       const domain = values[7];
       const reason = values[8];
+      const commandLine = values[11];
+      const exePath = values[12];
       allConnections.push({
         timestamp: date,
         domain: domain !== "unknown" ? domain : void 0,
@@ -20012,7 +20018,9 @@ async function getConnections() {
         blocked: decision === "blocked" && egressPolicy === BLOCK,
         authorized: decision === "allowed",
         protocol,
-        reason
+        reason,
+        exePath: exePath !== "unknown" ? exePath : void 0,
+        commandLine: commandLine !== "unknown" ? commandLine : void 0
       });
     }
     const filtered = filterDNSNoise(allConnections);

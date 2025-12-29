@@ -6,7 +6,6 @@ import path from "node:path";
 import {
   AGENT_LOG_FILENAME,
   BLOCK,
-  ALLOWED_DOMAINS_ONLY,
   AGENT_INSTALL_PATH,
   AGENT_READY_PATH,
 } from "./constants";

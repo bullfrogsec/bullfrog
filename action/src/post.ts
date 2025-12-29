@@ -20,6 +20,8 @@ interface WorkflowActionResult {
     timestamp: Date;
     protocol: string;
     reason: string;
+    exePath?: string;
+    commandLine?: string;
   }>;
   createdAt: Date;
 }
@@ -98,6 +100,8 @@ async function displaySummary(
         { data: "Protocol", header: true },
         { data: "Reason", header: true },
         { data: "Status", header: true },
+        { data: "Exe Path", header: true },
+        { data: "Command Line", header: true },
       ],
       ...connections.map((conn) => [
         conn.timestamp.toISOString(),
@@ -111,6 +115,8 @@ async function displaySummary(
           : conn.authorized
             ? "✅ Authorized"
             : "⚠️ Unauthorized",
+        conn.exePath || "-",
+        conn.commandLine || "-",
       ]),
     ];
 
@@ -186,6 +192,8 @@ type Connection = {
   authorized: boolean;
   protocol: string;
   reason: string;
+  exePath?: string;
+  commandLine?: string;
 };
 
 async function getConnections(): Promise<Connection[]> {
@@ -203,9 +211,9 @@ async function getConnections(): Promise<Connection[]> {
         continue; // Skip empty lines
       }
 
-      // connections.log format: timestamp|decision|protocol|srcIP|srcPort|dstIP|dstPort|domain|reason
+      // connections.log format: timestamp|decision|protocol|srcIP|srcPort|dstIP|dstPort|domain|reason|pid|processName|commandLine|exePath
       const values = line.split("|");
-      if (values.length < 9) {
+      if (values.length < 13) {
         continue; // Skip malformed lines
       }
 
@@ -222,6 +230,8 @@ async function getConnections(): Promise<Connection[]> {
       const destPort = values[6];
       const domain = values[7];
       const reason = values[8];
+      const commandLine = values[11];
+      const exePath = values[12];
 
       allConnections.push({
         timestamp: date,
@@ -232,6 +242,8 @@ async function getConnections(): Promise<Connection[]> {
         authorized: decision === "allowed",
         protocol,
         reason,
+        exePath: exePath !== "unknown" ? exePath : undefined,
+        commandLine: commandLine !== "unknown" ? commandLine : undefined,
       });
     }
 
