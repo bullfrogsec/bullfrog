@@ -115,12 +115,7 @@ async function startAgent({
 
   console.log("Loading nftables rules");
 
-  if (blockingMode && dnsPolicy === ALLOWED_DOMAINS_ONLY) {
-    await exec(
-      `sudo nft -f ${path.join(agentDirectory, "queue_block_with_dns.nft")}`,
-    );
-    console.log("loaded blocking rules (with DNS)");
-  } else if (blockingMode) {
+  if (blockingMode) {
     await exec(`sudo nft -f ${path.join(agentDirectory, "queue_block.nft")}`);
     console.log("loaded blocking rules");
   } else {
