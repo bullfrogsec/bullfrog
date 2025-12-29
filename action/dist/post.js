@@ -19921,6 +19921,7 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         { data: "Protocol", header: true },
         { data: "Reason", header: true },
         { data: "Status", header: true },
+        { data: "Process", header: true },
         { data: "Exe Path", header: true },
         { data: "Command Line", header: true }
       ],
@@ -19932,6 +19933,7 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         conn.protocol,
         getHumanFriendlyReason(conn.reason),
         conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized",
+        conn.process || "-",
         conn.exePath || "-",
         conn.commandLine || "-"
       ])
@@ -20008,6 +20010,7 @@ async function getConnections() {
       const destPort = values[6];
       const domain = values[7];
       const reason = values[8];
+      const process2 = values[10];
       const commandLine = values[11];
       const exePath = values[12];
       allConnections.push({
@@ -20019,6 +20022,7 @@ async function getConnections() {
         authorized: decision === "allowed",
         protocol,
         reason,
+        process: process2 !== "unknown" ? process2 : void 0,
         exePath: exePath !== "unknown" ? exePath : void 0,
         commandLine: commandLine !== "unknown" ? commandLine : void 0
       });

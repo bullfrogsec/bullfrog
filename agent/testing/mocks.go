@@ -80,3 +80,53 @@ func (m *ProcProvider) GetProcesses() ([]int, error) {
 	}
 	return pids, nil
 }
+
+// ContainerInfo holds container information (duplicated for testing independence)
+type ContainerInfo struct {
+	ID      string
+	Name    string
+	Image   string
+	RootPID int
+}
+
+// ProcessDetails holds process information for mock Docker provider
+type ProcessDetails struct {
+	PID         int
+	ProcessName string
+	CommandLine string
+	ExecPath    string
+}
+
+// MockDockerProvider implements IDockerProvider for testing
+type MockDockerProvider struct {
+	Containers map[string]*ContainerInfo  // Key: IP address
+	ProcessMap map[string]*ProcessDetails // Key: "containerID:IP:Port:Protocol"
+}
+
+func NewMockDockerProvider() *MockDockerProvider {
+	return &MockDockerProvider{
+		Containers: make(map[string]*ContainerInfo),
+		ProcessMap: make(map[string]*ProcessDetails),
+	}
+}
+
+func (m *MockDockerProvider) FindContainerByIP(ip string) (*ContainerInfo, error) {
+	if container, exists := m.Containers[ip]; exists {
+		return container, nil
+	}
+	return nil, fmt.Errorf("container not found")
+}
+
+func (m *MockDockerProvider) GetProcessInContainer(container *ContainerInfo, srcIP, srcPort, protocol string) (
+	int, string, string, string, error) {
+
+	key := fmt.Sprintf("%s:%s:%s:%s", container.ID, srcIP, srcPort, protocol)
+	if proc, exists := m.ProcessMap[key]; exists {
+		return proc.PID, proc.ProcessName, proc.CommandLine, proc.ExecPath, nil
+	}
+	return 0, "", "", "", fmt.Errorf("process not found")
+}
+
+func (m *MockDockerProvider) Close() error {
+	return nil
+}

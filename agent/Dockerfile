@@ -1,4 +1,4 @@
-FROM golang:1.22.7-bookworm@sha256:027bd04b1d3b4529bf8ccebf62eb7eeeae7b7bef134a68bd419824e929ad93ad
+FROM golang:1.24.11-bookworm@sha256:fc58bb98c4b7ebc8211c94df9dee40489e48363c69071bceca91aa59023b0dee
 
 ARG BUILDOS
 ARG BUILDARCH

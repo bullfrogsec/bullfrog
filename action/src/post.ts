@@ -100,6 +100,7 @@ async function displaySummary(
         { data: "Protocol", header: true },
         { data: "Reason", header: true },
         { data: "Status", header: true },
+        { data: "Process", header: true },
         { data: "Exe Path", header: true },
         { data: "Command Line", header: true },
       ],
@@ -115,6 +116,7 @@ async function displaySummary(
           : conn.authorized
             ? "✅ Authorized"
             : "⚠️ Unauthorized",
+        conn.process || "-",
         conn.exePath || "-",
         conn.commandLine || "-",
       ]),
@@ -192,6 +194,7 @@ type Connection = {
   authorized: boolean;
   protocol: string;
   reason: string;
+  process?: string;
   exePath?: string;
   commandLine?: string;
 };
@@ -230,6 +233,7 @@ async function getConnections(): Promise<Connection[]> {
       const destPort = values[6];
       const domain = values[7];
       const reason = values[8];
+      const process = values[10];
       const commandLine = values[11];
       const exePath = values[12];
 
@@ -242,6 +246,7 @@ async function getConnections(): Promise<Connection[]> {
         authorized: decision === "allowed",
         protocol,
         reason,
+        process: process !== "unknown" ? process : undefined,
         exePath: exePath !== "unknown" ? exePath : undefined,
         commandLine: commandLine !== "unknown" ? commandLine : undefined,
       });

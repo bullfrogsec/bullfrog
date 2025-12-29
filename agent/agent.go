@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/google/gopacket"
@@ -88,6 +89,7 @@ type AgentConfig struct {
 	NetInfoProvider INetInfoProvider
 	FileSystem      IFileSystem
 	ProcProvider    IProcProvider
+	DockerProvider  IDockerProvider
 }
 
 type Agent struct {
@@ -102,6 +104,7 @@ type Agent struct {
 	filesystem        IFileSystem
 	processInfoCache  map[string]*ProcessInfo
 	procProvider      IProcProvider
+	dockerProvider    IDockerProvider
 }
 
 func NewAgent(config AgentConfig) *Agent {
@@ -116,6 +119,19 @@ func NewAgent(config AgentConfig) *Agent {
 		filesystem:        config.FileSystem,
 		processInfoCache:  make(map[string]*ProcessInfo),
 		procProvider:      config.ProcProvider,
+		dockerProvider:    config.DockerProvider,
+	}
+
+	// If no Docker provider specified, try to create one
+	if agent.dockerProvider == nil {
+		dockerProvider, err := NewDockerProvider()
+		if err != nil {
+			log.Printf("Docker unavailable, using NullDockerProvider: %v", err)
+			agent.dockerProvider = &NullDockerProvider{}
+		} else {
+			log.Printf("Docker provider initialized successfully")
+			agent.dockerProvider = dockerProvider
+		}
 	}
 
 	agent.init(config)
@@ -248,7 +264,38 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) (int, 
 		return cached.PID, cached.ProcessName, cached.CommandLine, cached.ExecutablePath
 	}
 
-	// Perform fresh lookup
+	// Try Docker container lookup first, but only if the IP is from a Docker network
+	if isDockerIP(srcIP) {
+		if container, err := a.dockerProvider.FindContainerByIP(srcIP); err == nil && container != nil {
+			pid, processName, cmdLine, execPath, err := a.dockerProvider.GetProcessInContainer(
+				container, srcIP, srcPort, protocol)
+
+			if err == nil {
+				// Format: "container-image:container-name:process-name"
+				formattedName := fmt.Sprintf("docker:%s;%s;%s", container.Image, container.Name, processName)
+
+				// Cache the result
+				a.processInfoCache[cacheKey] = &ProcessInfo{
+					PID:            pid,
+					ProcessName:    formattedName,
+					CommandLine:    cmdLine,
+					ExecutablePath: execPath,
+					Timestamp:      time.Now().Unix(),
+				}
+
+				return pid, formattedName, cmdLine, execPath
+			}
+
+			// Log error per user's preference
+			log.Printf("Docker process lookup failed for %s in container %s: %v",
+				cacheKey, container.Name, err)
+		} else if err != nil && err.Error() != "Docker not available" {
+			// Log Docker API errors (but not if Docker is simply unavailable)
+			log.Printf("Docker container lookup failed for IP %s: %v", srcIP, err)
+		}
+	}
+
+	// Fallback to host process lookup
 	pid, processName, cmdLine, execPath, err := getProcessInfo(a.procProvider, srcIP, srcPort, protocol)
 	if err != nil {
 		fmt.Printf("Process lookup failed for %s: %v\n", cacheKey, err)
@@ -308,6 +355,14 @@ func (a *Agent) loadAllowedDNSServers() error {
 	return nil
 }
 
+func tcpPortToString(port layers.TCPPort) string {
+	return strconv.Itoa(int(port))
+}
+
+func udpPortToString(port layers.UDPPort) string {
+	return strconv.Itoa(int(port))
+}
+
 func getDestinationIP(packet gopacket.Packet) (string, error) {
 	netLayer := packet.NetworkLayer()
 	if netLayer == nil {
@@ -353,18 +408,18 @@ func (a *Agent) extractPacketInfo(packet gopacket.Packet) PacketInfo {
 	var protocol string
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
-		info.SrcPort = tcp.SrcPort.String()
-		info.DstPort = tcp.DstPort.String()
+		info.SrcPort = tcpPortToString(tcp.SrcPort)
+		info.DstPort = tcpPortToString(tcp.DstPort)
 		protocol = "tcp"
 	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
-		info.SrcPort = udp.SrcPort.String()
-		info.DstPort = udp.DstPort.String()
+		info.SrcPort = udpPortToString(udp.SrcPort)
+		info.DstPort = udpPortToString(udp.DstPort)
 		protocol = "udp"
 	}
 
 	// Lookup process information
-	if protocol != "" && info.SrcIP != "unknown" && info.SrcPort != "unknown" {
+	if protocol != "" && info.SrcIP != "unknown" && info.SrcPort != "unknown" && info.SrcPort != "53" {
 		info.PID, info.ProcessName, info.CommandLine, info.ExecutablePath =
 			a.getCachedOrLookupProcess(info.SrcIP, info.SrcPort, protocol)
 	}
@@ -716,13 +771,13 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	var transportProtocol string
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
-		srcPort = tcp.SrcPort.String()
-		dstPort = tcp.DstPort.String()
+		srcPort = tcpPortToString(tcp.SrcPort)
+		dstPort = tcpPortToString(tcp.DstPort)
 		transportProtocol = "tcp"
 	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
-		srcPort = udp.SrcPort.String()
-		dstPort = udp.DstPort.String()
+		srcPort = udpPortToString(udp.SrcPort)
+		dstPort = udpPortToString(udp.DstPort)
 		transportProtocol = "udp"
 	}
 
