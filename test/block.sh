@@ -32,6 +32,10 @@ NODE_OPTIONS=--enable-source-maps node \
   --require /vagrant/test/block.env.js \
   /vagrant/action/dist/post.js
 
+echo "Content of $GITHUB_STEP_SUMMARY"
+echo "-------------------------------"
+cat $GITHUB_STEP_SUMMARY
+
 grep --quiet  'www.bing.com</td><td>-</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
 grep --quiet '93.184.215.14</td><td>443</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
 grep --quiet  'registry-1.docker.io</td><td>-</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
