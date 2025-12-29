@@ -58,7 +58,6 @@ type AgentConfig struct {
 	DNSPolicy       string
 	AllowedDomains  []string
 	AllowedIPs      []string
-	Firewall        IFirewall
 	EnableSudo      bool
 	NetInfoProvider INetInfoProvider
 	FileSystem      IFileSystem
@@ -72,7 +71,6 @@ type Agent struct {
 	allowedDNSServers map[string]bool
 	allowedCIDR       []*net.IPNet
 	ipToDomain        map[string]string // Reverse mapping: IP -> domain name for logging
-	firewall          IFirewall
 	netInfoProvider   INetInfoProvider
 	filesystem        IFileSystem
 }
@@ -85,7 +83,6 @@ func NewAgent(config AgentConfig) *Agent {
 		allowedIps:        make(map[string]bool),
 		allowedDNSServers: make(map[string]bool),
 		ipToDomain:        make(map[string]string),
-		firewall:          config.Firewall,
 		netInfoProvider:   config.NetInfoProvider,
 		filesystem:        config.FileSystem,
 	}
@@ -180,25 +177,6 @@ func (a *Agent) loadAllowedIp(ips []string) {
 		}
 		fmt.Printf("failed to parse ip: %s. skipping.\n", ip)
 	}
-}
-
-func (a *Agent) addToFirewall(ips map[string]bool, cidr []*net.IPNet) error {
-	if !a.blocking {
-		return nil
-	}
-	for ip := range ips {
-		err := a.firewall.AddIp(ip)
-		if err != nil {
-			return fmt.Errorf("error adding %s to firewall: %v", ip, err)
-		}
-	}
-	for _, c := range cidr {
-		err := a.firewall.AddIp(c.String())
-		if err != nil {
-			return fmt.Errorf("error adding %s to firewall: %v", c.String(), err)
-		}
-	}
-	return nil
 }
 
 func (a *Agent) isDomainAllowed(domain string) bool {

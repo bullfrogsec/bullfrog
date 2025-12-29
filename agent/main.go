@@ -41,7 +41,6 @@ func main() {
 		AllowedDomains:  strings.Split(*allowedDomains, ","),
 		AllowedIPs:      strings.Split(*allowedIPs, ","),
 		EnableSudo:      *enableSudo,
-		Firewall:        &NFTFirewall{},
 		NetInfoProvider: &LinuxNetInfoProvider{},
 		FileSystem:      &FileSystem{}},
 	)

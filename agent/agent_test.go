@@ -24,7 +24,6 @@ func TestNewAgent(t *testing.T) {
 				AllowedDomains:  []string{},
 				AllowedIPs:      []string{"10.0.0.0/24"},
 				EnableSudo:      true,
-				Firewall:        testingUtils.NewFirewall(),
 				NetInfoProvider: &testingUtils.NetInfoProvider{},
 				FileSystem:      &testingUtils.FileSystem{},
 			},
@@ -40,7 +39,6 @@ func TestNewAgent(t *testing.T) {
 				AllowedDomains:  []string{""},
 				AllowedIPs:      []string{"127.0.0.1"},
 				EnableSudo:      true,
-				Firewall:        testingUtils.NewFirewall(),
 				NetInfoProvider: &testingUtils.NetInfoProvider{},
 				FileSystem:      &testingUtils.FileSystem{},
 			},
@@ -56,7 +54,6 @@ func TestNewAgent(t *testing.T) {
 				AllowedDomains:  []string{"example.com"},
 				AllowedIPs:      []string{""},
 				EnableSudo:      true,
-				Firewall:        testingUtils.NewFirewall(),
 				NetInfoProvider: &testingUtils.NetInfoProvider{},
 				FileSystem:      &testingUtils.FileSystem{},
 			},
@@ -91,7 +88,6 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		Firewall:        testingUtils.NewFirewall(),
 		NetInfoProvider: &testingUtils.NetInfoProvider{},
 		FileSystem:      &testingUtils.FileSystem{},
 	})
@@ -101,7 +97,6 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		Firewall:        testingUtils.NewFirewall(),
 		NetInfoProvider: &testingUtils.NetInfoProvider{},
 		FileSystem:      &testingUtils.FileSystem{},
 	})
@@ -193,7 +188,6 @@ func TestProcessDNSResponseAPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		Firewall:        testingUtils.NewFirewall(),
 		NetInfoProvider: &testingUtils.NetInfoProvider{},
 		FileSystem:      &testingUtils.FileSystem{},
 	}
@@ -251,7 +245,6 @@ func TestProcessDNSResponseCNAMEPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		Firewall:        testingUtils.NewFirewall(),
 		NetInfoProvider: &testingUtils.NetInfoProvider{},
 		FileSystem:      &testingUtils.FileSystem{},
 	}
