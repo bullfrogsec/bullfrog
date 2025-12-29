@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { parseInputs } from "./inputs";
 import path from "node:path";
 import { AGENT_LOG_FILENAME, CONNECTIONS_LOG_PATH, BLOCK } from "./constants";
+import { getDate } from "./util";
 
 interface WorkflowActionResult {
   workflowRunId: string;
@@ -202,9 +203,9 @@ async function getConnections(): Promise<Connection[]> {
         continue; // Skip empty lines
       }
 
-      // connections.log format: timestamp|decision|protocol|srcIP|dstIP|dstPort|domain|reason
+      // connections.log format: timestamp|decision|protocol|srcIP|srcPort|dstIP|dstPort|domain|reason
       const values = line.split("|");
-      if (values.length < 8) {
+      if (values.length < 9) {
         continue; // Skip malformed lines
       }
 
@@ -213,18 +214,7 @@ async function getConnections(): Promise<Connection[]> {
         continue; // Skip invalid timestamps
       }
 
-      // Determine if timestamp is in seconds, milliseconds, or nanoseconds
-      let date: Date;
-      if (timestamp > 1e15) {
-        // Likely nanoseconds, divide by 1e6
-        date = new Date(timestamp / 1e6);
-      } else if (timestamp > 1e12) {
-        // Likely milliseconds
-        date = new Date(timestamp);
-      } else {
-        // Likely seconds
-        date = new Date(timestamp * 1000);
-      }
+      const date = getDate(timestamp);
 
       const decision = values[1] as "allowed" | "blocked";
       const protocol = values[2];

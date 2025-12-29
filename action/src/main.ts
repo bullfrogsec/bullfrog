@@ -204,17 +204,14 @@ async function main() {
   const pkg = require(`${actionDirectory}/../package.json`);
 
   // Add control plane domain to allowed domains if API token is provided
-  const effectiveAllowedDomains = [...allowedDomains];
   if (apiToken) {
     try {
       const url = new URL(controlPlaneBaseUrl);
       const controlPlaneDomain = url.hostname;
-      if (!effectiveAllowedDomains.includes(controlPlaneDomain)) {
-        effectiveAllowedDomains.push(controlPlaneDomain);
-        core.info(
-          `Added control plane domain to allowed domains: ${controlPlaneDomain}`,
-        );
-      }
+      allowedDomains.push(controlPlaneDomain);
+      core.info(
+        `Added control plane domain to allowed domains: ${controlPlaneDomain}`,
+      );
     } catch (error) {
       core.warning(
         `Failed to parse control plane URL: ${error instanceof Error ? error.message : String(error)}`,
@@ -239,7 +236,7 @@ async function main() {
   await startAgent({
     agentLogFilepath,
     agentDirectory,
-    allowedDomains: effectiveAllowedDomains,
+    allowedDomains,
     allowedIps,
     dnsPolicy,
     enableSudo,

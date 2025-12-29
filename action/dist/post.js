@@ -380,7 +380,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug2("making CONNECT request");
+      debug3("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -400,7 +400,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug2(
+          debug3(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug2("got illegal response body from proxy");
+          debug3("got illegal response body from proxy");
           socket.destroy();
           var error = new Error("got illegal response body from proxy");
           error.code = "ECONNRESET";
@@ -420,13 +420,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug2("tunneling connection has established");
+        debug3("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug2(
+        debug3(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -488,9 +488,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug2;
+    var debug3;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug2 = function() {
+      debug3 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -500,10 +500,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug2 = function() {
+      debug3 = function() {
       };
     }
-    exports2.debug = debug2;
+    exports2.debug = debug3;
   }
 });
 
@@ -19714,10 +19714,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug2(message) {
+    function debug3(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug2;
+    exports2.debug = debug3;
     function error(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -19796,7 +19796,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 });
 
 // src/post.ts
-var core2 = __toESM(require_core());
+var core3 = __toESM(require_core());
 var import_promises = __toESM(require("node:fs/promises"));
 
 // src/inputs.ts
@@ -19858,6 +19858,20 @@ function parseInputs() {
 
 // src/post.ts
 var import_node_path = __toESM(require("node:path"));
+
+// src/util.ts
+var core2 = __toESM(require_core());
+function getDate(timestamp) {
+  if (timestamp > 1e15) {
+    return new Date(timestamp / 1e6);
+  } else if (timestamp > 1e12) {
+    return new Date(timestamp);
+  } else {
+    return new Date(timestamp * 1e3);
+  }
+}
+
+// src/post.ts
 function getGitHubContext() {
   const repo = process.env.GITHUB_REPOSITORY || "";
   const [organization] = repo.split("/");
@@ -19885,7 +19899,7 @@ function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
 async function displaySummary(connections, controlPlaneBaseUrl) {
-  const summary2 = core2.summary;
+  const summary2 = core3.summary;
   if (controlPlaneBaseUrl) {
     const { workflowRunId } = getGitHubContext();
     const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
@@ -19936,7 +19950,7 @@ async function submitResultsToControlPlane(connections, apiToken, controlPlaneBa
       connections,
       createdAt: /* @__PURE__ */ new Date()
     };
-    core2.debug(
+    core3.debug(
       `Submitting results to control plane: ${JSON.stringify(payload)}`
     );
     const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
@@ -19955,11 +19969,11 @@ async function submitResultsToControlPlane(connections, apiToken, controlPlaneBa
         `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`
       );
     }
-    core2.info(
+    core3.info(
       `Results successfully submitted to control plane for workflow run ${workflowRunId}`
     );
   } catch (error) {
-    core2.warning(
+    core3.warning(
       `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`
     );
   }
@@ -19976,21 +19990,14 @@ async function getConnections() {
         continue;
       }
       const values = line.split("|");
-      if (values.length < 8) {
+      if (values.length < 9) {
         continue;
       }
       const timestamp = parseInt(values[0], 10);
       if (isNaN(timestamp)) {
         continue;
       }
-      let date;
-      if (timestamp > 1e15) {
-        date = new Date(timestamp / 1e6);
-      } else if (timestamp > 1e12) {
-        date = new Date(timestamp);
-      } else {
-        date = new Date(timestamp * 1e3);
-      }
+      const date = getDate(timestamp);
       const decision = values[1];
       const protocol = values[2];
       const destIp = values[5];
@@ -20009,8 +20016,8 @@ async function getConnections() {
       });
     }
     const filtered = filterDNSNoise(allConnections);
-    core2.debug("\n\nConnections:\n");
-    filtered.forEach((c) => core2.debug(JSON.stringify(c)));
+    core3.debug("\n\nConnections:\n");
+    filtered.forEach((c) => core3.debug(JSON.stringify(c)));
     return filtered;
   } catch (error) {
     console.error("Error reading connections log file", error);
@@ -20102,7 +20109,7 @@ async function printAgentLogs({
     const log = await import_promises.default.readFile(agentLogFilepath, "utf8");
     const lines = log.split("\n");
     for (const line of lines) {
-      core2.debug(line);
+      core3.debug(line);
     }
   } catch (error) {
     console.error("Error reading log file", error);
@@ -20126,14 +20133,14 @@ async function main() {
       );
     }
   } catch (error) {
-    core2.warning(
+    core3.warning(
       `Failed to process results: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
 main().catch((error) => {
   console.error(error);
-  core2.setFailed(error);
+  core3.setFailed(error);
   process.exit(1);
 });
 /*! Bundled license information:

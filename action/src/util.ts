@@ -23,3 +23,17 @@ export async function waitForFile(
   core.debug(`Timeout: File ${filePath} is not available.`);
   return false;
 }
+
+// Determine if timestamp is in seconds, milliseconds, or nanoseconds
+export function getDate(timestamp: number) {
+  if (timestamp > 1e15) {
+    // Likely nanoseconds, divide by 1e6
+    return new Date(timestamp / 1e6);
+  } else if (timestamp > 1e12) {
+    // Likely milliseconds
+    return new Date(timestamp);
+  } else {
+    // Likely seconds
+    return new Date(timestamp * 1000);
+  }
+}

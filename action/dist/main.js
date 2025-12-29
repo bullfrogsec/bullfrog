@@ -20010,17 +20010,14 @@ async function main() {
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
   const pkg = require(`${actionDirectory}/../package.json`);
-  const effectiveAllowedDomains = [...allowedDomains];
   if (apiToken) {
     try {
       const url = new URL(controlPlaneBaseUrl);
       const controlPlaneDomain = url.hostname;
-      if (!effectiveAllowedDomains.includes(controlPlaneDomain)) {
-        effectiveAllowedDomains.push(controlPlaneDomain);
-        core3.info(
-          `Added control plane domain to allowed domains: ${controlPlaneDomain}`
-        );
-      }
+      allowedDomains.push(controlPlaneDomain);
+      core3.info(
+        `Added control plane domain to allowed domains: ${controlPlaneDomain}`
+      );
     } catch (error) {
       core3.warning(
         `Failed to parse control plane URL: ${error instanceof Error ? error.message : String(error)}`
@@ -20040,7 +20037,7 @@ async function main() {
   await startAgent({
     agentLogFilepath,
     agentDirectory,
-    allowedDomains: effectiveAllowedDomains,
+    allowedDomains,
     allowedIps,
     dnsPolicy,
     enableSudo,
