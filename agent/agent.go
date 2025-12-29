@@ -57,10 +57,18 @@ type ConnectionLog struct {
 	Decision string
 	Protocol string
 	SrcIP    string
+	SrcPort  string
 	DstIP    string
 	DstPort  string
 	Domain   string
 	Reason   string
+}
+
+type PacketInfo struct {
+	SrcIP   string
+	SrcPort string
+	DstIP   string
+	DstPort string
 }
 
 type AgentConfig struct {
@@ -228,7 +236,7 @@ func (a *Agent) addConnectionLog(log ConnectionLog) {
 		}
 	}
 
-	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), log.Decision, log.Protocol, log.SrcIP, log.DstIP, log.DstPort, log.Domain, log.Reason)
+	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), log.Decision, log.Protocol, log.SrcIP, log.SrcPort, log.DstIP, log.DstPort, log.Domain, log.Reason)
 	a.filesystem.Append("/var/log/gha-agent/connections.log", content)
 }
 
@@ -263,6 +271,41 @@ func getDestinationIP(packet gopacket.Packet) (string, error) {
 	}
 }
 
+func extractPacketInfo(packet gopacket.Packet) PacketInfo {
+	info := PacketInfo{
+		SrcIP:   "unknown",
+		SrcPort: "unknown",
+		DstIP:   "unknown",
+		DstPort: "unknown",
+	}
+
+	// Extract IPs from network layer
+	netLayer := packet.NetworkLayer()
+	if netLayer != nil {
+		switch v := netLayer.(type) {
+		case *layers.IPv4:
+			info.SrcIP = v.SrcIP.String()
+			info.DstIP = v.DstIP.String()
+		case *layers.IPv6:
+			info.SrcIP = v.SrcIP.String()
+			info.DstIP = v.DstIP.String()
+		}
+	}
+
+	// Extract ports from transport layer
+	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp := tcpLayer.(*layers.TCP)
+		info.SrcPort = tcp.SrcPort.String()
+		info.DstPort = tcp.DstPort.String()
+	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		udp := udpLayer.(*layers.UDP)
+		info.SrcPort = udp.SrcPort.String()
+		info.DstPort = udp.DstPort.String()
+	}
+
+	return info
+}
+
 func extractDomainFromSRV(domain string) string {
 	// drop the protocol and transport layer subdomains from the SRV DNS query domain
 	// only _http._tcp. and _https._tcp are supported for now
@@ -271,14 +314,14 @@ func extractDomainFromSRV(domain string) string {
 	return re.ReplaceAllString(domain, "")
 }
 
-func (a *Agent) processDNSLayer(dns *layers.DNS) uint8 {
+func (a *Agent) processDNSLayer(dns *layers.DNS, pkt PacketInfo) uint8 {
 	if !dns.QR {
-		return a.processDNSQuery(dns)
+		return a.processDNSQuery(dns, pkt)
 	}
-	return a.processDNSResponse(dns)
+	return a.processDNSResponse(dns, pkt)
 }
 
-func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
+func (a *Agent) processDNSQuery(dns *layers.DNS, pkt PacketInfo) uint8 {
 	for _, q := range dns.Questions {
 		domain := string(q.Name)
 		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
@@ -293,8 +336,9 @@ func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 			a.addConnectionLog(ConnectionLog{
 				Decision: "allowed",
 				Protocol: "DNS",
-				SrcIP:    "unknown",
-				DstIP:    "unknown",
+				SrcIP:    pkt.SrcIP,
+				SrcPort:  pkt.SrcPort,
+				DstIP:    pkt.DstIP,
 				DstPort:  "53",
 				Domain:   domain,
 				Reason:   "domain-allowed",
@@ -306,8 +350,9 @@ func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 		a.addConnectionLog(ConnectionLog{
 			Decision: "blocked",
 			Protocol: "DNS",
-			SrcIP:    "unknown",
-			DstIP:    "unknown",
+			SrcIP:    pkt.SrcIP,
+			SrcPort:  pkt.SrcPort,
+			DstIP:    pkt.DstIP,
 			DstPort:  "53",
 			Domain:   domain,
 			Reason:   "domain-not-allowed",
@@ -317,7 +362,7 @@ func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 	return DROP_REQUEST
 }
 
-func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourceRecord) {
+func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourceRecord, pkt PacketInfo) {
 	fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
 	fmt.Printf("%s:%s", answer.Name, answer.IP)
 	ip := answer.IP.String()
@@ -334,7 +379,8 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 			a.addConnectionLog(ConnectionLog{
 				Decision: "allowed",
 				Protocol: "DNS-response",
-				SrcIP:    "unknown",
+				SrcIP:    pkt.SrcIP,
+				SrcPort:  pkt.SrcPort,
 				DstIP:    ip,
 				DstPort:  "53",
 				Domain:   domain,
@@ -346,7 +392,8 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 		a.addConnectionLog(ConnectionLog{
 			Decision: "allowed",
 			Protocol: "DNS-response",
-			SrcIP:    "unknown",
+			SrcIP:    pkt.SrcIP,
+			SrcPort:  pkt.SrcPort,
 			DstIP:    ip,
 			DstPort:  "53",
 			Domain:   domain,
@@ -356,7 +403,8 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 		a.addConnectionLog(ConnectionLog{
 			Decision: "blocked",
 			Protocol: "DNS-response",
-			SrcIP:    "unknown",
+			SrcIP:    pkt.SrcIP,
+			SrcPort:  pkt.SrcPort,
 			DstIP:    ip,
 			DstPort:  "53",
 			Domain:   domain,
@@ -397,12 +445,12 @@ func (a *Agent) processDNSTypeSRVResponse(domain string, answer *layers.DNSResou
 	}
 }
 
-func (a *Agent) processDNSResponse(dns *layers.DNS) uint8 {
+func (a *Agent) processDNSResponse(dns *layers.DNS, pkt PacketInfo) uint8 {
 	domain := string(dns.Questions[0].Name)
 	for _, answer := range dns.Answers {
 		fmt.Printf("DNS Answer: %s %s %s\n", answer.Name, answer.Type, answer.IP)
 		if answer.Type == layers.DNSTypeA {
-			a.processDNSTypeAResponse(domain, &answer)
+			a.processDNSTypeAResponse(domain, &answer, pkt)
 		} else if answer.Type == layers.DNSTypeCNAME {
 			a.processDNSTypeCNAMEResponse(domain, &answer)
 		} else if answer.Type == layers.DNSTypeSRV {
@@ -423,22 +471,19 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 	}
 
+	pkt := extractPacketInfo(packet)
 	domain := string(dns.Questions[0].Name)
 	// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 	if !dns.QR {
 		// making sure the DNS query is using a trusted DNS server
-		destinationIP, err := getDestinationIP(packet)
-		if err != nil {
-			fmt.Printf("Failed to get destination IP: %v\n", err)
-			return DROP_REQUEST
-		}
-		if !a.allowedDNSServers[destinationIP] {
-			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, destinationIP)
+		if !a.allowedDNSServers[pkt.DstIP] {
+			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
 			a.addConnectionLog(ConnectionLog{
 				Decision: "blocked",
 				Protocol: "DNS",
-				SrcIP:    "unknown",
-				DstIP:    destinationIP,
+				SrcIP:    pkt.SrcIP,
+				SrcPort:  pkt.SrcPort,
+				DstIP:    pkt.DstIP,
 				DstPort:  "53",
 				Domain:   domain,
 				Reason:   "untrusted-dns-server",
@@ -451,10 +496,10 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 	if !a.blockDNS && !dns.QR {
 		return ACCEPT_REQUEST
 	}
-	return a.processDNSLayer(dns)
+	return a.processDNSLayer(dns, pkt)
 }
 
-func (a *Agent) processDNSOverTCPPayload(payload []byte) uint8 {
+func (a *Agent) processDNSOverTCPPayload(payload []byte, pkt PacketInfo) uint8 {
 	// Extract message length from first 2 bytes
 	// - First byte shifted left 8 bits + second byte
 	// - Creates 16-bit length prefix
@@ -472,7 +517,7 @@ func (a *Agent) processDNSOverTCPPayload(payload []byte) uint8 {
 		fmt.Println("Failed to decode DNS over TCP payload", err)
 		return DROP_REQUEST
 	}
-	return a.processDNSLayer(dns)
+	return a.processDNSLayer(dns, pkt)
 }
 
 func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
@@ -480,20 +525,18 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 	tcp, _ := tcpLayer.(*layers.TCP)
 	dstPort, srcPort, payload := tcp.DstPort, tcp.SrcPort, tcp.Payload
 
+	pkt := extractPacketInfo(packet)
+
 	// Validate DNS server IP
 	if dstPort == DNS_PORT {
-		destinationIP, err := getDestinationIP(packet)
-		if err != nil {
-			fmt.Printf("Failed to get destination IP: %v\n", err)
-			return DROP_REQUEST
-		}
-		if !a.allowedDNSServers[destinationIP] {
-			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", destinationIP)
+		if !a.allowedDNSServers[pkt.DstIP] {
+			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", pkt.DstIP)
 			a.addConnectionLog(ConnectionLog{
 				Decision: "blocked",
 				Protocol: "TCP-DNS",
-				SrcIP:    "unknown",
-				DstIP:    destinationIP,
+				SrcIP:    pkt.SrcIP,
+				SrcPort:  pkt.SrcPort,
+				DstIP:    pkt.DstIP,
 				DstPort:  "53",
 				Domain:   "unknown",
 				Reason:   "untrusted-dns-server",
@@ -518,7 +561,7 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 	}
 
 	// Now we have a payload in the TCP packet, we need to make sure it is a valid DNS over TCP payload and the DNS query is for a known domain. We don't want to exfiltrate data over DNS over TCP
-	return a.processDNSOverTCPPayload(payload)
+	return a.processDNSOverTCPPayload(payload, pkt)
 
 }
 
@@ -530,6 +573,7 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 			Decision: "blocked",
 			Protocol: "unknown",
 			SrcIP:    "unknown",
+			SrcPort:  "unknown",
 			DstIP:    "unknown",
 			DstPort:  "unknown",
 			Domain:   "unknown",
@@ -557,6 +601,7 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 			Decision: "blocked",
 			Protocol: "unknown",
 			SrcIP:    "unknown",
+			SrcPort:  "unknown",
 			DstIP:    "unknown",
 			DstPort:  "unknown",
 			Domain:   "unknown",
@@ -589,6 +634,7 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 			Decision: "allowed",
 			Protocol: protocol,
 			SrcIP:    srcIP,
+			SrcPort:  srcPort,
 			DstIP:    dstIP,
 			DstPort:  dstPort,
 			Domain:   domain,
@@ -604,6 +650,7 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 			Decision: "audit",
 			Protocol: protocol,
 			SrcIP:    srcIP,
+			SrcPort:  srcPort,
 			DstIP:    dstIP,
 			DstPort:  dstPort,
 			Domain:   domain,
@@ -618,6 +665,7 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 		Decision: "blocked",
 		Protocol: protocol,
 		SrcIP:    srcIP,
+		SrcPort:  srcPort,
 		DstIP:    dstIP,
 		DstPort:  dstPort,
 		Domain:   domain,

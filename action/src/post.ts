@@ -228,10 +228,10 @@ async function getConnections(): Promise<Connection[]> {
 
       const decision = values[1] as "allowed" | "blocked";
       const protocol = values[2];
-      const destIp = values[4];
-      const destPort = values[5];
-      const domain = values[6];
-      const reason = values[7];
+      const destIp = values[5];
+      const destPort = values[6];
+      const domain = values[7];
+      const reason = values[8];
 
       allConnections.push({
         timestamp: date,
