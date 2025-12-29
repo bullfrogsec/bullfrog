@@ -314,7 +314,7 @@ func (a *Agent) processDNSQuery(dns *layers.DNS) uint8 {
 
 		fmt.Printf("%s -> Blocked DNS Query\n", domain)
 		a.addIpToLogs("blocked", domain, "unknown")
-		a.addConnectionLog("blocked", "DNS", "unknown", "unknown", "53", domain, "domain-blocked")
+		a.addConnectionLog("blocked", "DNS", "unknown", "unknown", "53", domain, "domain-not-allowed")
 		return DROP_REQUEST
 	}
 	return DROP_REQUEST
@@ -343,7 +343,7 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 		a.addConnectionLog("allowed", "DNS-response", "unknown", ip, "53", domain, "ip-allowed")
 	} else {
 		a.addIpToLogs("blocked", domain, ip)
-		a.addConnectionLog("blocked", "DNS-response", "unknown", ip, "53", domain, "not-allowed")
+		a.addConnectionLog("blocked", "DNS-response", "unknown", ip, "53", domain, "domain-not-allowed")
 		if blocking {
 			fmt.Println("-> Blocked request")
 		} else {
@@ -546,13 +546,13 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	// In audit mode, log but allow
 	if !a.blocking {
 		fmt.Printf("AUDIT: %s:%s -> %s:%s (%s) [%s] - would be blocked\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
-		a.addConnectionLog("audit", protocol, srcIP, dstIP, dstPort, domain, "not-in-allowlist")
+		a.addConnectionLog("audit", protocol, srcIP, dstIP, dstPort, domain, "ip-not-allowed")
 		return ACCEPT_REQUEST
 	}
 
 	// Block mode - drop the packet
 	fmt.Printf("BLOCK: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
-	a.addConnectionLog("blocked", protocol, srcIP, dstIP, dstPort, domain, "not-in-allowlist")
+	a.addConnectionLog("blocked", protocol, srcIP, dstIP, dstPort, domain, "ip-not-allowed")
 	return DROP_REQUEST
 }
 

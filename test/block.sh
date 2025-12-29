@@ -6,8 +6,8 @@ set -x
 # Stop on failure
 set -e
 
-sudo rm -f $GITHUB_STEP_SUMMARY
 export GITHUB_STEP_SUMMARY="/tmp/github_step_summary"
+sudo rm -f $GITHUB_STEP_SUMMARY
 touch $GITHUB_STEP_SUMMARY
 
 sudo pkill --signal 9 agent || true
@@ -36,11 +36,12 @@ echo "Content of $GITHUB_STEP_SUMMARY"
 echo "-------------------------------"
 cat $GITHUB_STEP_SUMMARY
 
-grep --quiet  'www.bing.com</td><td>-</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
-grep --quiet '93.184.215.14</td><td>443</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
-grep --quiet  'registry-1.docker.io</td><td>-</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
-grep --quiet  'www.wikipedia.org</td><td>-</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
-grep --quiet  'tcp.example.com</td><td>-</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
-grep --quiet  'www.google.com</td><td>8.8.8.8</td><td>53</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep --quiet  'www.bing.com</td><td>-</td><td>53</td><td>DNS</td><td>Domain not allowed</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep --quiet '93.184.215.14</td><td>443</td><td>TCP</td><td>IP not allowed</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep --quiet  'registry-1.docker.io</td><td>-</td><td>53</td><td>DNS</td><td>Domain not allowed</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep --quiet  'www.wikipedia.org</td><td>-</td><td>53</td><td>DNS</td><td>Domain not allowed</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep --quiet  'tcp.example.com</td><td>-</td><td>53</td><td>DNS</td><td>Domain not allowed</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep --quiet  'www.google.com</td><td>8.8.8.8</td><td>53</td><td>DNS</td><td>Untrusted DNS server</td><td>🚫 Blocked' $GITHUB_STEP_SUMMARY
+grep -E --quiet 'www\.google\.com</td><td>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+</td><td>443</td><td>TCP</td><td>IP allowed</td><td>✅ Authorized' $GITHUB_STEP_SUMMARY
 
 echo "Tests passed successfully"

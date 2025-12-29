@@ -45,6 +45,22 @@ function getGitHubContext(): {
   return { workflowRunId, runAttempt, jobName, organization, repo };
 }
 
+// Map reason codes to human-friendly descriptions
+const REASON_CODE_MAP: Record<string, string> = {
+  "domain-allowed": "Domain allowed",
+  "domain-not-allowed": "Domain not allowed",
+  "dns-resolved": "DNS resolved",
+  "ip-allowed": "IP allowed",
+  "ip-not-allowed": "IP not allowed",
+  "untrusted-dns-server": "Untrusted DNS server",
+  "no-network-layer": "No network layer",
+  "unknown-network-layer": "Unknown network layer",
+};
+
+function getHumanFriendlyReason(reasonCode: string): string {
+  return REASON_CODE_MAP[reasonCode] || reasonCode;
+}
+
 async function displaySummary(
   connections: Connection[],
   controlPlaneBaseUrl?: string,
@@ -88,7 +104,7 @@ async function displaySummary(
         conn.ip || "-",
         conn.port?.toString() || "-",
         conn.protocol,
-        conn.reason,
+        getHumanFriendlyReason(conn.reason),
         conn.blocked
           ? "🚫 Blocked"
           : conn.authorized
