@@ -54,21 +54,29 @@ const (
 )
 
 type ConnectionLog struct {
-	Decision string
-	Protocol string
-	SrcIP    string
-	SrcPort  string
-	DstIP    string
-	DstPort  string
-	Domain   string
-	Reason   string
+	Decision       string
+	Protocol       string
+	SrcIP          string
+	SrcPort        string
+	DstIP          string
+	DstPort        string
+	Domain         string
+	Reason         string
+	PID            int
+	ProcessName    string
+	CommandLine    string
+	ExecutablePath string
 }
 
 type PacketInfo struct {
-	SrcIP   string
-	SrcPort string
-	DstIP   string
-	DstPort string
+	SrcIP          string
+	SrcPort        string
+	DstIP          string
+	DstPort        string
+	PID            int
+	ProcessName    string
+	CommandLine    string
+	ExecutablePath string
 }
 
 type AgentConfig struct {
@@ -79,6 +87,7 @@ type AgentConfig struct {
 	EnableSudo      bool
 	NetInfoProvider INetInfoProvider
 	FileSystem      IFileSystem
+	ProcProvider    IProcProvider
 }
 
 type Agent struct {
@@ -91,6 +100,8 @@ type Agent struct {
 	ipToDomain        map[string]string // Reverse mapping: IP -> domain name for logging
 	netInfoProvider   INetInfoProvider
 	filesystem        IFileSystem
+	processInfoCache  map[string]*ProcessInfo
+	procProvider      IProcProvider
 }
 
 func NewAgent(config AgentConfig) *Agent {
@@ -103,6 +114,8 @@ func NewAgent(config AgentConfig) *Agent {
 		ipToDomain:        make(map[string]string),
 		netInfoProvider:   config.NetInfoProvider,
 		filesystem:        config.FileSystem,
+		processInfoCache:  make(map[string]*ProcessInfo),
+		procProvider:      config.ProcProvider,
 	}
 
 	agent.init(config)
@@ -227,6 +240,33 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 	return false
 }
 
+func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) (int, string, string, string) {
+	cacheKey := fmt.Sprintf("%s:%s:%s", srcIP, srcPort, protocol)
+
+	// Check cache first
+	if cached, exists := a.processInfoCache[cacheKey]; exists {
+		return cached.PID, cached.ProcessName, cached.CommandLine, cached.ExecutablePath
+	}
+
+	// Perform fresh lookup
+	pid, processName, cmdLine, execPath, err := getProcessInfo(a.procProvider, srcIP, srcPort, protocol)
+	if err != nil {
+		fmt.Printf("Process lookup failed for %s: %v\n", cacheKey, err)
+		return 0, "unknown", "unknown", "unknown"
+	}
+
+	// Cache the result
+	a.processInfoCache[cacheKey] = &ProcessInfo{
+		PID:            pid,
+		ProcessName:    processName,
+		CommandLine:    cmdLine,
+		ExecutablePath: execPath,
+		Timestamp:      time.Now().Unix(),
+	}
+
+	return pid, processName, cmdLine, execPath
+}
+
 func (a *Agent) addConnectionLog(log ConnectionLog) {
 
 	// Skip logging connections to default IPs (metadata services, etc.)
@@ -236,7 +276,20 @@ func (a *Agent) addConnectionLog(log ConnectionLog) {
 		}
 	}
 
-	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s|%s\n", time.Now().UnixMilli(), log.Decision, log.Protocol, log.SrcIP, log.SrcPort, log.DstIP, log.DstPort, log.Domain, log.Reason)
+	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s\n",
+		time.Now().UnixMilli(),
+		log.Decision,
+		log.Protocol,
+		log.SrcIP,
+		log.SrcPort,
+		log.DstIP,
+		log.DstPort,
+		log.Domain,
+		log.Reason,
+		log.PID,
+		log.ProcessName,
+		log.CommandLine,
+		log.ExecutablePath)
 	a.filesystem.Append("/var/log/gha-agent/connections.log", content)
 }
 
@@ -271,12 +324,16 @@ func getDestinationIP(packet gopacket.Packet) (string, error) {
 	}
 }
 
-func extractPacketInfo(packet gopacket.Packet) PacketInfo {
+func (a *Agent) extractPacketInfo(packet gopacket.Packet) PacketInfo {
 	info := PacketInfo{
-		SrcIP:   "unknown",
-		SrcPort: "unknown",
-		DstIP:   "unknown",
-		DstPort: "unknown",
+		SrcIP:          "unknown",
+		SrcPort:        "unknown",
+		DstIP:          "unknown",
+		DstPort:        "unknown",
+		PID:            0,
+		ProcessName:    "unknown",
+		CommandLine:    "unknown",
+		ExecutablePath: "unknown",
 	}
 
 	// Extract IPs from network layer
@@ -292,15 +349,24 @@ func extractPacketInfo(packet gopacket.Packet) PacketInfo {
 		}
 	}
 
-	// Extract ports from transport layer
+	// Extract ports and determine protocol
+	var protocol string
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
 		info.SrcPort = tcp.SrcPort.String()
 		info.DstPort = tcp.DstPort.String()
+		protocol = "tcp"
 	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
 		info.SrcPort = udp.SrcPort.String()
 		info.DstPort = udp.DstPort.String()
+		protocol = "udp"
+	}
+
+	// Lookup process information
+	if protocol != "" && info.SrcIP != "unknown" && info.SrcPort != "unknown" {
+		info.PID, info.ProcessName, info.CommandLine, info.ExecutablePath =
+			a.getCachedOrLookupProcess(info.SrcIP, info.SrcPort, protocol)
 	}
 
 	return info
@@ -334,28 +400,36 @@ func (a *Agent) processDNSQuery(dns *layers.DNS, pkt PacketInfo) uint8 {
 		if a.isDomainAllowed(domain) {
 			fmt.Printf("%s -> Allowed DNS Query\n", domain)
 			a.addConnectionLog(ConnectionLog{
-				Decision: "allowed",
-				Protocol: "DNS",
-				SrcIP:    pkt.SrcIP,
-				SrcPort:  pkt.SrcPort,
-				DstIP:    pkt.DstIP,
-				DstPort:  "53",
-				Domain:   domain,
-				Reason:   "domain-allowed",
+				Decision:       "allowed",
+				Protocol:       "DNS",
+				SrcIP:          pkt.SrcIP,
+				SrcPort:        pkt.SrcPort,
+				DstIP:          pkt.DstIP,
+				DstPort:        "53",
+				Domain:         domain,
+				Reason:         "domain-allowed",
+				PID:            pkt.PID,
+				ProcessName:    pkt.ProcessName,
+				CommandLine:    pkt.CommandLine,
+				ExecutablePath: pkt.ExecutablePath,
 			})
 			return ACCEPT_REQUEST
 		}
 
 		fmt.Printf("%s -> Blocked DNS Query\n", domain)
 		a.addConnectionLog(ConnectionLog{
-			Decision: "blocked",
-			Protocol: "DNS",
-			SrcIP:    pkt.SrcIP,
-			SrcPort:  pkt.SrcPort,
-			DstIP:    pkt.DstIP,
-			DstPort:  "53",
-			Domain:   domain,
-			Reason:   "domain-not-allowed",
+			Decision:       "blocked",
+			Protocol:       "DNS",
+			SrcIP:          pkt.SrcIP,
+			SrcPort:        pkt.SrcPort,
+			DstIP:          pkt.DstIP,
+			DstPort:        "53",
+			Domain:         domain,
+			Reason:         "domain-not-allowed",
+			PID:            pkt.PID,
+			ProcessName:    pkt.ProcessName,
+			CommandLine:    pkt.CommandLine,
+			ExecutablePath: pkt.ExecutablePath,
 		})
 		return DROP_REQUEST
 	}
@@ -377,38 +451,50 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 			// No need to update nftables - Go agent handles all decisions
 			a.allowedIps[ip] = true
 			a.addConnectionLog(ConnectionLog{
-				Decision: "allowed",
-				Protocol: "DNS-response",
-				SrcIP:    pkt.SrcIP,
-				SrcPort:  pkt.SrcPort,
-				DstIP:    ip,
-				DstPort:  "53",
-				Domain:   domain,
-				Reason:   "dns-resolved",
+				Decision:       "allowed",
+				Protocol:       "DNS-response",
+				SrcIP:          pkt.SrcIP,
+				SrcPort:        pkt.SrcPort,
+				DstIP:          ip,
+				DstPort:        "53",
+				Domain:         domain,
+				Reason:         "dns-resolved",
+				PID:            pkt.PID,
+				ProcessName:    pkt.ProcessName,
+				CommandLine:    pkt.CommandLine,
+				ExecutablePath: pkt.ExecutablePath,
 			})
 		}
 	} else if a.isIpAllowed(ip) {
 		fmt.Println("-> Allowed request")
 		a.addConnectionLog(ConnectionLog{
-			Decision: "allowed",
-			Protocol: "DNS-response",
-			SrcIP:    pkt.SrcIP,
-			SrcPort:  pkt.SrcPort,
-			DstIP:    ip,
-			DstPort:  "53",
-			Domain:   domain,
-			Reason:   "ip-allowed",
+			Decision:       "allowed",
+			Protocol:       "DNS-response",
+			SrcIP:          pkt.SrcIP,
+			SrcPort:        pkt.SrcPort,
+			DstIP:          ip,
+			DstPort:        "53",
+			Domain:         domain,
+			Reason:         "ip-allowed",
+			PID:            pkt.PID,
+			ProcessName:    pkt.ProcessName,
+			CommandLine:    pkt.CommandLine,
+			ExecutablePath: pkt.ExecutablePath,
 		})
 	} else {
 		a.addConnectionLog(ConnectionLog{
-			Decision: "blocked",
-			Protocol: "DNS-response",
-			SrcIP:    pkt.SrcIP,
-			SrcPort:  pkt.SrcPort,
-			DstIP:    ip,
-			DstPort:  "53",
-			Domain:   domain,
-			Reason:   "domain-not-allowed",
+			Decision:       "blocked",
+			Protocol:       "DNS-response",
+			SrcIP:          pkt.SrcIP,
+			SrcPort:        pkt.SrcPort,
+			DstIP:          ip,
+			DstPort:        "53",
+			Domain:         domain,
+			Reason:         "domain-not-allowed",
+			PID:            pkt.PID,
+			ProcessName:    pkt.ProcessName,
+			CommandLine:    pkt.CommandLine,
+			ExecutablePath: pkt.ExecutablePath,
 		})
 		if blocking {
 			fmt.Println("-> Blocked request")
@@ -471,7 +557,7 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 		fmt.Printf("DNS Question: %s %s\n", q.Name, q.Type)
 	}
 
-	pkt := extractPacketInfo(packet)
+	pkt := a.extractPacketInfo(packet)
 	domain := string(dns.Questions[0].Name)
 	// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 	if !dns.QR {
@@ -479,14 +565,18 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 		if !a.allowedDNSServers[pkt.DstIP] {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
 			a.addConnectionLog(ConnectionLog{
-				Decision: "blocked",
-				Protocol: "DNS",
-				SrcIP:    pkt.SrcIP,
-				SrcPort:  pkt.SrcPort,
-				DstIP:    pkt.DstIP,
-				DstPort:  "53",
-				Domain:   domain,
-				Reason:   "untrusted-dns-server",
+				Decision:       "blocked",
+				Protocol:       "DNS",
+				SrcIP:          pkt.SrcIP,
+				SrcPort:        pkt.SrcPort,
+				DstIP:          pkt.DstIP,
+				DstPort:        "53",
+				Domain:         domain,
+				Reason:         "untrusted-dns-server",
+				PID:            pkt.PID,
+				ProcessName:    pkt.ProcessName,
+				CommandLine:    pkt.CommandLine,
+				ExecutablePath: pkt.ExecutablePath,
 			})
 			return DROP_REQUEST
 		}
@@ -525,21 +615,25 @@ func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
 	tcp, _ := tcpLayer.(*layers.TCP)
 	dstPort, srcPort, payload := tcp.DstPort, tcp.SrcPort, tcp.Payload
 
-	pkt := extractPacketInfo(packet)
+	pkt := a.extractPacketInfo(packet)
 
 	// Validate DNS server IP
 	if dstPort == DNS_PORT {
 		if !a.allowedDNSServers[pkt.DstIP] {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", pkt.DstIP)
 			a.addConnectionLog(ConnectionLog{
-				Decision: "blocked",
-				Protocol: "TCP-DNS",
-				SrcIP:    pkt.SrcIP,
-				SrcPort:  pkt.SrcPort,
-				DstIP:    pkt.DstIP,
-				DstPort:  "53",
-				Domain:   "unknown",
-				Reason:   "untrusted-dns-server",
+				Decision:       "blocked",
+				Protocol:       "TCP-DNS",
+				SrcIP:          pkt.SrcIP,
+				SrcPort:        pkt.SrcPort,
+				DstIP:          pkt.DstIP,
+				DstPort:        "53",
+				Domain:         "unknown",
+				Reason:         "untrusted-dns-server",
+				PID:            pkt.PID,
+				ProcessName:    pkt.ProcessName,
+				CommandLine:    pkt.CommandLine,
+				ExecutablePath: pkt.ExecutablePath,
 			})
 			return DROP_REQUEST
 		}
@@ -570,14 +664,18 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	if netLayer == nil {
 		fmt.Println("No network layer found, dropping packet")
 		a.addConnectionLog(ConnectionLog{
-			Decision: "blocked",
-			Protocol: "unknown",
-			SrcIP:    "unknown",
-			SrcPort:  "unknown",
-			DstIP:    "unknown",
-			DstPort:  "unknown",
-			Domain:   "unknown",
-			Reason:   "no-network-layer",
+			Decision:       "blocked",
+			Protocol:       "unknown",
+			SrcIP:          "unknown",
+			SrcPort:        "unknown",
+			DstIP:          "unknown",
+			DstPort:        "unknown",
+			Domain:         "unknown",
+			Reason:         "no-network-layer",
+			PID:            0,
+			ProcessName:    "unknown",
+			CommandLine:    "unknown",
+			ExecutablePath: "unknown",
 		})
 		return DROP_REQUEST
 	}
@@ -598,27 +696,40 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	default:
 		fmt.Println("Unknown network layer type, dropping packet")
 		a.addConnectionLog(ConnectionLog{
-			Decision: "blocked",
-			Protocol: "unknown",
-			SrcIP:    "unknown",
-			SrcPort:  "unknown",
-			DstIP:    "unknown",
-			DstPort:  "unknown",
-			Domain:   "unknown",
-			Reason:   "unknown-network-layer",
+			Decision:       "blocked",
+			Protocol:       "unknown",
+			SrcIP:          "unknown",
+			SrcPort:        "unknown",
+			DstIP:          "unknown",
+			DstPort:        "unknown",
+			Domain:         "unknown",
+			Reason:         "unknown-network-layer",
+			PID:            0,
+			ProcessName:    "unknown",
+			CommandLine:    "unknown",
+			ExecutablePath: "unknown",
 		})
 		return DROP_REQUEST
 	}
 
 	// Extract ports if TCP or UDP
+	var transportProtocol string
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
 		srcPort = tcp.SrcPort.String()
 		dstPort = tcp.DstPort.String()
+		transportProtocol = "tcp"
 	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
 		srcPort = udp.SrcPort.String()
 		dstPort = udp.DstPort.String()
+		transportProtocol = "udp"
+	}
+
+	// Lookup process information
+	pid, processName, cmdLine, execPath := 0, "unknown", "unknown", "unknown"
+	if transportProtocol != "" && srcIP != "" && srcPort != "N/A" {
+		pid, processName, cmdLine, execPath = a.getCachedOrLookupProcess(srcIP, srcPort, transportProtocol)
 	}
 
 	// Look up domain for this IP (if it was resolved via DNS)
@@ -631,14 +742,18 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	if a.isIpAllowed(dstIP) {
 		fmt.Printf("ALLOW: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
 		a.addConnectionLog(ConnectionLog{
-			Decision: "allowed",
-			Protocol: protocol,
-			SrcIP:    srcIP,
-			SrcPort:  srcPort,
-			DstIP:    dstIP,
-			DstPort:  dstPort,
-			Domain:   domain,
-			Reason:   "ip-allowed",
+			Decision:       "allowed",
+			Protocol:       protocol,
+			SrcIP:          srcIP,
+			SrcPort:        srcPort,
+			DstIP:          dstIP,
+			DstPort:        dstPort,
+			Domain:         domain,
+			Reason:         "ip-allowed",
+			PID:            pid,
+			ProcessName:    processName,
+			CommandLine:    cmdLine,
+			ExecutablePath: execPath,
 		})
 		return ACCEPT_REQUEST
 	}
@@ -647,14 +762,18 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	if !a.blocking {
 		fmt.Printf("AUDIT: %s:%s -> %s:%s (%s) [%s] - would be blocked\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
 		a.addConnectionLog(ConnectionLog{
-			Decision: "audit",
-			Protocol: protocol,
-			SrcIP:    srcIP,
-			SrcPort:  srcPort,
-			DstIP:    dstIP,
-			DstPort:  dstPort,
-			Domain:   domain,
-			Reason:   "ip-not-allowed",
+			Decision:       "audit",
+			Protocol:       protocol,
+			SrcIP:          srcIP,
+			SrcPort:        srcPort,
+			DstIP:          dstIP,
+			DstPort:        dstPort,
+			Domain:         domain,
+			Reason:         "ip-not-allowed",
+			PID:            pid,
+			ProcessName:    processName,
+			CommandLine:    cmdLine,
+			ExecutablePath: execPath,
 		})
 		return ACCEPT_REQUEST
 	}
@@ -662,14 +781,18 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 	// Block mode - drop the packet
 	fmt.Printf("BLOCK: %s:%s -> %s:%s (%s) [%s]\n", srcIP, srcPort, dstIP, dstPort, protocol, domain)
 	a.addConnectionLog(ConnectionLog{
-		Decision: "blocked",
-		Protocol: protocol,
-		SrcIP:    srcIP,
-		SrcPort:  srcPort,
-		DstIP:    dstIP,
-		DstPort:  dstPort,
-		Domain:   domain,
-		Reason:   "ip-not-allowed",
+		Decision:       "blocked",
+		Protocol:       protocol,
+		SrcIP:          srcIP,
+		SrcPort:        srcPort,
+		DstIP:          dstIP,
+		DstPort:        dstPort,
+		Domain:         domain,
+		Reason:         "ip-not-allowed",
+		PID:            pid,
+		ProcessName:    processName,
+		CommandLine:    cmdLine,
+		ExecutablePath: execPath,
 	})
 	return DROP_REQUEST
 }

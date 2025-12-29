@@ -90,6 +90,7 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 		EnableSudo:      true,
 		NetInfoProvider: &testingUtils.NetInfoProvider{},
 		FileSystem:      &testingUtils.FileSystem{},
+		ProcProvider:    testingUtils.NewMockProcProvider(),
 	})
 	noBlockDNSAgent := NewAgent(AgentConfig{
 		EgressPolicy:    EGRESS_POLICY_BLOCK,
@@ -99,6 +100,7 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 		EnableSudo:      true,
 		NetInfoProvider: &testingUtils.NetInfoProvider{},
 		FileSystem:      &testingUtils.FileSystem{},
+		ProcProvider:    testingUtils.NewMockProcProvider(),
 	})
 
 	tests := []struct {

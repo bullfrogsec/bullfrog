@@ -42,8 +42,9 @@ func main() {
 		AllowedIPs:      strings.Split(*allowedIPs, ","),
 		EnableSudo:      *enableSudo,
 		NetInfoProvider: &LinuxNetInfoProvider{},
-		FileSystem:      &FileSystem{}},
-	)
+		FileSystem:      &FileSystem{},
+		ProcProvider:    &LinuxProcProvider{},
+	})
 
 	nfq, err := netfilter.NewNFQueue(0, 1000, netfilter.NF_DEFAULT_PACKET_SIZE)
 	if err != nil {
