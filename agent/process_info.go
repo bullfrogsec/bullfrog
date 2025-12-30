@@ -17,9 +17,10 @@ import (
 // ProcessInfo holds process identification data
 type ProcessInfo struct {
 	PID            int
-	ProcessName    string // From /proc/[pid]/comm
-	CommandLine    string // From /proc/[pid]/cmdline (full command with args)
-	ExecutablePath string // From /proc/[pid]/exe (actual binary location)
+	ProcessName    string      // From /proc/[pid]/comm
+	CommandLine    string      // From /proc/[pid]/cmdline (full command with args)
+	ExecutablePath string      // From /proc/[pid]/exe (actual binary location)
+	Docker         *DockerInfo // Docker container info if process is in a container
 	Timestamp      int64
 }
 

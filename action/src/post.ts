@@ -22,6 +22,7 @@ interface WorkflowActionResult {
     reason: string;
     exePath?: string;
     commandLine?: string;
+    docker?: DockerInfo;
   }>;
   createdAt: Date;
 }
@@ -101,6 +102,7 @@ async function displaySummary(
         { data: "Reason", header: true },
         { data: "Status", header: true },
         { data: "Process", header: true },
+        { data: "Container", header: true },
         { data: "Exe Path", header: true },
         { data: "Command Line", header: true },
       ],
@@ -117,6 +119,9 @@ async function displaySummary(
             ? "✅ Authorized"
             : "⚠️ Unauthorized",
         conn.process || "-",
+        conn.docker
+          ? `${conn.docker.containerImage}:${conn.docker.containerName}`
+          : "-",
         conn.exePath || "-",
         conn.commandLine || "-",
       ]),
@@ -185,6 +190,11 @@ async function submitResultsToControlPlane(
   }
 }
 
+type DockerInfo = {
+  containerImage: string;
+  containerName: string;
+};
+
 type Connection = {
   timestamp: Date;
   domain?: string;
@@ -197,6 +207,7 @@ type Connection = {
   process?: string;
   exePath?: string;
   commandLine?: string;
+  docker?: DockerInfo;
 };
 
 async function getConnections(): Promise<Connection[]> {
@@ -236,6 +247,7 @@ async function getConnections(): Promise<Connection[]> {
         const process = logEntry.processName;
         const commandLine = logEntry.commandLine;
         const exePath = logEntry.executablePath;
+        const docker = logEntry.docker;
 
         allConnections.push({
           timestamp: date,
@@ -249,6 +261,7 @@ async function getConnections(): Promise<Connection[]> {
           process: process !== "unknown" ? process : undefined,
           exePath: exePath !== "unknown" ? exePath : undefined,
           commandLine: commandLine !== "unknown" ? commandLine : undefined,
+          docker: docker || undefined,
         });
       } catch {
         core.warning(`Failed to parse log line: ${line}`);

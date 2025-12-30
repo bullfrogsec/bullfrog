@@ -19922,6 +19922,7 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         { data: "Reason", header: true },
         { data: "Status", header: true },
         { data: "Process", header: true },
+        { data: "Container", header: true },
         { data: "Exe Path", header: true },
         { data: "Command Line", header: true }
       ],
@@ -19934,6 +19935,7 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
         getHumanFriendlyReason(conn.reason),
         conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized",
         conn.process || "-",
+        conn.docker ? `${conn.docker.containerImage}:${conn.docker.containerName}` : "-",
         conn.exePath || "-",
         conn.commandLine || "-"
       ])
@@ -20013,6 +20015,7 @@ async function getConnections() {
         const process2 = logEntry.processName;
         const commandLine = logEntry.commandLine;
         const exePath = logEntry.executablePath;
+        const docker = logEntry.docker;
         allConnections.push({
           timestamp: date,
           domain: domain !== "unknown" ? domain : void 0,
@@ -20024,7 +20027,8 @@ async function getConnections() {
           reason,
           process: process2 !== "unknown" ? process2 : void 0,
           exePath: exePath !== "unknown" ? exePath : void 0,
-          commandLine: commandLine !== "unknown" ? commandLine : void 0
+          commandLine: commandLine !== "unknown" ? commandLine : void 0,
+          docker: docker || void 0
         });
       } catch {
         core3.warning(`Failed to parse log line: ${line}`);

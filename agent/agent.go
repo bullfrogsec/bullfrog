@@ -55,21 +55,27 @@ const (
 	DNS_PORT                              = layers.TCPPort(53)
 )
 
+type DockerInfo struct {
+	ContainerImage string `json:"containerImage"`
+	ContainerName  string `json:"containerName"`
+}
+
 type ConnectionLog struct {
-	Timestamp      int64  `json:"timestamp"`
-	Decision       string `json:"decision"`
-	Protocol       string `json:"protocol"`
-	SrcIP          string `json:"srcIP"`
-	SrcPort        string `json:"srcPort"`
-	DstIP          string `json:"dstIP"`
-	DstPort        string `json:"dstPort"`
-	Domain         string `json:"domain"`
-	Reason         string `json:"reason"`
-	PID            int    `json:"pid"`
-	ProcessName    string `json:"processName"`
-	CommandLine    string `json:"commandLine"`
-	ExecutablePath string `json:"executablePath"`
-	ProcessingTime int64  `json:"processingTime"`
+	Timestamp      int64        `json:"timestamp"`
+	Decision       string       `json:"decision"`
+	Protocol       string       `json:"protocol"`
+	SrcIP          string       `json:"srcIP"`
+	SrcPort        string       `json:"srcPort"`
+	DstIP          string       `json:"dstIP"`
+	DstPort        string       `json:"dstPort"`
+	Domain         string       `json:"domain"`
+	Reason         string       `json:"reason"`
+	PID            int          `json:"pid"`
+	ProcessName    string       `json:"processName"`
+	CommandLine    string       `json:"commandLine"`
+	ExecutablePath string       `json:"executablePath"`
+	ProcessingTime int64        `json:"processingTime"`
+	Docker         *DockerInfo  `json:"docker,omitempty"`
 }
 
 type PacketInfo struct {
@@ -81,6 +87,7 @@ type PacketInfo struct {
 	ProcessName    string
 	CommandLine    string
 	ExecutablePath string
+	Docker         *DockerInfo
 	StartTime      time.Time
 }
 
@@ -260,12 +267,12 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 	return false
 }
 
-func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) (int, string, string, string) {
+func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) *ProcessInfo {
 	cacheKey := fmt.Sprintf("%s:%s:%s", srcIP, srcPort, protocol)
 
 	// Check cache first
 	if cached, exists := a.processInfoCache[cacheKey]; exists {
-		return cached.PID, cached.ProcessName, cached.CommandLine, cached.ExecutablePath
+		return cached
 	}
 
 	// Try Docker container lookup first, but only if the IP is from a Docker network
@@ -275,19 +282,20 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) (int, 
 				container, srcIP, srcPort, protocol)
 
 			if err == nil {
-				// Format: "container-image:container-name:process-name"
-				formattedName := fmt.Sprintf("docker:%s;%s;%s", container.Image, container.Name, processName)
-
-				// Cache the result
-				a.processInfoCache[cacheKey] = &ProcessInfo{
+				// Cache the result with Docker info
+				processInfo := &ProcessInfo{
 					PID:            pid,
-					ProcessName:    formattedName,
+					ProcessName:    processName,
 					CommandLine:    cmdLine,
 					ExecutablePath: execPath,
-					Timestamp:      time.Now().Unix(),
+					Docker: &DockerInfo{
+						ContainerImage: container.Image,
+						ContainerName:  container.Name,
+					},
+					Timestamp: time.Now().Unix(),
 				}
-
-				return pid, formattedName, cmdLine, execPath
+				a.processInfoCache[cacheKey] = processInfo
+				return processInfo
 			}
 
 			// Log error per user's preference
@@ -303,19 +311,27 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) (int, 
 	pid, processName, cmdLine, execPath, err := getProcessInfo(a.procProvider, srcIP, srcPort, protocol)
 	if err != nil {
 		fmt.Printf("Process lookup failed for %s: %v\n", cacheKey, err)
-		return 0, "unknown", "unknown", "unknown"
+		return &ProcessInfo{
+			PID:            0,
+			ProcessName:    "unknown",
+			CommandLine:    "unknown",
+			ExecutablePath: "unknown",
+			Docker:         nil,
+			Timestamp:      time.Now().Unix(),
+		}
 	}
 
 	// Cache the result
-	a.processInfoCache[cacheKey] = &ProcessInfo{
+	processInfo := &ProcessInfo{
 		PID:            pid,
 		ProcessName:    processName,
 		CommandLine:    cmdLine,
 		ExecutablePath: execPath,
+		Docker:         nil,
 		Timestamp:      time.Now().Unix(),
 	}
-
-	return pid, processName, cmdLine, execPath
+	a.processInfoCache[cacheKey] = processInfo
+	return processInfo
 }
 
 func (a *Agent) addConnectionLog(pkt PacketInfo, decision, protocol, domain, reason string) {
@@ -344,6 +360,7 @@ func (a *Agent) addConnectionLog(pkt PacketInfo, decision, protocol, domain, rea
 		CommandLine:    pkt.CommandLine,
 		ExecutablePath: pkt.ExecutablePath,
 		ProcessingTime: time.Since(pkt.StartTime).Milliseconds(),
+		Docker:         pkt.Docker,
 	}
 
 	jsonBytes, err := json.Marshal(logEntry)
@@ -437,8 +454,12 @@ func (a *Agent) extractPacketInfo(packet gopacket.Packet) PacketInfo {
 
 	// Lookup process information
 	if protocol != "" && info.SrcIP != "unknown" && info.SrcPort != "unknown" && info.SrcPort != "53" {
-		info.PID, info.ProcessName, info.CommandLine, info.ExecutablePath =
-			a.getCachedOrLookupProcess(info.SrcIP, info.SrcPort, protocol)
+		processInfo := a.getCachedOrLookupProcess(info.SrcIP, info.SrcPort, protocol)
+		info.PID = processInfo.PID
+		info.ProcessName = processInfo.ProcessName
+		info.CommandLine = processInfo.CommandLine
+		info.ExecutablePath = processInfo.ExecutablePath
+		info.Docker = processInfo.Docker
 	}
 
 	return info
