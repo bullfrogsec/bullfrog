@@ -19992,42 +19992,44 @@ async function getConnections() {
     const log = await import_promises.default.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
     core3.debug("\n\nConnections.log:\n");
-    lines.forEach((l) => core3.debug(JSON.stringify(l)));
+    lines.forEach((l) => core3.debug(l));
     for (const line of lines) {
       if (!line.trim()) {
         continue;
       }
-      const values = line.split("|");
-      if (values.length < 13) {
+      try {
+        const logEntry = JSON.parse(line);
+        const timestamp = parseInt(logEntry.timestamp, 10);
+        if (isNaN(timestamp)) {
+          continue;
+        }
+        const date = getDate(timestamp);
+        const decision = logEntry.decision;
+        const protocol = logEntry.protocol;
+        const destIp = logEntry.dstIP;
+        const destPort = logEntry.dstPort;
+        const domain = logEntry.domain;
+        const reason = logEntry.reason;
+        const process2 = logEntry.processName;
+        const commandLine = logEntry.commandLine;
+        const exePath = logEntry.executablePath;
+        allConnections.push({
+          timestamp: date,
+          domain: domain !== "unknown" ? domain : void 0,
+          ip: destIp !== "unknown" ? destIp : void 0,
+          port: destPort !== "unknown" ? parseInt(destPort) : void 0,
+          blocked: decision === "blocked" && egressPolicy === BLOCK,
+          authorized: decision === "allowed",
+          protocol,
+          reason,
+          process: process2 !== "unknown" ? process2 : void 0,
+          exePath: exePath !== "unknown" ? exePath : void 0,
+          commandLine: commandLine !== "unknown" ? commandLine : void 0
+        });
+      } catch {
+        core3.warning(`Failed to parse log line: ${line}`);
         continue;
       }
-      const timestamp = parseInt(values[0], 10);
-      if (isNaN(timestamp)) {
-        continue;
-      }
-      const date = getDate(timestamp);
-      const decision = values[1];
-      const protocol = values[2];
-      const destIp = values[5];
-      const destPort = values[6];
-      const domain = values[7];
-      const reason = values[8];
-      const process2 = values[10];
-      const commandLine = values[11];
-      const exePath = values[12];
-      allConnections.push({
-        timestamp: date,
-        domain: domain !== "unknown" ? domain : void 0,
-        ip: destIp !== "unknown" ? destIp : void 0,
-        port: destPort !== "unknown" ? parseInt(destPort) : void 0,
-        blocked: decision === "blocked" && egressPolicy === BLOCK,
-        authorized: decision === "allowed",
-        protocol,
-        reason,
-        process: process2 !== "unknown" ? process2 : void 0,
-        exePath: exePath !== "unknown" ? exePath : void 0,
-        commandLine: commandLine !== "unknown" ? commandLine : void 0
-      });
     }
     const filtered = filterDNSNoise(allConnections);
     core3.debug("\n\nConnections:\n");

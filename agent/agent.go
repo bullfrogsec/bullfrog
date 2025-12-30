@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -55,19 +56,20 @@ const (
 )
 
 type ConnectionLog struct {
-	Decision       string
-	Protocol       string
-	SrcIP          string
-	SrcPort        string
-	DstIP          string
-	DstPort        string
-	Domain         string
-	Reason         string
-	PID            int
-	ProcessName    string
-	CommandLine    string
-	ExecutablePath string
-	ProcessingTime time.Duration
+	Timestamp      int64  `json:"timestamp"`
+	Decision       string `json:"decision"`
+	Protocol       string `json:"protocol"`
+	SrcIP          string `json:"srcIP"`
+	SrcPort        string `json:"srcPort"`
+	DstIP          string `json:"dstIP"`
+	DstPort        string `json:"dstPort"`
+	Domain         string `json:"domain"`
+	Reason         string `json:"reason"`
+	PID            int    `json:"pid"`
+	ProcessName    string `json:"processName"`
+	CommandLine    string `json:"commandLine"`
+	ExecutablePath string `json:"executablePath"`
+	ProcessingTime int64  `json:"processingTime"`
 }
 
 type PacketInfo struct {
@@ -327,21 +329,30 @@ func (a *Agent) addConnectionLog(pkt PacketInfo, decision, protocol, domain, rea
 		}
 	}
 
-	content := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d\n",
-		time.Now().UnixMilli(),
-		decision,
-		protocol,
-		pkt.SrcIP,
-		pkt.SrcPort,
-		pkt.DstIP,
-		pkt.DstPort,
-		domain,
-		reason,
-		pkt.PID,
-		pkt.ProcessName,
-		pkt.CommandLine,
-		pkt.ExecutablePath,
-		time.Since(pkt.StartTime).Milliseconds())
+	logEntry := ConnectionLog{
+		Timestamp:      time.Now().UnixMilli(),
+		Decision:       decision,
+		Protocol:       protocol,
+		SrcIP:          pkt.SrcIP,
+		SrcPort:        pkt.SrcPort,
+		DstIP:          pkt.DstIP,
+		DstPort:        pkt.DstPort,
+		Domain:         domain,
+		Reason:         reason,
+		PID:            pkt.PID,
+		ProcessName:    pkt.ProcessName,
+		CommandLine:    pkt.CommandLine,
+		ExecutablePath: pkt.ExecutablePath,
+		ProcessingTime: time.Since(pkt.StartTime).Milliseconds(),
+	}
+
+	jsonBytes, err := json.Marshal(logEntry)
+	if err != nil {
+		log.Printf("Error marshaling connection log: %v", err)
+		return
+	}
+
+	content := string(jsonBytes) + "\n"
 	a.filesystem.Append("/var/log/gha-agent/connections.log", content)
 }
 

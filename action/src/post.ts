@@ -209,49 +209,51 @@ async function getConnections(): Promise<Connection[]> {
     const log = await fs.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
     core.debug("\n\nConnections.log:\n");
-    lines.forEach((l) => core.debug(JSON.stringify(l)));
+    lines.forEach((l) => core.debug(l));
 
     for (const line of lines) {
       if (!line.trim()) {
         continue; // Skip empty lines
       }
 
-      // connections.log format: timestamp|decision|protocol|srcIP|srcPort|dstIP|dstPort|domain|reason|pid|processName|commandLine|exePath
-      const values = line.split("|");
-      if (values.length < 13) {
-        continue; // Skip malformed lines
+      try {
+        // Parse JSON log entry
+        const logEntry = JSON.parse(line);
+
+        const timestamp = parseInt(logEntry.timestamp, 10);
+        if (isNaN(timestamp)) {
+          continue; // Skip invalid timestamps
+        }
+
+        const date = getDate(timestamp);
+
+        const decision = logEntry.decision as "allowed" | "blocked";
+        const protocol = logEntry.protocol;
+        const destIp = logEntry.dstIP;
+        const destPort = logEntry.dstPort;
+        const domain = logEntry.domain;
+        const reason = logEntry.reason;
+        const process = logEntry.processName;
+        const commandLine = logEntry.commandLine;
+        const exePath = logEntry.executablePath;
+
+        allConnections.push({
+          timestamp: date,
+          domain: domain !== "unknown" ? domain : undefined,
+          ip: destIp !== "unknown" ? destIp : undefined,
+          port: destPort !== "unknown" ? parseInt(destPort) : undefined,
+          blocked: decision === "blocked" && egressPolicy === BLOCK,
+          authorized: decision === "allowed",
+          protocol,
+          reason,
+          process: process !== "unknown" ? process : undefined,
+          exePath: exePath !== "unknown" ? exePath : undefined,
+          commandLine: commandLine !== "unknown" ? commandLine : undefined,
+        });
+      } catch {
+        core.warning(`Failed to parse log line: ${line}`);
+        continue;
       }
-
-      const timestamp = parseInt(values[0], 10);
-      if (isNaN(timestamp)) {
-        continue; // Skip invalid timestamps
-      }
-
-      const date = getDate(timestamp);
-
-      const decision = values[1] as "allowed" | "blocked";
-      const protocol = values[2];
-      const destIp = values[5];
-      const destPort = values[6];
-      const domain = values[7];
-      const reason = values[8];
-      const process = values[10];
-      const commandLine = values[11];
-      const exePath = values[12];
-
-      allConnections.push({
-        timestamp: date,
-        domain: domain !== "unknown" ? domain : undefined,
-        ip: destIp !== "unknown" ? destIp : undefined,
-        port: destPort !== "unknown" ? parseInt(destPort) : undefined,
-        blocked: decision === "blocked" && egressPolicy === BLOCK,
-        authorized: decision === "allowed",
-        protocol,
-        reason,
-        process: process !== "unknown" ? process : undefined,
-        exePath: exePath !== "unknown" ? exePath : undefined,
-        commandLine: commandLine !== "unknown" ? commandLine : undefined,
-      });
     }
 
     // Filter DNS noise according to logic:
