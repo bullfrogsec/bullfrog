@@ -292,3 +292,284 @@ func TestExtractDomainFromSRVRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessNonDNSPacket(t *testing.T) {
+	// Test TCP packet with allowed IP
+	t.Run("Accept TCP packet to allowed IP", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"93.184.216.34"},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+	})
+
+	// Test TCP packet with allowed IP from domain resolution
+	t.Run("Accept TCP packet to IP resolved from allowed domain", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"example.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		// First, simulate DNS response to add IP to allowlist
+		dnsResponse := testingUtils.GenerateDNSTypeAResponsePacket(
+			"example.com",
+			net.IP{93, 184, 216, 34},
+			net.IP{127, 0, 0, 53},
+		)
+		agent.ProcessPacket(dnsResponse)
+
+		// Now test TCP packet to that IP
+		tcpPacket := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(tcpPacket)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+
+		// Verify IP-to-domain mapping exists
+		if domain, exists := agent.ipToDomain["93.184.216.34"]; !exists || domain != "example.com" {
+			t.Errorf("Expected IP-to-domain mapping, got domain=%v, exists=%v", domain, exists)
+		}
+	})
+
+	// Test TCP packet to blocked IP in block mode
+	t.Run("Drop TCP packet to blocked IP in block mode", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"10.0.0.1"},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34}, // Not in allowlist
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST, got %v", decision)
+		}
+	})
+
+	// Test TCP packet to blocked IP in audit mode
+	t.Run("Accept TCP packet to blocked IP in audit mode", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_AUDIT,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"10.0.0.1"},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34}, // Not in allowlist
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST (audit mode), got %v", decision)
+		}
+	})
+
+	// Test UDP packet with allowed IP
+	t.Run("Accept UDP packet to allowed IP", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"8.8.8.8"},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateUDPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{8, 8, 8, 8},
+			12345,
+			123, // NTP port
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+	})
+
+	// Test UDP packet to blocked IP
+	t.Run("Drop UDP packet to blocked IP", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateUDPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{8, 8, 8, 8},
+			12345,
+			123,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST, got %v", decision)
+		}
+	})
+
+	// Test packet without network layer
+	t.Run("Drop packet without network layer", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GeneratePacketWithoutNetworkLayer()
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST for packet without network layer, got %v", decision)
+		}
+	})
+
+	// Test CIDR range matching
+	t.Run("Accept TCP packet to IP in CIDR range", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"10.0.0.0/24"}, // CIDR range
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{10, 0, 0, 50}, // Within 10.0.0.0/24
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for IP in CIDR range, got %v", decision)
+		}
+	})
+
+	// Test default allowed IPs (127.0.0.1, 169.254.169.254)
+	t.Run("Accept TCP packet to localhost", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{}, // Empty, but defaults include 127.0.0.1
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{127, 0, 0, 1},
+			12345,
+			8080,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for localhost, got %v", decision)
+		}
+	})
+
+	// Test metadata service IP (169.254.169.254)
+	t.Run("Accept TCP packet to metadata service", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{}, // Empty, but defaults include 169.254.169.254
+			EnableSudo:      true,
+			NetInfoProvider: &testingUtils.NetInfoProvider{},
+			FileSystem:      &testingUtils.FileSystem{},
+			ProcProvider:    testingUtils.NewMockProcProvider(),
+		})
+
+		packet := testingUtils.GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{169, 254, 169, 254},
+			12345,
+			80,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for metadata service IP, got %v", decision)
+		}
+	})
+}

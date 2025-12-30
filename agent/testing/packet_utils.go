@@ -133,5 +133,85 @@ func GenerateDNSPacket(dns layers.DNS, udp layers.UDP, ip layers.IPv4) gopacket.
 
 	rawPacket := buf.Bytes()
 	return gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet, gopacket.Default)
-
 }
+
+// GenerateTCPPacket creates a TCP packet for testing non-DNS traffic
+func GenerateTCPPacket(srcIP, dstIP net.IP, srcPort, dstPort uint16) gopacket.Packet {
+	ether := layers.Ethernet{
+		EthernetType: layers.EthernetTypeIPv4,
+		SrcMAC:       net.HardwareAddr{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA},
+		DstMAC:       net.HardwareAddr{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD},
+	}
+	ip := layers.IPv4{
+		Protocol: layers.IPProtocolTCP,
+		SrcIP:    srcIP,
+		DstIP:    dstIP,
+		Version:  4,
+	}
+	tcp := layers.TCP{
+		SrcPort: layers.TCPPort(srcPort),
+		DstPort: layers.TCPPort(dstPort),
+		SYN:     true,
+	}
+	tcp.SetNetworkLayerForChecksum(&ip)
+
+	buf := gopacket.NewSerializeBuffer()
+	opt := gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+	gopacket.SerializeLayers(buf, opt, &ether, &ip, &tcp)
+
+	rawPacket := buf.Bytes()
+	return gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet, gopacket.Default)
+}
+
+// GenerateUDPPacket creates a UDP packet for testing non-DNS traffic
+func GenerateUDPPacket(srcIP, dstIP net.IP, srcPort, dstPort uint16) gopacket.Packet {
+	ether := layers.Ethernet{
+		EthernetType: layers.EthernetTypeIPv4,
+		SrcMAC:       net.HardwareAddr{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA},
+		DstMAC:       net.HardwareAddr{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD},
+	}
+	ip := layers.IPv4{
+		Protocol: layers.IPProtocolUDP,
+		SrcIP:    srcIP,
+		DstIP:    dstIP,
+		Version:  4,
+	}
+	udp := layers.UDP{
+		SrcPort: layers.UDPPort(srcPort),
+		DstPort: layers.UDPPort(dstPort),
+	}
+	udp.SetNetworkLayerForChecksum(&ip)
+
+	buf := gopacket.NewSerializeBuffer()
+	opt := gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+	gopacket.SerializeLayers(buf, opt, &ether, &ip, &udp)
+
+	rawPacket := buf.Bytes()
+	return gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet, gopacket.Default)
+}
+
+// GeneratePacketWithoutNetworkLayer creates a malformed packet without a network layer
+func GeneratePacketWithoutNetworkLayer() gopacket.Packet {
+	ether := layers.Ethernet{
+		EthernetType: layers.EthernetTypeIPv4,
+		SrcMAC:       net.HardwareAddr{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA},
+		DstMAC:       net.HardwareAddr{0xBD, 0xBD, 0xBD, 0xBD, 0xBD, 0xBD},
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	opt := gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+	gopacket.SerializeLayers(buf, opt, &ether)
+
+	rawPacket := buf.Bytes()
+	return gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet, gopacket.Default)
+}
+
