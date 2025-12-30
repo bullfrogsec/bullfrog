@@ -92,45 +92,48 @@ type PacketInfo struct {
 }
 
 type AgentConfig struct {
-	EgressPolicy    string
-	DNSPolicy       string
-	AllowedDomains  []string
-	AllowedIPs      []string
-	EnableSudo      bool
-	NetInfoProvider INetInfoProvider
-	FileSystem      IFileSystem
-	ProcProvider    IProcProvider
-	DockerProvider  IDockerProvider
+	EgressPolicy       string
+	DNSPolicy          string
+	AllowedDomains     []string
+	AllowedIPs         []string
+	EnableSudo         bool
+	CollectProcessInfo bool
+	NetInfoProvider    INetInfoProvider
+	FileSystem         IFileSystem
+	ProcProvider       IProcProvider
+	DockerProvider     IDockerProvider
 }
 
 type Agent struct {
-	blockDNS          bool
-	blocking          bool
-	allowedDomains    map[string]bool
-	allowedIps        map[string]bool
-	allowedDNSServers map[string]bool
-	allowedCIDR       []*net.IPNet
-	ipToDomain        map[string]string // Reverse mapping: IP -> domain name for logging
-	netInfoProvider   INetInfoProvider
-	filesystem        IFileSystem
-	processInfoCache  map[string]*ProcessInfo
-	procProvider      IProcProvider
-	dockerProvider    IDockerProvider
+	blockDNS           bool
+	blocking           bool
+	collectProcessInfo bool
+	allowedDomains     map[string]bool
+	allowedIps         map[string]bool
+	allowedDNSServers  map[string]bool
+	allowedCIDR        []*net.IPNet
+	ipToDomain         map[string]string // Reverse mapping: IP -> domain name for logging
+	netInfoProvider    INetInfoProvider
+	filesystem         IFileSystem
+	processInfoCache   map[string]*ProcessInfo
+	procProvider       IProcProvider
+	dockerProvider     IDockerProvider
 }
 
 func NewAgent(config AgentConfig) *Agent {
 	agent := &Agent{
-		blockDNS:          false,
-		blocking:          false,
-		allowedDomains:    make(map[string]bool),
-		allowedIps:        make(map[string]bool),
-		allowedDNSServers: make(map[string]bool),
-		ipToDomain:        make(map[string]string),
-		netInfoProvider:   config.NetInfoProvider,
-		filesystem:        config.FileSystem,
-		processInfoCache:  make(map[string]*ProcessInfo),
-		procProvider:      config.ProcProvider,
-		dockerProvider:    config.DockerProvider,
+		blockDNS:           false,
+		blocking:           false,
+		collectProcessInfo: config.CollectProcessInfo,
+		allowedDomains:     make(map[string]bool),
+		allowedIps:         make(map[string]bool),
+		allowedDNSServers:  make(map[string]bool),
+		ipToDomain:         make(map[string]string),
+		netInfoProvider:    config.NetInfoProvider,
+		filesystem:         config.FileSystem,
+		processInfoCache:   make(map[string]*ProcessInfo),
+		procProvider:       config.ProcProvider,
+		dockerProvider:     config.DockerProvider,
 	}
 
 	// If no Docker provider specified, try to create one
@@ -268,6 +271,18 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 }
 
 func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) *ProcessInfo {
+	// If process info collection is disabled, return default/unknown info
+	if !a.collectProcessInfo {
+		return &ProcessInfo{
+			PID:            0,
+			ProcessName:    "unknown",
+			CommandLine:    "unknown",
+			ExecutablePath: "unknown",
+			Docker:         nil,
+			Timestamp:      time.Now().Unix(),
+		}
+	}
+
 	cacheKey := fmt.Sprintf("%s:%s:%s", srcIP, srcPort, protocol)
 
 	// Check cache first

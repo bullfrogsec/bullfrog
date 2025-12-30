@@ -19849,6 +19849,7 @@ function parseInputs() {
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
+    collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
@@ -19945,7 +19946,8 @@ async function startAgent({
   allowedIps,
   dnsPolicy,
   egressPolicy,
-  enableSudo
+  enableSudo,
+  collectProcessInfo
 }) {
   const blockingMode = egressPolicy === BLOCK;
   console.log("Loading nftables rules");
@@ -19964,6 +19966,7 @@ async function startAgent({
   const allowedDomainsFlag = allowedDomains.length > 0 ? `--allowed-domains ${allowedDomains.join(",")}` : "";
   const allowedIpsFlag = allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
   const enableSudoFlag = enableSudo ? "true" : "false";
+  const collectProcessInfoFlag = collectProcessInfo ? "true" : "false";
   const agentCommand = [
     AGENT_INSTALL_PATH,
     "--dns-policy",
@@ -19971,6 +19974,7 @@ async function startAgent({
     "--egress-policy",
     egressPolicy,
     `--enable-sudo=${enableSudoFlag}`,
+    `--collect-process-info=${collectProcessInfoFlag}`,
     allowedDomainsFlag,
     allowedIpsFlag
   ].join(" ");
@@ -20002,6 +20006,7 @@ async function main() {
     dnsPolicy,
     egressPolicy,
     enableSudo,
+    collectProcessInfo,
     localAgent,
     logDirectory,
     apiToken,
@@ -20041,6 +20046,7 @@ async function main() {
     allowedIps,
     dnsPolicy,
     enableSudo,
+    collectProcessInfo,
     egressPolicy
   });
 }

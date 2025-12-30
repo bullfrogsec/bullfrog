@@ -32,18 +32,20 @@ func main() {
 	dnsPolicy := flag.String("dns-policy", "allowed-domains-only", "DNS policy: allowed-domains-only or any")
 	egressPolicy := flag.String("egress-policy", "audit", "Egress policy: audit or block")
 	enableSudo := flag.Bool("enable-sudo", true, "Enable sudo: true or false")
+	collectProcessInfo := flag.Bool("collect-process-info", true, "Collect process information: true or false")
 
 	flag.Parse()
 
 	agent := NewAgent(AgentConfig{
-		DNSPolicy:       *dnsPolicy,
-		EgressPolicy:    *egressPolicy,
-		AllowedDomains:  strings.Split(*allowedDomains, ","),
-		AllowedIPs:      strings.Split(*allowedIPs, ","),
-		EnableSudo:      *enableSudo,
-		NetInfoProvider: &LinuxNetInfoProvider{},
-		FileSystem:      &FileSystem{},
-		ProcProvider:    &LinuxProcProvider{},
+		DNSPolicy:          *dnsPolicy,
+		EgressPolicy:       *egressPolicy,
+		AllowedDomains:     strings.Split(*allowedDomains, ","),
+		AllowedIPs:         strings.Split(*allowedIPs, ","),
+		EnableSudo:         *enableSudo,
+		CollectProcessInfo: *collectProcessInfo,
+		NetInfoProvider:    &LinuxNetInfoProvider{},
+		FileSystem:         &FileSystem{},
+		ProcProvider:       &LinuxProcProvider{},
 	})
 
 	nfq, err := netfilter.NewNFQueue(0, 1000, netfilter.NF_DEFAULT_PACKET_SIZE)

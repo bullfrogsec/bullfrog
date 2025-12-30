@@ -9,6 +9,7 @@ export interface Inputs {
   allowedIps: Array<string>;
   dnsPolicy: DnsPolicy;
   enableSudo: boolean;
+  collectProcessInfo: boolean;
   egressPolicy: EgressPolicy;
   localAgent: boolean;
   logDirectory: string;
@@ -70,6 +71,7 @@ export function parseInputs(): Inputs {
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
+    collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),

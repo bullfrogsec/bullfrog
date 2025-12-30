@@ -101,6 +101,7 @@ async function startAgent({
   dnsPolicy,
   egressPolicy,
   enableSudo,
+  collectProcessInfo,
 }: {
   agentDirectory: string;
   allowedDomains: string[];
@@ -109,6 +110,7 @@ async function startAgent({
   dnsPolicy: DnsPolicy;
   egressPolicy: EgressPolicy;
   enableSudo: boolean;
+  collectProcessInfo: boolean;
 }) {
   const blockingMode = egressPolicy === BLOCK;
 
@@ -142,6 +144,7 @@ async function startAgent({
     allowedIps.length > 0 ? `--allowed-ips ${allowedIps.join(",")}` : "";
 
   const enableSudoFlag = enableSudo ? "true" : "false";
+  const collectProcessInfoFlag = collectProcessInfo ? "true" : "false";
 
   const agentCommand = [
     AGENT_INSTALL_PATH,
@@ -150,6 +153,7 @@ async function startAgent({
     "--egress-policy",
     egressPolicy,
     `--enable-sudo=${enableSudoFlag}`,
+    `--collect-process-info=${collectProcessInfoFlag}`,
     allowedDomainsFlag,
     allowedIpsFlag,
   ].join(" ");
@@ -189,6 +193,7 @@ async function main() {
     dnsPolicy,
     egressPolicy,
     enableSudo,
+    collectProcessInfo,
     localAgent,
     logDirectory,
     apiToken,
@@ -239,6 +244,7 @@ async function main() {
     allowedIps,
     dnsPolicy,
     enableSudo,
+    collectProcessInfo,
     egressPolicy,
   });
 }

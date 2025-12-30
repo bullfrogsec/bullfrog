@@ -19847,6 +19847,7 @@ function parseInputs() {
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
+    collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
