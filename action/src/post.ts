@@ -288,9 +288,7 @@ function filterDNSNoise(connections: Connection[]): Connection[] {
   for (const [, conns] of byDomain) {
     // Check if there are any non-DNS connections with reason "ip-allowed"
     const hasActualConnection = conns.some(
-      (c) =>
-        !["DNS", "DNS-response"].includes(c.protocol) &&
-        c.reason === "ip-allowed",
+      (c) => !["DNS"].includes(c.protocol) && c.reason === "ip-allowed",
     );
 
     if (hasActualConnection) {

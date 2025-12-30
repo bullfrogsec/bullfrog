@@ -20050,7 +20050,7 @@ function filterDNSNoise(connections) {
   const result = [];
   for (const [, conns] of byDomain) {
     const hasActualConnection = conns.some(
-      (c) => !["DNS", "DNS-response"].includes(c.protocol) && c.reason === "ip-allowed"
+      (c) => !["DNS"].includes(c.protocol) && c.reason === "ip-allowed"
     );
     if (hasActualConnection) {
       const filtered = conns.filter(

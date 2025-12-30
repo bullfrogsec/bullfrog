@@ -507,52 +507,52 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 			// Add to in-memory allowed IPs map
 			// No need to update nftables - Go agent handles all decisions
 			a.allowedIps[ip] = true
-			a.addConnectionLog(ConnectionLog{
-				Decision:       "allowed",
-				Protocol:       "DNS-response",
-				SrcIP:          pkt.SrcIP,
-				SrcPort:        pkt.SrcPort,
-				DstIP:          ip,
-				DstPort:        "53",
-				Domain:         domain,
-				Reason:         "dns-resolved",
-				PID:            pkt.PID,
-				ProcessName:    pkt.ProcessName,
-				CommandLine:    pkt.CommandLine,
-				ExecutablePath: pkt.ExecutablePath,
-			})
+			// a.addConnectionLog(ConnectionLog{
+			// 	Decision:       "allowed",
+			// 	Protocol:       "DNS-response",
+			// 	SrcIP:          pkt.SrcIP,
+			// 	SrcPort:        pkt.SrcPort,
+			// 	DstIP:          ip,
+			// 	DstPort:        "53",
+			// 	Domain:         domain,
+			// 	Reason:         "dns-resolved",
+			// 	PID:            pkt.PID,
+			// 	ProcessName:    pkt.ProcessName,
+			// 	CommandLine:    pkt.CommandLine,
+			// 	ExecutablePath: pkt.ExecutablePath,
+			// })
 		}
 	} else if a.isIpAllowed(ip) {
 		fmt.Println("-> Allowed request")
-		a.addConnectionLog(ConnectionLog{
-			Decision:       "allowed",
-			Protocol:       "DNS-response",
-			SrcIP:          pkt.SrcIP,
-			SrcPort:        pkt.SrcPort,
-			DstIP:          ip,
-			DstPort:        "53",
-			Domain:         domain,
-			Reason:         "ip-allowed",
-			PID:            pkt.PID,
-			ProcessName:    pkt.ProcessName,
-			CommandLine:    pkt.CommandLine,
-			ExecutablePath: pkt.ExecutablePath,
-		})
+		// a.addConnectionLog(ConnectionLog{
+		// 	Decision:       "allowed",
+		// 	Protocol:       "DNS-response",
+		// 	SrcIP:          pkt.SrcIP,
+		// 	SrcPort:        pkt.SrcPort,
+		// 	DstIP:          ip,
+		// 	DstPort:        "53",
+		// 	Domain:         domain,
+		// 	Reason:         "ip-allowed",
+		// 	PID:            pkt.PID,
+		// 	ProcessName:    pkt.ProcessName,
+		// 	CommandLine:    pkt.CommandLine,
+		// 	ExecutablePath: pkt.ExecutablePath,
+		// })
 	} else {
-		a.addConnectionLog(ConnectionLog{
-			Decision:       "blocked",
-			Protocol:       "DNS-response",
-			SrcIP:          pkt.SrcIP,
-			SrcPort:        pkt.SrcPort,
-			DstIP:          ip,
-			DstPort:        "53",
-			Domain:         domain,
-			Reason:         "domain-not-allowed",
-			PID:            pkt.PID,
-			ProcessName:    pkt.ProcessName,
-			CommandLine:    pkt.CommandLine,
-			ExecutablePath: pkt.ExecutablePath,
-		})
+		// a.addConnectionLog(ConnectionLog{
+		// 	Decision:       "blocked",
+		// 	Protocol:       "DNS-response",
+		// 	SrcIP:          pkt.SrcIP,
+		// 	SrcPort:        pkt.SrcPort,
+		// 	DstIP:          ip,
+		// 	DstPort:        "53",
+		// 	Domain:         domain,
+		// 	Reason:         "domain-not-allowed",
+		// 	PID:            pkt.PID,
+		// 	ProcessName:    pkt.ProcessName,
+		// 	CommandLine:    pkt.CommandLine,
+		// 	ExecutablePath: pkt.ExecutablePath,
+		// })
 		if blocking {
 			fmt.Println("-> Blocked request")
 		} else {
