@@ -316,10 +316,12 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) (int, 
 
 func (a *Agent) addConnectionLog(log ConnectionLog) {
 
-	// Skip logging connections to default IPs (metadata services, etc.)
-	for _, defaultIP := range defaultIps {
-		if log.DstIP == defaultIP {
-			return
+	// Skip logging connections to allowed non-DNS default IPs (metadata services, etc.)
+	if log.Decision == "allowed" && log.DstPort != "53" {
+		for _, defaultIP := range defaultIps {
+			if log.DstIP == defaultIP {
+				return
+			}
 		}
 	}
 

@@ -208,6 +208,8 @@ async function getConnections(): Promise<Connection[]> {
     const { egressPolicy } = parseInputs();
     const log = await fs.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
+    core.debug("\n\nConnections.log:\n");
+    lines.forEach((l) => core.debug(JSON.stringify(l)));
 
     for (const line of lines) {
       if (!line.trim()) {
