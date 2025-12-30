@@ -61,7 +61,7 @@ const REASON_CODE_MAP: Record<string, string> = {
   "unknown-network-layer": "Unknown network layer",
 };
 
-function getHumanFriendlyReason(reasonCode: string): string {
+export function getHumanFriendlyReason(reasonCode: string): string {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
 
@@ -195,7 +195,7 @@ type DockerInfo = {
   containerName: string;
 };
 
-type Connection = {
+export type Connection = {
   timestamp: Date;
   domain?: string;
   ip?: string;
@@ -286,7 +286,7 @@ async function getConnections(): Promise<Connection[]> {
   }
 }
 
-function filterDNSNoise(connections: Connection[]): Connection[] {
+export function filterDNSNoise(connections: Connection[]): Connection[] {
   // Group connections by domain
   const byDomain = new Map<string, Connection[]>();
 
@@ -352,7 +352,7 @@ function filterDNSNoise(connections: Connection[]): Connection[] {
   return result;
 }
 
-function deduplicateByDomain(connections: Connection[]): Connection[] {
+export function deduplicateByDomain(connections: Connection[]): Connection[] {
   const seen = new Set<string>();
   const result: Connection[] = [];
 
@@ -372,7 +372,7 @@ function deduplicateByDomain(connections: Connection[]): Connection[] {
   return result;
 }
 
-function deduplicateByDomainAndIP(connections: Connection[]): Connection[] {
+export function deduplicateByDomainAndIP(connections: Connection[]): Connection[] {
   const seen = new Set<string>();
   const result: Connection[] = [];
 
@@ -438,8 +438,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  core.setFailed(error);
-  process.exit(1);
-});
+// Only run main if this file is executed directly (not imported for tests)
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    core.setFailed(error);
+    process.exit(1);
+  });
+}

@@ -8,6 +8,10 @@ var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -24,6 +28,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/@actions/core/lib/utils.js
 var require_utils = __commonJS({
@@ -19796,6 +19801,14 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 });
 
 // src/post.ts
+var post_exports = {};
+__export(post_exports, {
+  deduplicateByDomain: () => deduplicateByDomain,
+  deduplicateByDomainAndIP: () => deduplicateByDomainAndIP,
+  filterDNSNoise: () => filterDNSNoise,
+  getHumanFriendlyReason: () => getHumanFriendlyReason
+});
+module.exports = __toCommonJS(post_exports);
 var core3 = __toESM(require_core());
 var import_promises = __toESM(require("node:fs/promises"));
 
@@ -20159,10 +20172,19 @@ async function main() {
     );
   }
 }
-main().catch((error) => {
-  console.error(error);
-  core3.setFailed(error);
-  process.exit(1);
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    core3.setFailed(error);
+    process.exit(1);
+  });
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  deduplicateByDomain,
+  deduplicateByDomainAndIP,
+  filterDNSNoise,
+  getHumanFriendlyReason
 });
 /*! Bundled license information:
 
