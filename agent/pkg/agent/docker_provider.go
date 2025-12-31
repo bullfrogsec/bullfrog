@@ -1,4 +1,4 @@
-package main
+package agent
 
 import (
 	"bufio"
@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bullfrogsec/agent/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
@@ -265,14 +264,14 @@ func (d *DockerProvider) GetProcessInContainer(container *ContainerInfo, srcIP, 
 }
 
 // readProcNetFileFromPath reads socket entries from a specific path
-func readProcNetFileFromPath(filename string) ([]types.SocketEntry, error) {
+func readProcNetFileFromPath(filename string) ([]SocketEntry, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open %s: %w", filename, err)
 	}
 	defer file.Close()
 
-	var entries []types.SocketEntry
+	var entries []SocketEntry
 	scanner := bufio.NewScanner(file)
 
 	// Skip header line
@@ -290,7 +289,7 @@ func readProcNetFileFromPath(filename string) ([]types.SocketEntry, error) {
 			continue
 		}
 
-		entries = append(entries, types.SocketEntry{
+		entries = append(entries, SocketEntry{
 			LocalAddr:  fields[1],
 			RemoteAddr: fields[2],
 			State:      fields[3],

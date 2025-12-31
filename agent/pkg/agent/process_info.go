@@ -1,4 +1,4 @@
-package main
+package agent
 
 import (
 	"bufio"
@@ -9,25 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bullfrogsec/agent/types"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
-// ProcessInfo holds process identification data
-type ProcessInfo struct {
-	PID            int
-	ProcessName    string      // From /proc/[pid]/comm
-	CommandLine    string      // From /proc/[pid]/cmdline (full command with args)
-	ExecutablePath string      // From /proc/[pid]/exe (actual binary location)
-	Docker         *DockerInfo // Docker container info if process is in a container
-	Timestamp      int64
-}
-
 // IProcProvider abstracts /proc filesystem operations for testability
 type IProcProvider interface {
 	// ReadProcNetFile reads /proc/net/{tcp,udp,tcp6,udp6}
-	ReadProcNetFile(protocol string, ipVersion int) ([]types.SocketEntry, error)
+	ReadProcNetFile(protocol string, ipVersion int) ([]SocketEntry, error)
 
 	// FindProcessByInode scans /proc/[pid]/fd/ to find which process owns an inode
 	FindProcessByInode(inode uint64) (int, error)
@@ -48,7 +37,7 @@ type IProcProvider interface {
 // LinuxProcProvider implements IProcProvider for real /proc filesystem
 type LinuxProcProvider struct{}
 
-func (p *LinuxProcProvider) ReadProcNetFile(protocol string, ipVersion int) ([]types.SocketEntry, error) {
+func (p *LinuxProcProvider) ReadProcNetFile(protocol string, ipVersion int) ([]SocketEntry, error) {
 	// Construct path: /proc/net/tcp, /proc/net/udp, /proc/net/tcp6, /proc/net/udp6
 	var filename string
 	if ipVersion == 4 {
@@ -63,7 +52,7 @@ func (p *LinuxProcProvider) ReadProcNetFile(protocol string, ipVersion int) ([]t
 	}
 	defer file.Close()
 
-	var entries []types.SocketEntry
+	var entries []SocketEntry
 	scanner := bufio.NewScanner(file)
 
 	// Skip header line
@@ -164,18 +153,18 @@ func (p *LinuxProcProvider) GetExecutablePath(pid int) (string, error) {
 // parseSocketLine parses a line from /proc/net/{tcp,udp}
 // Format: sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode
 // Example: "0: 0100007F:0277 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 966876 1 ..."
-func parseSocketLine(line string) (types.SocketEntry, error) {
+func parseSocketLine(line string) (SocketEntry, error) {
 	fields := strings.Fields(line)
 	if len(fields) < 10 {
-		return types.SocketEntry{}, fmt.Errorf("invalid line format")
+		return SocketEntry{}, fmt.Errorf("invalid line format")
 	}
 
 	inode, err := strconv.ParseUint(fields[9], 10, 64)
 	if err != nil {
-		return types.SocketEntry{}, fmt.Errorf("invalid inode: %w", err)
+		return SocketEntry{}, fmt.Errorf("invalid inode: %w", err)
 	}
 
-	return types.SocketEntry{
+	return SocketEntry{
 		LocalAddr:  fields[1],
 		RemoteAddr: fields[2],
 		State:      fields[3],

@@ -1,11 +1,145 @@
-package testing
+package agent
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
+
+// Mock implementations for testing
+
+type mockNetInfoProvider struct {
+}
+
+func (m *mockNetInfoProvider) GetDNSServer() (string, error) {
+	return "127.0.0.125", nil
+}
+
+func (m *mockNetInfoProvider) FlushDNSCache() error {
+	return nil
+}
+
+type mockFileSystem struct {
+}
+
+func (m *mockFileSystem) Append(filename string, content string) error {
+	return nil
+}
+
+type mockProcProvider struct {
+	InodeToPID    map[uint64]int
+	PIDToName     map[int]string
+	PIDToCmdLine  map[int]string
+	PIDToExecPath map[int]string
+}
+
+func newMockProcProvider() *mockProcProvider {
+	return &mockProcProvider{
+		InodeToPID:    make(map[uint64]int),
+		PIDToName:     make(map[int]string),
+		PIDToCmdLine:  make(map[int]string),
+		PIDToExecPath: make(map[int]string),
+	}
+}
+
+// ReadProcNetFile returns an empty slice for testing - tests don't need actual socket data
+func (m *mockProcProvider) ReadProcNetFile(protocol string, ipVersion int) ([]SocketEntry, error) {
+	return []SocketEntry{}, nil
+}
+
+func (m *mockProcProvider) FindProcessByInode(inode uint64) (int, error) {
+	if pid, ok := m.InodeToPID[inode]; ok {
+		return pid, nil
+	}
+	return 0, fmt.Errorf("inode not found")
+}
+
+func (m *mockProcProvider) GetProcessName(pid int) (string, error) {
+	if name, ok := m.PIDToName[pid]; ok {
+		return name, nil
+	}
+	return "", fmt.Errorf("process not found")
+}
+
+func (m *mockProcProvider) GetCommandLine(pid int) (string, error) {
+	if cmdLine, ok := m.PIDToCmdLine[pid]; ok {
+		return cmdLine, nil
+	}
+	return "", fmt.Errorf("command line not found")
+}
+
+func (m *mockProcProvider) GetExecutablePath(pid int) (string, error) {
+	if execPath, ok := m.PIDToExecPath[pid]; ok {
+		return execPath, nil
+	}
+	return "", fmt.Errorf("executable path not found")
+}
+
+func (m *mockProcProvider) GetProcesses() ([]int, error) {
+	var pids []int
+	for pid := range m.PIDToName {
+		pids = append(pids, pid)
+	}
+	return pids, nil
+}
+
+// mockContainerInfo holds container information
+type mockContainerInfo struct {
+	ID      string
+	Name    string
+	Image   string
+	RootPID int
+}
+
+// mockProcessDetails holds process information for mock Docker provider
+type mockProcessDetails struct {
+	PID         int
+	ProcessName string
+	CommandLine string
+	ExecPath    string
+}
+
+// mockDockerProvider implements IDockerProvider for testing
+type mockDockerProvider struct {
+	Containers map[string]*mockContainerInfo  // Key: IP address
+	ProcessMap map[string]*mockProcessDetails // Key: "containerID:IP:Port:Protocol"
+}
+
+func newMockDockerProvider() *mockDockerProvider {
+	return &mockDockerProvider{
+		Containers: make(map[string]*mockContainerInfo),
+		ProcessMap: make(map[string]*mockProcessDetails),
+	}
+}
+
+func (m *mockDockerProvider) FindContainerByIP(ip string) (*ContainerInfo, error) {
+	if container, exists := m.Containers[ip]; exists {
+		// Convert mock type to real type
+		return &ContainerInfo{
+			ID:      container.ID,
+			Name:    container.Name,
+			Image:   container.Image,
+			RootPID: container.RootPID,
+		}, nil
+	}
+	return nil, fmt.Errorf("container not found")
+}
+
+func (m *mockDockerProvider) GetProcessInContainer(container *ContainerInfo, srcIP, srcPort, protocol string) (
+	int, string, string, string, error) {
+
+	key := fmt.Sprintf("%s:%s:%s:%s", container.ID, srcIP, srcPort, protocol)
+	if proc, exists := m.ProcessMap[key]; exists {
+		return proc.PID, proc.ProcessName, proc.CommandLine, proc.ExecPath, nil
+	}
+	return 0, "", "", "", fmt.Errorf("process not found")
+}
+
+func (m *mockDockerProvider) Close() error {
+	return nil
+}
 
 func GenerateDNSRequestPacket(domain string, nameserver net.IP) gopacket.Packet {
 	dns := layers.DNS{
@@ -214,4 +348,3 @@ func GeneratePacketWithoutNetworkLayer() gopacket.Packet {
 	rawPacket := buf.Bytes()
 	return gopacket.NewPacket(rawPacket, layers.LayerTypeEthernet, gopacket.Default)
 }
-

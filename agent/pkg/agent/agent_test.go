@@ -1,10 +1,9 @@
-package main
+package agent
 
 import (
 	"net"
 	"testing"
 
-	testingUtils "github.com/bullfrogsec/agent/testing"
 	"github.com/google/gopacket"
 )
 
@@ -24,8 +23,8 @@ func TestNewAgent(t *testing.T) {
 				AllowedDomains:  []string{},
 				AllowedIPs:      []string{"10.0.0.0/24"},
 				EnableSudo:      true,
-				NetInfoProvider: &testingUtils.NetInfoProvider{},
-				FileSystem:      &testingUtils.FileSystem{},
+				NetInfoProvider: &mockNetInfoProvider{},
+				FileSystem:      &mockFileSystem{},
 			},
 			wantErr:      false,
 			wantBlocking: true,
@@ -39,8 +38,8 @@ func TestNewAgent(t *testing.T) {
 				AllowedDomains:  []string{""},
 				AllowedIPs:      []string{"127.0.0.1"},
 				EnableSudo:      true,
-				NetInfoProvider: &testingUtils.NetInfoProvider{},
-				FileSystem:      &testingUtils.FileSystem{},
+				NetInfoProvider: &mockNetInfoProvider{},
+				FileSystem:      &mockFileSystem{},
 			},
 			wantErr:      false,
 			wantBlocking: true,
@@ -54,8 +53,8 @@ func TestNewAgent(t *testing.T) {
 				AllowedDomains:  []string{"example.com"},
 				AllowedIPs:      []string{""},
 				EnableSudo:      true,
-				NetInfoProvider: &testingUtils.NetInfoProvider{},
-				FileSystem:      &testingUtils.FileSystem{},
+				NetInfoProvider: &mockNetInfoProvider{},
+				FileSystem:      &mockFileSystem{},
 			},
 			wantErr:      false,
 			wantBlocking: false,
@@ -88,9 +87,9 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		NetInfoProvider: &testingUtils.NetInfoProvider{},
-		FileSystem:      &testingUtils.FileSystem{},
-		ProcProvider:    testingUtils.NewMockProcProvider(),
+		NetInfoProvider: &mockNetInfoProvider{},
+		FileSystem:      &mockFileSystem{},
+		ProcProvider:    newMockProcProvider(),
 	})
 	noBlockDNSAgent := NewAgent(AgentConfig{
 		EgressPolicy:    EGRESS_POLICY_BLOCK,
@@ -98,9 +97,9 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		NetInfoProvider: &testingUtils.NetInfoProvider{},
-		FileSystem:      &testingUtils.FileSystem{},
-		ProcProvider:    testingUtils.NewMockProcProvider(),
+		NetInfoProvider: &mockNetInfoProvider{},
+		FileSystem:      &mockFileSystem{},
+		ProcProvider:    newMockProcProvider(),
 	})
 
 	tests := []struct {
@@ -111,31 +110,31 @@ func TestProcessDNSQueryPacket(t *testing.T) {
 	}{
 		{
 			name:   "Accept DNS query to trusted.com",
-			packet: testingUtils.GenerateDNSRequestPacket("trusted.com", net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSRequestPacket("trusted.com", net.IP{127, 0, 0, 53}),
 			agent:  blockDNSAgent,
 			want:   ACCEPT_REQUEST,
 		},
 		{
 			name:   "Drop DNS query to blocked.com",
-			packet: testingUtils.GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53}),
 			agent:  blockDNSAgent,
 			want:   DROP_REQUEST,
 		},
 		{
 			name:   "Drop DNS query using untrusted DNS server but trusted domain",
-			packet: testingUtils.GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8}),
+			packet: GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8}),
 			agent:  blockDNSAgent,
 			want:   DROP_REQUEST,
 		},
 		{
 			name:   "Acccept DNS SRV query to _https._tcp.trusted.com",
-			packet: testingUtils.GenerateDNSTypeSRVRequestPacket("_https._tcp.trusted.com", net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSTypeSRVRequestPacket("_https._tcp.trusted.com", net.IP{127, 0, 0, 53}),
 			agent:  blockDNSAgent,
 			want:   ACCEPT_REQUEST,
 		},
 		{
 			name:   "Acccept DNS query to blocked.com when not blocking DNS",
-			packet: testingUtils.GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53}),
 			agent:  noBlockDNSAgent,
 			want:   ACCEPT_REQUEST,
 		},
@@ -166,7 +165,7 @@ func TestProcessDNSResponseAPacket(t *testing.T) {
 	}{
 		{
 			name:   "Allow IP to trusted.com",
-			packet: testingUtils.GenerateDNSTypeAResponsePacket("trusted.com", net.IP{123, 123, 123, 123}, net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSTypeAResponsePacket("trusted.com", net.IP{123, 123, 123, 123}, net.IP{127, 0, 0, 53}),
 			want: want{
 				decision:         ACCEPT_REQUEST,
 				ip:               "123.123.123.123",
@@ -175,7 +174,7 @@ func TestProcessDNSResponseAPacket(t *testing.T) {
 		},
 		{
 			name:   "Do not allow IP to blocked.com",
-			packet: testingUtils.GenerateDNSTypeAResponsePacket("blocked.com", net.IP{110, 110, 110, 110}, net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSTypeAResponsePacket("blocked.com", net.IP{110, 110, 110, 110}, net.IP{127, 0, 0, 53}),
 			want: want{
 				decision:         ACCEPT_REQUEST,
 				ip:               "110.110.110.110",
@@ -190,8 +189,8 @@ func TestProcessDNSResponseAPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		NetInfoProvider: &testingUtils.NetInfoProvider{},
-		FileSystem:      &testingUtils.FileSystem{},
+		NetInfoProvider: &mockNetInfoProvider{},
+		FileSystem:      &mockFileSystem{},
 	}
 
 	for _, tt := range tests {
@@ -223,7 +222,7 @@ func TestProcessDNSResponseCNAMEPacket(t *testing.T) {
 	}{
 		{
 			name:   "Allow cname for trusted.com",
-			packet: testingUtils.GenerateDNSTypeCNAMEResponsePacket("trusted.com", "cname-value.com", net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSTypeCNAMEResponsePacket("trusted.com", "cname-value.com", net.IP{127, 0, 0, 53}),
 			want: want{
 				decision:         ACCEPT_REQUEST,
 				domain:           "cname-value.com",
@@ -232,7 +231,7 @@ func TestProcessDNSResponseCNAMEPacket(t *testing.T) {
 		},
 		{
 			name:   "Do no allow cname for blocked.com",
-			packet: testingUtils.GenerateDNSTypeCNAMEResponsePacket("blocked.com", "cname-value.com", net.IP{127, 0, 0, 53}),
+			packet: GenerateDNSTypeCNAMEResponsePacket("blocked.com", "cname-value.com", net.IP{127, 0, 0, 53}),
 			want: want{
 				decision:         ACCEPT_REQUEST,
 				domain:           "cname-value.com",
@@ -247,8 +246,8 @@ func TestProcessDNSResponseCNAMEPacket(t *testing.T) {
 		AllowedDomains:  []string{"trusted.com"},
 		AllowedIPs:      []string{""},
 		EnableSudo:      true,
-		NetInfoProvider: &testingUtils.NetInfoProvider{},
-		FileSystem:      &testingUtils.FileSystem{},
+		NetInfoProvider: &mockNetInfoProvider{},
+		FileSystem:      &mockFileSystem{},
 	}
 
 	for _, tt := range tests {
@@ -302,12 +301,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{"93.184.216.34"},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateTCPPacket(
+		packet := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{93, 184, 216, 34},
 			12345,
@@ -329,13 +328,13 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{"example.com"},
 			AllowedIPs:      []string{},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
 		// First, simulate DNS response to add IP to allowlist
-		dnsResponse := testingUtils.GenerateDNSTypeAResponsePacket(
+		dnsResponse := GenerateDNSTypeAResponsePacket(
 			"example.com",
 			net.IP{93, 184, 216, 34},
 			net.IP{127, 0, 0, 53},
@@ -343,7 +342,7 @@ func TestProcessNonDNSPacket(t *testing.T) {
 		agent.ProcessPacket(dnsResponse)
 
 		// Now test TCP packet to that IP
-		tcpPacket := testingUtils.GenerateTCPPacket(
+		tcpPacket := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{93, 184, 216, 34},
 			12345,
@@ -370,12 +369,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{"10.0.0.1"},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateTCPPacket(
+		packet := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{93, 184, 216, 34}, // Not in allowlist
 			12345,
@@ -397,12 +396,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{"10.0.0.1"},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateTCPPacket(
+		packet := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{93, 184, 216, 34}, // Not in allowlist
 			12345,
@@ -424,12 +423,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{"8.8.8.8"},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateUDPPacket(
+		packet := GenerateUDPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{8, 8, 8, 8},
 			12345,
@@ -451,12 +450,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateUDPPacket(
+		packet := GenerateUDPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{8, 8, 8, 8},
 			12345,
@@ -478,12 +477,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{},
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GeneratePacketWithoutNetworkLayer()
+		packet := GeneratePacketWithoutNetworkLayer()
 
 		decision := agent.ProcessPacket(packet)
 
@@ -500,12 +499,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{"10.0.0.0/24"}, // CIDR range
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateTCPPacket(
+		packet := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{10, 0, 0, 50}, // Within 10.0.0.0/24
 			12345,
@@ -527,12 +526,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{}, // Empty, but defaults include 127.0.0.1
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateTCPPacket(
+		packet := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{127, 0, 0, 1},
 			12345,
@@ -554,12 +553,12 @@ func TestProcessNonDNSPacket(t *testing.T) {
 			AllowedDomains:  []string{},
 			AllowedIPs:      []string{}, // Empty, but defaults include 169.254.169.254
 			EnableSudo:      true,
-			NetInfoProvider: &testingUtils.NetInfoProvider{},
-			FileSystem:      &testingUtils.FileSystem{},
-			ProcProvider:    testingUtils.NewMockProcProvider(),
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
 		})
 
-		packet := testingUtils.GenerateTCPPacket(
+		packet := GenerateTCPPacket(
 			net.IP{127, 0, 0, 1},
 			net.IP{169, 254, 169, 254},
 			12345,

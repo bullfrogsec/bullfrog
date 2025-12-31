@@ -11,4 +11,4 @@ RUN apt-get install --yes libnetfilter-queue-dev
 
 COPY . ./
 
-RUN env GOOS=$BUILDOS GOARCH=$BUILDARCH go build -trimpath -ldflags=-buildid=
+RUN env GOOS=$BUILDOS GOARCH=$BUILDARCH go build -trimpath -ldflags=-buildid= -o agent ./cmd/agent
