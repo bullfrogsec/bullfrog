@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bullfrogsec/agent/pkg/agent"
 	netfilter "github.com/AkihiroSuda/go-netfilter-queue"
+	"github.com/bullfrogsec/agent/pkg/agent"
 )
 
 func main() {

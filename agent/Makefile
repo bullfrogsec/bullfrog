@@ -16,7 +16,7 @@ build:
 
 .PHONY: fix
 fix:
-	go fmt
+	go fmt ./pkg/agent ./cmd/agent
 
 .PHONY: test.artifacts
 test.artifacts:
