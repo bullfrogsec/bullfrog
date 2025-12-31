@@ -213,6 +213,23 @@ func (m *mockProcProviderWithCallCount) ReadProcNetFile(protocol string, ipVersi
 	return m.mockProcProviderWithSockets.ReadProcNetFile(protocol, ipVersion)
 }
 
+// mockProcProviderForDockerFallback extends mockProcProvider for Docker fallback testing
+type mockProcProviderForDockerFallback struct {
+	mockProcProvider
+}
+
+func (m *mockProcProviderForDockerFallback) ReadProcNetFile(protocol string, ipVersion int) ([]SocketEntry, error) {
+	// Convert 172.17.0.3:12345 to hex format
+	// 172.17.0.3 = 0xAC110003 (little-endian: 030011AC)
+	// 12345 = 0x3039 (hex for port)
+	return []SocketEntry{
+		{
+			LocalAddr: "030011AC:3039",
+			Inode:     12345,
+		},
+	}, nil
+}
+
 func GenerateDNSRequestPacket(domain string, nameserver net.IP) gopacket.Packet {
 	dns := layers.DNS{
 		ID:           0x22,

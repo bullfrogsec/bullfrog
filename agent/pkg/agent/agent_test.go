@@ -883,6 +883,144 @@ func TestProcessInfoCollection(t *testing.T) {
 			t.Errorf("Expected no process lookup for DNS response packet, but ReadProcNetFile was called %d times", mockProc.callCount)
 		}
 	})
+
+	// Test Docker container process lookup
+	t.Run("Extract process info from Docker container", func(t *testing.T) {
+		mockDocker := newMockDockerProvider()
+
+		// Setup a container with IP from Docker network range
+		dockerIP := "172.17.0.2"
+		mockDocker.Containers[dockerIP] = &mockContainerInfo{
+			ID:      "abc123456789",
+			Name:    "my-container",
+			Image:   "nginx:latest",
+			RootPID: 12345,
+		}
+
+		// Setup process info for the container
+		containerKey := "abc123456789:172.17.0.2:8080:tcp"
+		mockDocker.ProcessMap[containerKey] = &mockProcessDetails{
+			PID:         100,
+			ProcessName: "nginx",
+			CommandLine: "nginx -g daemon off;",
+			ExecPath:    "/usr/sbin/nginx",
+		}
+
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{"93.184.216.34"},
+			EnableSudo:         true,
+			CollectProcessInfo: true,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         newMockFileSystem(),
+			ProcProvider:       newMockProcProvider(),
+			DockerProvider:     mockDocker,
+		})
+
+		// Create packet from Docker container IP
+		packet := GenerateTCPPacket(
+			net.ParseIP(dockerIP),
+			net.IP{93, 184, 216, 34},
+			8080,
+			443,
+		)
+
+		agent.ProcessPacket(packet)
+
+		// Check that process info was cached with Docker details
+		cacheKey := "172.17.0.2:8080:tcp"
+		cached, exists := agent.processInfoCache[cacheKey]
+		if !exists {
+			t.Errorf("Expected cache entry for Docker process")
+			return
+		}
+
+		if cached.PID != 100 {
+			t.Errorf("Expected PID 100 from Docker, got %d", cached.PID)
+		}
+		if cached.ProcessName != "nginx" {
+			t.Errorf("Expected process name 'nginx', got %s", cached.ProcessName)
+		}
+		if cached.Docker == nil {
+			t.Errorf("Expected Docker info to be populated")
+			return
+		}
+		if cached.Docker.ContainerName != "my-container" {
+			t.Errorf("Expected container name 'my-container', got %s", cached.Docker.ContainerName)
+		}
+		if cached.Docker.ContainerImage != "nginx:latest" {
+			t.Errorf("Expected container image 'nginx:latest', got %s", cached.Docker.ContainerImage)
+		}
+	})
+
+	// Test fallback to host process when Docker lookup fails
+	t.Run("Fallback to host process when Docker lookup fails", func(t *testing.T) {
+		mockDocker := newMockDockerProvider()
+
+		// Use 127.0.0.1 which our mock proc provider can handle
+		// But trick it into thinking it's a Docker IP by adding to Docker containers
+		testIP := "172.17.0.3"
+		mockDocker.Containers[testIP] = &mockContainerInfo{
+			ID:      "def987654321",
+			Name:    "failing-container",
+			Image:   "app:latest",
+			RootPID: 99999,
+		}
+		// Intentionally not adding ProcessMap entry to simulate Docker process lookup failure
+
+		// Use custom mock that can handle the specific IP
+		mockProc := &mockProcProviderForDockerFallback{
+			mockProcProvider: mockProcProvider{
+				InodeToPID:    map[uint64]int{12345: 2000},
+				PIDToName:     map[int]string{2000: "python3"},
+				PIDToCmdLine:  map[int]string{2000: "python3 app.py"},
+				PIDToExecPath: map[int]string{2000: "/usr/bin/python3"},
+			},
+		}
+
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{"93.184.216.34"},
+			EnableSudo:         true,
+			CollectProcessInfo: true,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         newMockFileSystem(),
+			ProcProvider:       mockProc,
+			DockerProvider:     mockDocker,
+		})
+
+		packet := GenerateTCPPacket(
+			net.ParseIP(testIP),
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		agent.ProcessPacket(packet)
+
+		// Check that process info was cached with host process details (fallback)
+		cacheKey := "172.17.0.3:12345:tcp"
+		cached, exists := agent.processInfoCache[cacheKey]
+		if !exists {
+			t.Errorf("Expected cache entry for host process (fallback)")
+			return
+		}
+
+		if cached.PID != 2000 {
+			t.Errorf("Expected PID 2000 from host fallback, got %d", cached.PID)
+		}
+		if cached.ProcessName != "python3" {
+			t.Errorf("Expected process name 'python3' from fallback, got %s", cached.ProcessName)
+		}
+		// Docker should be nil since we fell back to host lookup
+		if cached.Docker != nil {
+			t.Errorf("Expected Docker info to be nil for host process fallback, got %v", cached.Docker)
+		}
+	})
 }
 
 func TestDomainWildcardMatching(t *testing.T) {
