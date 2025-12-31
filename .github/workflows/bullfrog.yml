@@ -160,7 +160,12 @@ jobs:
           _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Make HTTP requests
-        run: source test/make_http_requests.sh
+        run: |
+          source test/make_http_requests.sh
+          if timeout 5 docker pull alpine:3.14; then
+            echo "Expected docker pull to fail, but it succeeded"
+            exit 1;
+          fi
 
       - name: Make DNS requests
         run: source test/make_dns_requests.sh
@@ -194,7 +199,12 @@ jobs:
           _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Make HTTP requests
-        run: source test/make_http_requests.sh
+        run:  |
+          source test/make_http_requests.sh
+          if timeout 5 docker pull alpine:3.14; then
+            echo "Expected docker pull to fail, but it succeeded"
+            exit 1;
+          fi
 
       - name: Make DNS requests
         run: |
@@ -230,7 +240,7 @@ jobs:
           _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Test curl calls within Docker
-        run: source test/docker.sh
+        run: source test/make_docker_requests.sh
 
       - name: Nginx
         run: source test/docker_nginx.sh
@@ -262,6 +272,9 @@ jobs:
             vagrantcloud-files-production.s3-accelerate.amazonaws.com
             vagrantcloud.com
             www.google.com
+            *.docker.io
+            production.cloudflare.docker.com
+            docker-images-prod.*.r2.cloudflarestorage.com
             *.hashicorp.com
 
       - name: Checkout

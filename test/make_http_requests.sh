@@ -14,8 +14,3 @@ if timeout 5 curl https://93.184.215.14 --output /dev/null; then
   echo 'Expected curl to 93.184.215.14 to fail, but it succeeded';
   exit 1;
 fi;
-
-if timeout 5 docker pull alpine:3.14; then
-  echo "Expected docker pull to fail, but it succeeded"
-  exit 1;
-fi
