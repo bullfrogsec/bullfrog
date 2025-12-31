@@ -25,7 +25,11 @@ describe("inputs", () => {
     });
 
     vi.mocked(core.getBooleanInput).mockImplementation((name: string) => {
-      return false;
+      const defaults: Record<string, boolean> = {
+        "enable-sudo": true,
+        "collect-process-info": true,
+      };
+      return defaults[name] || false;
     });
 
     delete process.env["_LOCAL_AGENT"];
@@ -40,8 +44,8 @@ describe("inputs", () => {
         allowedIps: [],
         dnsPolicy: ALLOWED_DOMAINS_ONLY,
         egressPolicy: AUDIT,
-        enableSudo: false,
-        collectProcessInfo: false,
+        enableSudo: true,
+        collectProcessInfo: true,
         localAgent: false,
         logDirectory: "/var/log/test",
         agentDownloadBaseURL: "https://example.com",
@@ -429,8 +433,10 @@ describe("inputs", () => {
 
     it("should handle multiple IPs and domains", () => {
       vi.mocked(core.getInput).mockImplementation((name: string) => {
-        if (name === "allowed-ips") return "10.0.0.1\n192.168.1.0/24\n172.16.0.0/12";
-        if (name === "allowed-domains") return "example.com\n*.google.com\napi.test.com";
+        if (name === "allowed-ips")
+          return "10.0.0.1\n192.168.1.0/24\n172.16.0.0/12";
+        if (name === "allowed-domains")
+          return "example.com\n*.google.com\napi.test.com";
         if (name === "egress-policy") return AUDIT;
         if (name === "dns-policy") return ALLOWED_DOMAINS_ONLY;
         if (name === "_log-directory") return "/var/log/test";

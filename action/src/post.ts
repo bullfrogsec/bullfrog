@@ -372,7 +372,9 @@ export function deduplicateByDomain(connections: Connection[]): Connection[] {
   return result;
 }
 
-export function deduplicateByDomainAndIP(connections: Connection[]): Connection[] {
+export function deduplicateByDomainAndIP(
+  connections: Connection[],
+): Connection[] {
   const seen = new Set<string>();
   const result: Connection[] = [];
 
