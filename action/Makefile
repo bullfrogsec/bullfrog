@@ -27,4 +27,4 @@ test.types:
 
 .PHONY: test.unit
 test.unit:
-	npm test
+	npx vitest run
