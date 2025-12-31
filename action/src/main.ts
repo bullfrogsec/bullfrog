@@ -176,16 +176,33 @@ async function startAgent({
 }
 
 async function verifyAgent({ agentDirectory }: { agentDirectory: string }) {
-  const agentDirName = path.dirname(AGENT_INSTALL_PATH);
+  // When using local agent (in CI), skip attestation verification
+  // as the artifact hasn't been published yet
+  if (process.env._LOCAL_AGENT === "true") {
+    console.log("Using local agent, skipping attestation verification");
+    return;
+  }
 
-  const src = path.join(agentDirectory, "agent.sha256");
-  const dest = path.join(agentDirName, "agent.sha256");
+  console.log("Verifying agent build provenance attestation");
 
-  await fs.cp(src, dest);
-
-  await exec("sha256sum --check --strict agent.sha256", {
-    cwd: agentDirName,
-  });
+  try {
+    const owner = process.env.GITHUB_REPOSITORY_OWNER || "bullfrogsec";
+    await exec(
+      `gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`,
+      {
+        env: {
+          ...process.env,
+          GH_TOKEN: process.env.GITHUB_TOKEN,
+        },
+      },
+    );
+    console.log("Agent attestation verified successfully");
+  } catch (error) {
+    console.error("Failed to verify agent attestation:", error);
+    throw new Error(
+      "Agent attestation verification failed. The agent binary may have been tampered with.",
+    );
+  }
 }
 
 async function main() {
