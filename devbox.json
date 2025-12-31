@@ -1,6 +1,12 @@
 {
-  "$schema":  "https://raw.githubusercontent.com/jetify-com/devbox/0.14.0/.schema/devbox.schema.json",
-  "packages": ["nodejs@24"],
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.0/.schema/devbox.schema.json",
+  "packages": [
+    "nodejs@24",
+    "libnetfilter_queue@latest",
+    "libnfnetlink@latest",
+    "gcc@latest",
+    "go@1.24.11"
+  ],
   "shell": {
     "init_hook": [
       "echo 'Welcome to devbox!' > /dev/null"
