@@ -156,10 +156,7 @@ jobs:
       - name: Make HTTP requests
         run: |
           source test/make_http_requests.sh
-          if timeout 5 docker pull alpine:3.14; then
-            echo "Expected docker pull to fail, but it succeeded"
-            exit 1;
-          fi
+          source test/make_docker_pull.sh
 
       - name: Make DNS requests
         run: source test/make_dns_requests.sh
@@ -193,10 +190,7 @@ jobs:
       - name: Make HTTP requests
         run:  |
           source test/make_http_requests.sh
-          if timeout 5 docker pull alpine:3.14; then
-            echo "Expected docker pull to fail, but it succeeded"
-            exit 1;
-          fi
+          source test/make_docker_pull.sh
 
       - name: Make DNS requests
         run: |

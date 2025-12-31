@@ -1,4 +1,15 @@
 #!/bin/bash
+#
+# Expected Bullfrog Configuration:
+#   egress-policy: block
+#   allowed-ips: |
+#     172.17.0.0/16
+#   allowed-domains: |
+#     *.docker.io
+#     production.cloudflare.docker.com
+#
+# This test verifies that traffic to containers accessed via localhost port
+# forwarding (127.0.0.1:8080) is allowed even in blocking mode.
 
 CONTAINER_NAME=nginx-6c5e1575
 

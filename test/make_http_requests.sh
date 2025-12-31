@@ -1,4 +1,11 @@
 #!/bin/bash
+#
+# Expected Bullfrog Configuration:
+#   egress-policy: block
+#   allowed-domains: *.google.com
+#
+# This test verifies that HTTP requests to allowed domains succeed while
+# requests to blocked domains and direct IP addresses fail.
 
 if ! timeout 5 curl https://www.google.com --output /dev/null; then
   echo 'Expected curl to www.google.com to succeed, but it failed';
