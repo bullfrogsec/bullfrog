@@ -19803,9 +19803,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 // src/post.ts
 var post_exports = {};
 __export(post_exports, {
-  deduplicateByDomain: () => deduplicateByDomain,
-  deduplicateByDomainAndIP: () => deduplicateByDomainAndIP,
-  filterDNSNoise: () => filterDNSNoise,
+  filterConnectionsNoise: () => filterConnectionsNoise,
   getHumanFriendlyReason: () => getHumanFriendlyReason
 });
 module.exports = __toCommonJS(post_exports);
@@ -19902,7 +19900,6 @@ function getGitHubContext() {
 var REASON_CODE_MAP = {
   "domain-allowed": "Domain allowed",
   "domain-not-allowed": "Domain not allowed",
-  "dns-resolved": "DNS resolved",
   "ip-allowed": "IP allowed",
   "ip-not-allowed": "IP not allowed",
   "untrusted-dns-server": "Untrusted DNS server",
@@ -20049,7 +20046,7 @@ async function getConnections() {
         continue;
       }
     }
-    const filtered = filterDNSNoise(allConnections);
+    const filtered = filterConnectionsNoise(allConnections);
     core3.debug("\n\nConnections:\n");
     filtered.forEach((c) => core3.debug(JSON.stringify(c)));
     return filtered;
@@ -20058,77 +20055,30 @@ async function getConnections() {
     return [];
   }
 }
-function filterDNSNoise(connections) {
-  const byDomain = /* @__PURE__ */ new Map();
-  for (const conn of connections) {
+function getProcessKey(conn) {
+  const process2 = conn.process || "unknown-process";
+  const exePath = conn.exePath || "unknown-exePath";
+  const commandLine = conn.commandLine || "unknown-commandLine";
+  return `${process2}|${exePath}|${commandLine}`;
+}
+function getDockerKey(conn) {
+  if (conn.docker) {
+    return `${conn.docker.containerImage}:${conn.docker.containerName}`;
+  }
+  return "no-docker";
+}
+function filterConnectionsNoise(connections) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  const sorted = [...connections].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
+  for (const conn of sorted) {
     const domain = conn.domain || "unknown";
-    if (!byDomain.has(domain)) {
-      byDomain.set(domain, []);
-    }
-    byDomain.get(domain).push(conn);
-  }
-  const result = [];
-  for (const [, conns] of byDomain) {
-    const hasActualConnection = conns.some(
-      (c) => !["DNS"].includes(c.protocol) && c.reason === "ip-allowed"
-    );
-    if (hasActualConnection) {
-      const filtered = conns.filter(
-        (c) => c.reason !== "domain-allowed" && c.reason !== "dns-resolved"
-      );
-      result.push(...filtered);
-    } else {
-      const hasDnsResolved = conns.some((c) => c.reason === "dns-resolved");
-      if (hasDnsResolved) {
-        const dnsResolvedOnly = conns.filter(
-          (c) => c.reason === "dns-resolved"
-        );
-        const deduplicated = deduplicateByDomainAndIP(dnsResolvedOnly);
-        result.push(...deduplicated);
-      } else {
-        const hasOnlyDomainAllowed = conns.every(
-          (c) => c.reason === "domain-allowed"
-        );
-        if (hasOnlyDomainAllowed) {
-          const deduplicated = deduplicateByDomain(conns);
-          result.push(...deduplicated);
-        } else {
-          const isBlocked = conns.some((c) => c.blocked);
-          if (isBlocked) {
-            const deduplicated = deduplicateByDomain(conns);
-            result.push(...deduplicated);
-          } else {
-            result.push(...conns);
-          }
-        }
-      }
-    }
-  }
-  return result;
-}
-function deduplicateByDomain(connections) {
-  const seen = /* @__PURE__ */ new Set();
-  const result = [];
-  const sorted = [...connections].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-  );
-  for (const conn of sorted) {
-    const key = conn.domain || "unknown";
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(conn);
-    }
-  }
-  return result;
-}
-function deduplicateByDomainAndIP(connections) {
-  const seen = /* @__PURE__ */ new Set();
-  const result = [];
-  const sorted = [...connections].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-  );
-  for (const conn of sorted) {
-    const key = `${conn.domain || "unknown"}|${conn.ip || "unknown"}`;
+    const ip = conn.ip || "unknown";
+    const processKey = getProcessKey(conn);
+    const dockerKey = getDockerKey(conn);
+    const key = `${domain}|${ip}|${processKey}|${dockerKey}`;
     if (!seen.has(key)) {
       seen.add(key);
       result.push(conn);
@@ -20181,9 +20131,7 @@ if (require.main === module) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  deduplicateByDomain,
-  deduplicateByDomainAndIP,
-  filterDNSNoise,
+  filterConnectionsNoise,
   getHumanFriendlyReason
 });
 /*! Bundled license information:

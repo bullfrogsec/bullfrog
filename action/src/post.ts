@@ -53,7 +53,6 @@ function getGitHubContext(): {
 const REASON_CODE_MAP: Record<string, string> = {
   "domain-allowed": "Domain allowed",
   "domain-not-allowed": "Domain not allowed",
-  "dns-resolved": "DNS resolved",
   "ip-allowed": "IP allowed",
   "ip-not-allowed": "IP not allowed",
   "untrusted-dns-server": "Untrusted DNS server",
@@ -269,12 +268,8 @@ async function getConnections(): Promise<Connection[]> {
       }
     }
 
-    // Filter DNS noise according to logic:
-    // 1. If a non-DNS connection with reason "ip-allowed" exists for a domain,
-    //    exclude "dns-resolved" and "domain-allowed" for that domain
-    // 2. If only "dns-resolved" connections exist, deduplicate by domain+IP
-    // 3. If only "domain-allowed" connections exist, deduplicate by domain
-    const filtered = filterDNSNoise(allConnections);
+    // Deduplicate connections by domain+ip+process+docker
+    const filtered = filterConnectionsNoise(allConnections);
 
     core.debug("\n\nConnections:\n");
     filtered.forEach((c) => core.debug(JSON.stringify(c)));
@@ -286,93 +281,23 @@ async function getConnections(): Promise<Connection[]> {
   }
 }
 
-export function filterDNSNoise(connections: Connection[]): Connection[] {
-  // Group connections by domain
-  const byDomain = new Map<string, Connection[]>();
-
-  for (const conn of connections) {
-    const domain = conn.domain || "unknown";
-    if (!byDomain.has(domain)) {
-      byDomain.set(domain, []);
-    }
-    byDomain.get(domain)!.push(conn);
-  }
-
-  const result: Connection[] = [];
-
-  for (const [, conns] of byDomain) {
-    // Check if there are any non-DNS connections with reason "ip-allowed"
-    const hasActualConnection = conns.some(
-      (c) => !["DNS"].includes(c.protocol) && c.reason === "ip-allowed",
-    );
-
-    if (hasActualConnection) {
-      // Exclude DNS-related logs (domain-allowed and dns-resolved)
-      const filtered = conns.filter(
-        (c) => c.reason !== "domain-allowed" && c.reason !== "dns-resolved",
-      );
-      result.push(...filtered);
-    } else {
-      const hasDnsResolved = conns.some((c) => c.reason === "dns-resolved");
-
-      if (hasDnsResolved) {
-        // Has DNS responses but no actual connection
-        // Show only dns-resolved entries, deduplicated by domain+IP
-        const dnsResolvedOnly = conns.filter(
-          (c) => c.reason === "dns-resolved",
-        );
-        const deduplicated = deduplicateByDomainAndIP(dnsResolvedOnly);
-        result.push(...deduplicated);
-      } else {
-        const hasOnlyDomainAllowed = conns.every(
-          (c) => c.reason === "domain-allowed",
-        );
-
-        if (hasOnlyDomainAllowed) {
-          // Only DNS queries (no response) - deduplicate by domain
-          const deduplicated = deduplicateByDomain(conns);
-          result.push(...deduplicated);
-        } else {
-          // Other cases (blocked, untrusted-dns-server, etc.)
-          // For blocked entries, also deduplicate to reduce noise
-          const isBlocked = conns.some((c) => c.blocked);
-          if (isBlocked) {
-            // Deduplicate blocked entries by domain
-            const deduplicated = deduplicateByDomain(conns);
-            result.push(...deduplicated);
-          } else {
-            // Include all other entries
-            result.push(...conns);
-          }
-        }
-      }
-    }
-  }
-
-  return result;
+function getProcessKey(conn: Connection): string {
+  // Create a unique key for process identification using all available process info
+  const process = conn.process || "unknown-process";
+  const exePath = conn.exePath || "unknown-exePath";
+  const commandLine = conn.commandLine || "unknown-commandLine";
+  return `${process}|${exePath}|${commandLine}`;
 }
 
-export function deduplicateByDomain(connections: Connection[]): Connection[] {
-  const seen = new Set<string>();
-  const result: Connection[] = [];
-
-  // Sort by timestamp to keep the first occurrence
-  const sorted = [...connections].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
-  );
-
-  for (const conn of sorted) {
-    const key = conn.domain || "unknown";
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(conn);
-    }
+function getDockerKey(conn: Connection): string {
+  // Create a unique key for docker container identification
+  if (conn.docker) {
+    return `${conn.docker.containerImage}:${conn.docker.containerName}`;
   }
-
-  return result;
+  return "no-docker";
 }
 
-export function deduplicateByDomainAndIP(
+export function filterConnectionsNoise(
   connections: Connection[],
 ): Connection[] {
   const seen = new Set<string>();
@@ -384,7 +309,13 @@ export function deduplicateByDomainAndIP(
   );
 
   for (const conn of sorted) {
-    const key = `${conn.domain || "unknown"}|${conn.ip || "unknown"}`;
+    // Create deduplication key from domain+ip+process+docker
+    const domain = conn.domain || "unknown";
+    const ip = conn.ip || "unknown";
+    const processKey = getProcessKey(conn);
+    const dockerKey = getDockerKey(conn);
+    const key = `${domain}|${ip}|${processKey}|${dockerKey}`;
+
     if (!seen.has(key)) {
       seen.add(key);
       result.push(conn);
