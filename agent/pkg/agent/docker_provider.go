@@ -427,19 +427,11 @@ func isDockerIP(ipStr string) bool {
 		return false
 	}
 
-	// Common Docker network ranges
-	dockerRanges := []string{
-		"172.17.0.0/16", // Default bridge
-	}
+	dockerNetworkBlock := "172.17.0.0/12"
 
-	for _, rangeStr := range dockerRanges {
-		_, cidr, err := net.ParseCIDR(rangeStr)
-		if err != nil {
-			continue
-		}
-		if cidr.Contains(ip) {
-			return true
-		}
+	_, cidr, _ := net.ParseCIDR(dockerNetworkBlock)
+	if cidr.Contains(ip) {
+		return true
 	}
 
 	return false

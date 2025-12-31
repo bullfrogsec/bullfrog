@@ -889,7 +889,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		mockDocker := newMockDockerProvider()
 
 		// Setup a container with IP from Docker network range
-		dockerIP := "172.17.0.2"
+		dockerIP := "172.18.0.2"
 		mockDocker.Containers[dockerIP] = &mockContainerInfo{
 			ID:      "abc123456789",
 			Name:    "my-container",
@@ -898,7 +898,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		}
 
 		// Setup process info for the container
-		containerKey := "abc123456789:172.17.0.2:8080:tcp"
+		containerKey := "abc123456789:172.18.0.2:8080:tcp"
 		mockDocker.ProcessMap[containerKey] = &mockProcessDetails{
 			PID:         100,
 			ProcessName: "nginx",
@@ -930,7 +930,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		agent.ProcessPacket(packet)
 
 		// Check that process info was cached with Docker details
-		cacheKey := "172.17.0.2:8080:tcp"
+		cacheKey := "172.18.0.2:8080:tcp"
 		cached, exists := agent.processInfoCache[cacheKey]
 		if !exists {
 			t.Errorf("Expected cache entry for Docker process")
