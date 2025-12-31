@@ -16,7 +16,7 @@ build:
 
 .PHONY: fix
 fix:
-	go fmt ./pkg/agent ./cmd/agent
+	go fmt ./...
 
 .PHONY: test.artifacts
 test.artifacts:
@@ -26,8 +26,8 @@ GOFMT_OUTPUT = $(shell gofmt -l .)
 
 .PHONY: test.lint
 test.lint:
-	@if [ -n "$$(gofmt -l ./pkg/agent ./cmd/agent)" ]; then \
-		echo "$$(gofmt -l ./pkg/agent ./cmd/agent)"; \
+	@if [ -n "$$(gofmt -l .)" ]; then \
+		echo "$$(gofmt -l .)"; \
 		exit 1; \
 	fi
 
@@ -37,7 +37,7 @@ test.types:
 
 .PHONY: test.unit
 test.unit:
-	go test ./pkg/agent/...
+	go test ./...
 
 .PHONY: test.generate-coverage
 test.generate-coverage:
