@@ -8,9 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 )
 
 // IProcProvider abstracts /proc filesystem operations for testability
@@ -219,17 +216,6 @@ func detectIPVersion(ipStr string) int {
 		return 4
 	}
 	return 6
-}
-
-// detectProtocol determines protocol (tcp/udp) from packet
-func detectProtocol(packet gopacket.Packet) string {
-	if packet.Layer(layers.LayerTypeTCP) != nil {
-		return "tcp"
-	}
-	if packet.Layer(layers.LayerTypeUDP) != nil {
-		return "udp"
-	}
-	return "unknown"
 }
 
 // getProcessInfo is the main entry point for process lookup

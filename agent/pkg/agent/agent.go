@@ -325,22 +325,6 @@ func udpPortToString(port layers.UDPPort) string {
 	return strconv.Itoa(int(port))
 }
 
-func getDestinationIP(packet gopacket.Packet) (string, error) {
-	netLayer := packet.NetworkLayer()
-	if netLayer == nil {
-		return "", fmt.Errorf("failed to get network layer")
-	}
-
-	switch v := netLayer.(type) {
-	case *layers.IPv4:
-		return v.DstIP.String(), nil
-	case *layers.IPv6:
-		return v.DstIP.String(), nil
-	default:
-		return "", fmt.Errorf("unknown network layer type")
-	}
-}
-
 func (a *Agent) extractPacketInfo(packet gopacket.Packet) PacketInfo {
 	info := PacketInfo{
 		SrcIP:          "unknown",
@@ -443,55 +427,11 @@ func (a *Agent) processDNSTypeAResponse(domain string, answer *layers.DNSResourc
 	if a.isDomainAllowed(domain) {
 		fmt.Println("-> Allowed request")
 		if !a.allowedIps[ip] {
-			// Add to in-memory allowed IPs map
-			// No need to update nftables - Go agent handles all decisions
 			a.allowedIps[ip] = true
-			// a.addConnectionLog(ConnectionLog{
-			// 	Decision:       "allowed",
-			// 	Protocol:       "DNS-response",
-			// 	SrcIP:          pkt.SrcIP,
-			// 	SrcPort:        pkt.SrcPort,
-			// 	DstIP:          ip,
-			// 	DstPort:        "53",
-			// 	Domain:         domain,
-			// 	Reason:         "dns-resolved",
-			// 	PID:            pkt.PID,
-			// 	ProcessName:    pkt.ProcessName,
-			// 	CommandLine:    pkt.CommandLine,
-			// 	ExecutablePath: pkt.ExecutablePath,
-			// })
 		}
 	} else if a.isIpAllowed(ip) {
 		fmt.Println("-> Allowed request")
-		// a.addConnectionLog(ConnectionLog{
-		// 	Decision:       "allowed",
-		// 	Protocol:       "DNS-response",
-		// 	SrcIP:          pkt.SrcIP,
-		// 	SrcPort:        pkt.SrcPort,
-		// 	DstIP:          ip,
-		// 	DstPort:        "53",
-		// 	Domain:         domain,
-		// 	Reason:         "ip-allowed",
-		// 	PID:            pkt.PID,
-		// 	ProcessName:    pkt.ProcessName,
-		// 	CommandLine:    pkt.CommandLine,
-		// 	ExecutablePath: pkt.ExecutablePath,
-		// })
 	} else {
-		// a.addConnectionLog(ConnectionLog{
-		// 	Decision:       "blocked",
-		// 	Protocol:       "DNS-response",
-		// 	SrcIP:          pkt.SrcIP,
-		// 	SrcPort:        pkt.SrcPort,
-		// 	DstIP:          ip,
-		// 	DstPort:        "53",
-		// 	Domain:         domain,
-		// 	Reason:         "domain-not-allowed",
-		// 	PID:            pkt.PID,
-		// 	ProcessName:    pkt.ProcessName,
-		// 	CommandLine:    pkt.CommandLine,
-		// 	ExecutablePath: pkt.ExecutablePath,
-		// })
 		if blocking {
 			fmt.Println("-> Blocked request")
 		} else {
@@ -593,7 +533,7 @@ func (a *Agent) processDNSOverTCPPayload(payload []byte, pkt PacketInfo) uint8 {
 	return a.processDNSLayer(dns, pkt)
 }
 
-func (a *Agent) processTCPPacket(packet gopacket.Packet) uint8 {
+func (a *Agent) processDNSOverTCPPacket(packet gopacket.Packet) uint8 {
 	tcpLayer := packet.Layer(layers.LayerTypeTCP)
 	tcp, _ := tcpLayer.(*layers.TCP)
 	dstPort, srcPort, payload := tcp.DstPort, tcp.SrcPort, tcp.Payload
@@ -704,14 +644,16 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 
 func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
+		fmt.Println("found dns layer")
 		return a.processDNSPacket(packet)
 	}
 	// check dns over tcp
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		fmt.Println("found tcp layer")
 		tcp := tcpLayer.(*layers.TCP)
 		// Only treat as DNS if it's actually on port 53
 		if tcp.DstPort == DNS_PORT || tcp.SrcPort == DNS_PORT {
-			return a.processTCPPacket(packet)
+			return a.processDNSOverTCPPacket(packet)
 		}
 	}
 	// Handle all other packets (non-DNS TCP, UDP, ICMP, etc.)

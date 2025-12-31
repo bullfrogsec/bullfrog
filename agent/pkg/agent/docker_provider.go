@@ -430,20 +430,6 @@ func isDockerIP(ipStr string) bool {
 	// Common Docker network ranges
 	dockerRanges := []string{
 		"172.17.0.0/16", // Default bridge
-		"172.18.0.0/16", // User-defined bridge
-		"172.19.0.0/16",
-		"172.20.0.0/16",
-		"172.21.0.0/16",
-		"172.22.0.0/16",
-		"172.23.0.0/16",
-		"172.24.0.0/16",
-		"172.25.0.0/16",
-		"172.26.0.0/16",
-		"172.27.0.0/16",
-		"172.28.0.0/16",
-		"172.29.0.0/16",
-		"172.30.0.0/16",
-		"172.31.0.0/16",
 	}
 
 	for _, rangeStr := range dockerRanges {

@@ -572,3 +572,920 @@ func TestProcessNonDNSPacket(t *testing.T) {
 		}
 	})
 }
+
+func TestProcessDNSOverTCP(t *testing.T) {
+	// Test valid DNS over TCP with allowed domain
+	t.Run("Accept valid DNS over TCP query to allowed domain", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSOverTCPPacket("trusted.com", net.IP{127, 0, 0, 53}, true)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+	})
+
+	// Test valid DNS over TCP with blocked domain
+	t.Run("Block valid DNS over TCP query to blocked domain", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSOverTCPPacket("blocked.com", net.IP{127, 0, 0, 53}, true)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST, got %v", decision)
+		}
+	})
+
+	// Test DNS over TCP with untrusted DNS server
+	t.Run("Block DNS over TCP to untrusted DNS server", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSOverTCPPacket("trusted.com", net.IP{8, 8, 8, 8}, true)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST for untrusted DNS server, got %v", decision)
+		}
+	})
+
+	// Test DNS over TCP with empty payload (connection establishment)
+	t.Run("Accept DNS over TCP with empty payload", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSOverTCPPacket("", net.IP{127, 0, 0, 53}, false)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for empty payload, got %v", decision)
+		}
+	})
+
+	// Test DNS over TCP with invalid payload
+	t.Run("Drop DNS over TCP with invalid payload", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSOverTCPPacketWithInvalidPayload(net.IP{127, 0, 0, 53})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST for invalid payload, got %v", decision)
+		}
+	})
+
+	// Test DNS over TCP response
+	t.Run("Accept DNS over TCP response", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// DNS response (from server to client)
+		packet := GenerateDNSOverTCPResponse("trusted.com", net.IP{123, 123, 123, 123}, net.IP{127, 0, 0, 53})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for DNS response, got %v", decision)
+		}
+
+		// Verify IP was added to allowlist
+		if !agent.allowedIps["123.123.123.123"] {
+			t.Errorf("Expected IP to be added to allowlist")
+		}
+	})
+
+	// Test DNS over TCP when not blocking DNS
+	t.Run("Accept DNS over TCP when not blocking DNS", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ANY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSOverTCPPacket("any-domain.com", net.IP{127, 0, 0, 53}, true)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST when not blocking DNS, got %v", decision)
+		}
+	})
+}
+
+func TestProcessInfoCollection(t *testing.T) {
+	// Test process info collection disabled
+	t.Run("Return unknown process info when collection disabled", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{"93.184.216.34"},
+			EnableSudo:         true,
+			CollectProcessInfo: false, // Disabled
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         &mockFileSystem{},
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		agent.ProcessPacket(packet)
+
+		// Process info should be "unknown"
+		cacheKey := "127.0.0.1:12345:tcp"
+		if cached, exists := agent.processInfoCache[cacheKey]; exists {
+			t.Errorf("Expected no cache entry when collection disabled, got %v", cached)
+		}
+	})
+
+	// Test process info collection enabled with cache
+	t.Run("Cache process info when collection enabled", func(t *testing.T) {
+		// Create a custom mock provider that returns socket entries
+		mockProc := &mockProcProviderWithSockets{
+			mockProcProvider: mockProcProvider{
+				InodeToPID:    map[uint64]int{12345: 1000},
+				PIDToName:     map[int]string{1000: "curl"},
+				PIDToCmdLine:  map[int]string{1000: "curl https://example.com"},
+				PIDToExecPath: map[int]string{1000: "/usr/bin/curl"},
+			},
+		}
+
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{"93.184.216.34"},
+			EnableSudo:         true,
+			CollectProcessInfo: true, // Enabled
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         &mockFileSystem{},
+			ProcProvider:       mockProc,
+		})
+
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		agent.ProcessPacket(packet)
+
+		// Check cache
+		cacheKey := "127.0.0.1:12345:tcp"
+		cached, exists := agent.processInfoCache[cacheKey]
+		if !exists {
+			t.Errorf("Expected cache entry for process info")
+		}
+		if cached.PID != 1000 {
+			t.Errorf("Expected PID 1000, got %d", cached.PID)
+		}
+		if cached.ProcessName != "curl" {
+			t.Errorf("Expected process name 'curl', got %s", cached.ProcessName)
+		}
+	})
+
+	// Test cache hit on second request
+	t.Run("Use cached process info on second request", func(t *testing.T) {
+		mockProc := &mockProcProviderWithCallCount{
+			mockProcProviderWithSockets: mockProcProviderWithSockets{
+				mockProcProvider: mockProcProvider{
+					InodeToPID:    map[uint64]int{12345: 1000},
+					PIDToName:     map[int]string{1000: "curl"},
+					PIDToCmdLine:  map[int]string{1000: "curl https://example.com"},
+					PIDToExecPath: map[int]string{1000: "/usr/bin/curl"},
+				},
+			},
+		}
+
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{"93.184.216.34"},
+			EnableSudo:         true,
+			CollectProcessInfo: true,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         &mockFileSystem{},
+			ProcProvider:       mockProc,
+		})
+
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		// First request - should populate cache
+		agent.ProcessPacket(packet)
+		firstCallCount := mockProc.callCount
+
+		// Second request - should use cache
+		agent.ProcessPacket(packet)
+
+		if mockProc.callCount != firstCallCount {
+			t.Errorf("Expected cached lookup on second request, but ReadProcNetFile was called again")
+		}
+	})
+
+	// Test DNS response packets skip process lookup (source port 53)
+	t.Run("Skip process lookup for DNS response packets", func(t *testing.T) {
+		mockProc := &mockProcProviderWithCallCount{
+			mockProcProviderWithSockets: mockProcProviderWithSockets{
+				mockProcProvider: mockProcProvider{
+					InodeToPID:    make(map[uint64]int),
+					PIDToName:     make(map[int]string),
+					PIDToCmdLine:  make(map[int]string),
+					PIDToExecPath: make(map[int]string),
+				},
+			},
+		}
+
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{"trusted.com"},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: true,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         &mockFileSystem{},
+			ProcProvider:       mockProc,
+		})
+
+		// DNS response has source port 53 - should not trigger process lookup
+		packet := GenerateDNSTypeAResponsePacket("trusted.com", net.IP{123, 123, 123, 123}, net.IP{127, 0, 0, 53})
+		agent.ProcessPacket(packet)
+
+		if mockProc.callCount > 0 {
+			t.Errorf("Expected no process lookup for DNS response packet, but ReadProcNetFile was called %d times", mockProc.callCount)
+		}
+	})
+}
+
+func TestDomainWildcardMatching(t *testing.T) {
+	tests := []struct {
+		name           string
+		allowedDomains []string
+		testDomain     string
+		shouldAllow    bool
+	}{
+		{
+			name:           "Exact match",
+			allowedDomains: []string{"example.com"},
+			testDomain:     "example.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Wildcard subdomain match",
+			allowedDomains: []string{"*.example.com"},
+			testDomain:     "api.example.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Wildcard nested subdomain match",
+			allowedDomains: []string{"*.example.com"},
+			testDomain:     "api.us.example.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Wildcard positioning subdomain match",
+			allowedDomains: []string{"api.*.example.com"},
+			testDomain:     "api.us.example.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Wildcard subdomain no match",
+			allowedDomains: []string{"*.example.com"},
+			testDomain:     "example.com",
+			shouldAllow:    false,
+		},
+		{
+			name:           "Wildcard TLD match",
+			allowedDomains: []string{"example.*"},
+			testDomain:     "example.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Wildcard TLD match alternative",
+			allowedDomains: []string{"example.*"},
+			testDomain:     "example.org",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Full wildcard",
+			allowedDomains: []string{"*"},
+			testDomain:     "anything.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Multiple patterns - first matches",
+			allowedDomains: []string{"*.trusted.com", "safe.net"},
+			testDomain:     "api.trusted.com",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Multiple patterns - second matches",
+			allowedDomains: []string{"*.trusted.com", "safe.net"},
+			testDomain:     "safe.net",
+			shouldAllow:    true,
+		},
+		{
+			name:           "Multiple patterns - none match",
+			allowedDomains: []string{"*.trusted.com", "safe.net"},
+			testDomain:     "evil.com",
+			shouldAllow:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := NewAgent(AgentConfig{
+				EgressPolicy:    EGRESS_POLICY_BLOCK,
+				DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+				AllowedDomains:  tt.allowedDomains,
+				AllowedIPs:      []string{},
+				EnableSudo:      true,
+				NetInfoProvider: &mockNetInfoProvider{},
+				FileSystem:      &mockFileSystem{},
+				ProcProvider:    newMockProcProvider(),
+			})
+
+			packet := GenerateDNSRequestPacket(tt.testDomain, net.IP{127, 0, 0, 53})
+			decision := agent.ProcessPacket(packet)
+
+			expectedDecision := DROP_REQUEST
+			if tt.shouldAllow {
+				expectedDecision = ACCEPT_REQUEST
+			}
+
+			if decision != expectedDecision {
+				t.Errorf("Domain %s with pattern %v: expected %v, got %v",
+					tt.testDomain, tt.allowedDomains, expectedDecision, decision)
+			}
+		})
+	}
+}
+
+func TestDNSSRVResponse(t *testing.T) {
+	t.Run("Accept SRV response for allowed domain", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSTypeSRVResponsePacket("_https._tcp.trusted.com", "server.trusted.com", net.IP{127, 0, 0, 53})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for SRV response, got %v", decision)
+		}
+
+		// Verify SRV target domain was added to allowlist
+		if !agent.allowedDomains["server.trusted.com"] {
+			t.Errorf("Expected SRV target domain to be added to allowlist")
+		}
+	})
+
+	t.Run("Do not add SRV target for blocked domain", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSTypeSRVResponsePacket("_https._tcp.blocked.com", "server.blocked.com", net.IP{127, 0, 0, 53})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST (DNS responses always accepted), got %v", decision)
+		}
+
+		// Verify SRV target domain was NOT added to allowlist
+		if agent.allowedDomains["server.blocked.com"] {
+			t.Errorf("Expected SRV target domain to NOT be added to allowlist for blocked domain")
+		}
+	})
+}
+
+func TestConnectionLogging(t *testing.T) {
+	// Test that allowed connections are logged
+	t.Run("Log allowed connection with correct fields", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{"93.184.216.34"},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		// Verify log contains expected fields (using camelCase JSON field names)
+		if !contains(log, "\"decision\":\"allowed\"") {
+			t.Errorf("Log missing decision field: %s", log)
+		}
+		if !contains(log, "\"protocol\":\"TCP\"") {
+			t.Errorf("Log missing protocol field: %s", log)
+		}
+		if !contains(log, "\"srcIP\":\"127.0.0.1\"") {
+			t.Errorf("Log missing srcIP field: %s", log)
+		}
+		if !contains(log, "\"dstIP\":\"93.184.216.34\"") {
+			t.Errorf("Log missing dstIP field: %s", log)
+		}
+		if !contains(log, "\"dstPort\":\"443\"") {
+			t.Errorf("Log missing dstPort field: %s", log)
+		}
+		if !contains(log, "\"reason\":\"ip-allowed\"") {
+			t.Errorf("Log missing reason field: %s", log)
+		}
+	})
+
+	// Test that blocked connections are logged
+	t.Run("Log blocked connection in block mode", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		if !contains(log, "\"decision\":\"blocked\"") {
+			t.Errorf("Log missing blocked decision: %s", log)
+		}
+		if !contains(log, "\"reason\":\"ip-not-allowed\"") {
+			t.Errorf("Log missing reason: %s", log)
+		}
+	})
+
+	// Test that audit mode connections are logged
+	t.Run("Log audit decision in audit mode", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_AUDIT,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST in audit mode, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		if !contains(log, "\"decision\":\"audit\"") {
+			t.Errorf("Log missing audit decision: %s", log)
+		}
+	})
+
+	// Test DNS query logging
+	t.Run("Log DNS query with domain name", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{"trusted.com"},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		packet := GenerateDNSRequestPacket("trusted.com", net.IP{127, 0, 0, 53})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry for DNS query, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		if !contains(log, "\"protocol\":\"DNS\"") {
+			t.Errorf("Log missing DNS protocol: %s", log)
+		}
+		if !contains(log, "\"domain\":\"trusted.com\"") {
+			t.Errorf("Log missing domain name: %s", log)
+		}
+		if !contains(log, "\"reason\":\"domain-allowed\"") {
+			t.Errorf("Log missing reason: %s", log)
+		}
+	})
+
+	// Test that blocked DNS queries are logged
+	t.Run("Log blocked DNS query", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{"trusted.com"},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		packet := GenerateDNSRequestPacket("blocked.com", net.IP{127, 0, 0, 53})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		if !contains(log, "\"decision\":\"blocked\"") {
+			t.Errorf("Log missing blocked decision: %s", log)
+		}
+		if !contains(log, "\"domain\":\"blocked.com\"") {
+			t.Errorf("Log missing domain name: %s", log)
+		}
+		if !contains(log, "\"reason\":\"domain-not-allowed\"") {
+			t.Errorf("Log missing reason: %s", log)
+		}
+	})
+
+	// Test that default IPs are NOT logged (to reduce noise)
+	t.Run("Do not log connections to default allowed IPs", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		// 169.254.169.254 is in defaultIps - should not be logged
+		packet := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{169, 254, 169, 254},
+			12345,
+			80,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for metadata service, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 0 {
+			t.Errorf("Expected 0 log entries for default IP, got %d: %v", len(logs), logs)
+		}
+	})
+
+	// Test that domain-to-IP mapping is logged
+	t.Run("Log connection with domain from DNS resolution", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{"example.com"},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		// First, DNS response to establish IP-to-domain mapping
+		dnsResponse := GenerateDNSTypeAResponsePacket("example.com", net.IP{93, 184, 216, 34}, net.IP{127, 0, 0, 53})
+		agent.ProcessPacket(dnsResponse)
+
+		// Clear logs from DNS response
+		mockFS.Clear()
+
+		// Now a TCP connection to that IP should log with the domain name
+		tcpPacket := GenerateTCPPacket(
+			net.IP{127, 0, 0, 1},
+			net.IP{93, 184, 216, 34},
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(tcpPacket)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		if !contains(log, "\"domain\":\"example.com\"") {
+			t.Errorf("Log should contain resolved domain name: %s", log)
+		}
+	})
+
+	// Test that untrusted DNS server is logged
+	t.Run("Log untrusted DNS server", func(t *testing.T) {
+		mockFS := newMockFileSystem()
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:       EGRESS_POLICY_BLOCK,
+			DNSPolicy:          DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:     []string{"trusted.com"},
+			AllowedIPs:         []string{},
+			EnableSudo:         true,
+			CollectProcessInfo: false,
+			NetInfoProvider:    &mockNetInfoProvider{},
+			FileSystem:         mockFS,
+			ProcProvider:       newMockProcProvider(),
+		})
+
+		// DNS query to untrusted server (8.8.8.8)
+		packet := GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST for untrusted DNS server, got %v", decision)
+		}
+
+		logs := mockFS.GetLogs("/var/log/gha-agent/connections.log")
+		if len(logs) != 1 {
+			t.Errorf("Expected 1 log entry, got %d", len(logs))
+			return
+		}
+
+		log := logs[0]
+		if !contains(log, "\"reason\":\"untrusted-dns-server\"") {
+			t.Errorf("Log missing untrusted DNS server reason: %s", log)
+		}
+		if !contains(log, "\"dstIP\":\"8.8.8.8\"") {
+			t.Errorf("Log missing untrusted DNS server IP: %s", log)
+		}
+	})
+}
+
+func TestIPv6PacketHandling(t *testing.T) {
+	// Test IPv6 TCP packet
+	t.Run("Accept IPv6 TCP packet to allowed IP", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"2001:4860:4860::8888"},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateIPv6TCPPacket(
+			net.ParseIP("::1"),
+			net.ParseIP("2001:4860:4860::8888"),
+			12345,
+			443,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for IPv6 packet, got %v", decision)
+		}
+	})
+
+	// Test IPv6 UDP packet
+	t.Run("Accept IPv6 UDP packet to allowed IP", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{},
+			AllowedIPs:      []string{"2001:4860:4860::8844"},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateIPv6UDPPacket(
+			net.ParseIP("::1"),
+			net.ParseIP("2001:4860:4860::8844"),
+			12345,
+			123,
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for IPv6 UDP packet, got %v", decision)
+		}
+	})
+
+	// Test IPv6 DNS query
+	t.Run("Accept IPv6 DNS query to allowed domain", func(t *testing.T) {
+		// Create a custom mock that includes IPv6 localhost in DNS servers
+		mockNet := &mockNetInfoProviderIPv6{}
+
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: mockNet,
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// Use IPv6 localhost as DNS server (which is now in the allowedDNSServers)
+		packet := GenerateIPv6DNSRequestPacket("trusted.com", net.ParseIP("::1"))
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for IPv6 DNS query, got %v", decision)
+		}
+	})
+
+	// Test IPv6 AAAA response
+	t.Run("Process IPv6 AAAA DNS response", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		packet := GenerateDNSTypeAAAAResponsePacket(
+			"trusted.com",
+			net.ParseIP("2001:4860:4860::8888"),
+			net.IP{127, 0, 0, 53},
+		)
+
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for AAAA response, got %v", decision)
+		}
+	})
+}
