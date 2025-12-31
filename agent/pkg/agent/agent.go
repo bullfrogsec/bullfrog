@@ -512,14 +512,17 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 	return a.processDNSLayer(dns, pkt)
 }
 
-func (a *Agent) processDNSOverTCPPayload(payload []byte, pkt PacketInfo) uint8 {
+func extractDNSFromTCPPayload(payload []byte) (*layers.DNS, error) {
+	if len(payload) < 3 {
+		return nil, fmt.Errorf("payload too short")
+	}
+
 	// Extract message length from first 2 bytes
 	// - First byte shifted left 8 bits + second byte
 	// - Creates 16-bit length prefix
 	messageLen := int(payload[0])<<8 | int(payload[1])
 	if messageLen == 0 || len(payload) < messageLen+2 {
-		fmt.Println("Invalid DNS over TCP payload")
-		return DROP_REQUEST
+		return nil, fmt.Errorf("invalid DNS over TCP payload length")
 	}
 
 	// We attempt to decode the DNS over TCP payload
@@ -527,7 +530,20 @@ func (a *Agent) processDNSOverTCPPayload(payload []byte, pkt PacketInfo) uint8 {
 	dns := &layers.DNS{}
 	err := dns.DecodeFromBytes(payload[2:messageLen+2], gopacket.NilDecodeFeedback)
 	if err != nil {
-		fmt.Println("Failed to decode DNS over TCP payload", err)
+		return nil, fmt.Errorf("failed to decode DNS over TCP payload: %w", err)
+	}
+
+	if len(dns.Questions) == 0 {
+		return nil, fmt.Errorf("no DNS questions in payload")
+	}
+
+	return dns, nil
+}
+
+func (a *Agent) processDNSOverTCPPayload(payload []byte, pkt PacketInfo) uint8 {
+	dns, err := extractDNSFromTCPPayload(payload)
+	if err != nil {
+		fmt.Printf("Failed to extract DNS from TCP payload: %v\n", err)
 		return DROP_REQUEST
 	}
 	return a.processDNSLayer(dns, pkt)
@@ -540,11 +556,25 @@ func (a *Agent) processDNSOverTCPPacket(packet gopacket.Packet) uint8 {
 
 	pkt := a.extractPacketInfo(packet)
 
+	if len(payload) == 0 {
+		// We only accept DNS over TCP packets with no payload since they are only used for initiating a connection
+		return ACCEPT_REQUEST
+	}
+
+	// Extract domain from payload for logging purposes
+	domain := "unknown"
+	dns, err := extractDNSFromTCPPayload(payload)
+	if err == nil && len(dns.Questions) > 0 {
+		domain = string(dns.Questions[0].Name)
+	} else {
+		fmt.Printf("failed to extract dns from TCP payload: %v\n", err)
+	}
+
 	// Validate DNS server IP
 	if dstPort == DNS_PORT {
 		if !a.allowedDNSServers[pkt.DstIP] {
-			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", "unknown", pkt.DstIP)
-			a.addConnectionLog(pkt, "blocked", "TCP-DNS", "unknown", "untrusted-dns-server")
+			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
+			a.addConnectionLog(pkt, "blocked", "TCP-DNS", domain, "untrusted-dns-server")
 			return DROP_REQUEST
 		}
 	}
@@ -556,11 +586,6 @@ func (a *Agent) processDNSOverTCPPacket(packet gopacket.Packet) uint8 {
 
 	// if we are not blocking DNS queries, just accept the query request
 	if !a.blockDNS && dstPort == DNS_PORT {
-		return ACCEPT_REQUEST
-	}
-
-	if len(payload) == 0 {
-		// We only accept DNS over TCP packets with no payload since they are only used for initiating a connection
 		return ACCEPT_REQUEST
 	}
 
@@ -644,12 +669,10 @@ func (a *Agent) processNonDNSPacket(packet gopacket.Packet) uint8 {
 
 func (a *Agent) ProcessPacket(packet gopacket.Packet) uint8 {
 	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
-		fmt.Println("found dns layer")
 		return a.processDNSPacket(packet)
 	}
 	// check dns over tcp
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-		fmt.Println("found tcp layer")
 		tcp := tcpLayer.(*layers.TCP)
 		// Only treat as DNS if it's actually on port 53
 		if tcp.DstPort == DNS_PORT || tcp.SrcPort == DNS_PORT {
