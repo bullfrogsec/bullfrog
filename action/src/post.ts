@@ -5,50 +5,6 @@ import path from "node:path";
 import { AGENT_LOG_FILENAME, CONNECTIONS_LOG_PATH, BLOCK } from "./constants";
 import { getDate } from "./util";
 
-interface WorkflowActionResult {
-  workflowRunId: string;
-  runAttempt: number;
-  jobName?: string; // Human-readable job name
-  organization: string;
-  repo: string;
-  connections: Array<{
-    domain?: string;
-    ip?: string;
-    port?: number;
-    blocked: boolean;
-    authorized: boolean;
-    timestamp: Date;
-    protocol: string;
-    reason: string;
-    exePath?: string;
-    commandLine?: string;
-    docker?: DockerInfo;
-  }>;
-  createdAt: Date;
-}
-
-function getGitHubContext(): {
-  workflowRunId: string;
-  runAttempt: number;
-  jobName?: string;
-  organization: string;
-  repo: string;
-} {
-  const repo = process.env.GITHUB_REPOSITORY || "";
-  const [organization] = repo.split("/");
-  const workflowRunId = process.env.GITHUB_RUN_ID || "";
-  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1");
-  const jobName = process.env.GITHUB_JOB || undefined;
-
-  if (!organization || !repo || !workflowRunId) {
-    throw new Error(
-      "Missing GitHub context: GITHUB_REPOSITORY or GITHUB_RUN_ID not set",
-    );
-  }
-
-  return { workflowRunId, runAttempt, jobName, organization, repo };
-}
-
 // Map reason codes to human-friendly descriptions
 const REASON_CODE_MAP: Record<string, string> = {
   "domain-allowed": "Domain allowed",
@@ -64,28 +20,10 @@ export function getHumanFriendlyReason(reasonCode: string): string {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
 
-async function displaySummary(
-  connections: Connection[],
-  controlPlaneBaseUrl?: string,
-): Promise<void> {
+export async function displaySummary(connections: Connection[]): Promise<void> {
   const summary = core.summary;
 
-  // Add control plane link if available
-  if (controlPlaneBaseUrl) {
-    const { workflowRunId } = getGitHubContext();
-    const baseUrl = controlPlaneBaseUrl.endsWith("/")
-      ? controlPlaneBaseUrl
-      : `${controlPlaneBaseUrl}/`;
-
-    summary
-      .addHeading("Bullfrog Control Plane", 3)
-      .addLink(
-        "View detailed results",
-        `${baseUrl}workflow-run/${workflowRunId}`,
-      );
-  } else {
-    summary.addHeading("Bullfrog Results", 3);
-  }
+  summary.addHeading("Bullfrog Results", 3);
 
   // Add connection results table if there are any connections
   if (connections.length > 0) {
@@ -132,61 +70,6 @@ async function displaySummary(
   }
 
   await summary.write();
-}
-
-async function submitResultsToControlPlane(
-  connections: Connection[],
-  apiToken: string,
-  controlPlaneBaseUrl: string,
-): Promise<void> {
-  try {
-    const { workflowRunId, runAttempt, jobName, organization, repo } =
-      getGitHubContext();
-
-    const payload: WorkflowActionResult = {
-      workflowRunId,
-      runAttempt,
-      jobName,
-      organization,
-      repo,
-      connections,
-      createdAt: new Date(),
-    };
-
-    core.debug(
-      `Submitting results to control plane: ${JSON.stringify(payload)}`,
-    );
-
-    // Ensure the base URL ends with a slash
-    const baseUrl = controlPlaneBaseUrl.endsWith("/")
-      ? controlPlaneBaseUrl
-      : `${controlPlaneBaseUrl}/`;
-    const apiUrl = `${baseUrl}v1/events`;
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiToken}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`,
-      );
-    }
-
-    core.info(
-      `Results successfully submitted to control plane for workflow run ${workflowRunId}`,
-    );
-  } catch (error) {
-    core.warning(
-      `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
 }
 
 type DockerInfo = {
@@ -342,7 +225,7 @@ async function printAgentLogs({
 }
 
 async function main() {
-  const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
+  const { logDirectory } = parseInputs();
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   await printAgentLogs({ agentLogFilepath });
@@ -351,19 +234,7 @@ async function main() {
     const connections = await getConnections();
 
     // Always display the summary
-    await displaySummary(
-      connections,
-      apiToken ? controlPlaneBaseUrl : undefined,
-    );
-
-    // Submit results to control plane if API token is provided
-    if (apiToken) {
-      await submitResultsToControlPlane(
-        connections,
-        apiToken,
-        controlPlaneBaseUrl,
-      );
-    }
+    await displaySummary(connections);
   } catch (error) {
     core.warning(
       `Failed to process results: ${error instanceof Error ? error.message : String(error)}`,

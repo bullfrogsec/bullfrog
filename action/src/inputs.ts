@@ -14,8 +14,6 @@ export interface Inputs {
   localAgent: boolean;
   logDirectory: string;
   agentDownloadBaseURL: string;
-  controlPlaneBaseUrl: string;
-  apiToken?: string;
 }
 
 function validateIps(ips: Array<string>): void {
@@ -64,8 +62,6 @@ export function parseInputs(): Inputs {
 
   const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
 
-  const apiToken = core.getInput("api-token");
-
   return {
     allowedDomains,
     allowedIps,
@@ -76,7 +72,5 @@ export function parseInputs(): Inputs {
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
     agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
-    controlPlaneBaseUrl: core.getInput("_control-plane-base-url"),
-    apiToken: apiToken || undefined,
   };
 }

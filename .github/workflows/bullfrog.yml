@@ -25,8 +25,6 @@ jobs:
         uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
           egress-policy: audit
-          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
-          _control-plane-base-url: https://005366084ac7.ngrok-free.app/
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - uses: fallard84/paths-filter@dfb4213208eb30382ee3e27b8a810fc3fb8cc911 # v3.0.3
@@ -121,8 +119,6 @@ jobs:
         with:
           allowed-domains: |
             *.google.com
-          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
-          _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Make HTTP requests
         run: |
@@ -156,8 +152,6 @@ jobs:
             *.google.com
           egress-policy: block
           enable-sudo: false
-          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
-          _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Make HTTP requests
         run: |
@@ -195,8 +189,6 @@ jobs:
             *.google.com
           dns-policy: any
           egress-policy: block
-          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
-          _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Make HTTP requests
         run:  |
@@ -236,8 +228,6 @@ jobs:
             production.cloudflare.docker.com
             www.google.com
           egress-policy: block
-          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
-          _control-plane-base-url: https://005366084ac7.ngrok-free.app/
 
       - name: Test curl calls within Docker
         run: source test/make_docker_requests.sh

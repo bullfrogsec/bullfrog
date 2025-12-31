@@ -13038,7 +13038,7 @@ var require_fetch = __commonJS({
         this.emit("terminated", error);
       }
     };
-    function fetch2(input, init = {}) {
+    function fetch(input, init = {}) {
       webidl.argumentLengthCheck(arguments, 1, { header: "globalThis.fetch" });
       const p = createDeferredPromise();
       let requestObject;
@@ -13968,7 +13968,7 @@ var require_fetch = __commonJS({
       }
     }
     module2.exports = {
-      fetch: fetch2,
+      fetch,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -17224,7 +17224,7 @@ var require_undici = __commonJS({
     module2.exports.getGlobalDispatcher = getGlobalDispatcher;
     if (util.nodeMajor > 16 || util.nodeMajor === 16 && util.nodeMinor >= 8) {
       let fetchImpl = null;
-      module2.exports.fetch = async function fetch2(resource) {
+      module2.exports.fetch = async function fetch(resource) {
         if (!fetchImpl) {
           fetchImpl = require_fetch().fetch;
         }
@@ -17573,12 +17573,12 @@ var require_lib = __commonJS({
             throw new Error("Client has already been disposed.");
           }
           const parsedUrl = new URL(requestUrl);
-          let info2 = this._prepareRequest(verb, parsedUrl, headers);
+          let info = this._prepareRequest(verb, parsedUrl, headers);
           const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb) ? this._maxRetries + 1 : 1;
           let numTries = 0;
           let response;
           do {
-            response = yield this.requestRaw(info2, data);
+            response = yield this.requestRaw(info, data);
             if (response && response.message && response.message.statusCode === HttpCodes.Unauthorized) {
               let authenticationHandler;
               for (const handler of this.handlers) {
@@ -17588,7 +17588,7 @@ var require_lib = __commonJS({
                 }
               }
               if (authenticationHandler) {
-                return authenticationHandler.handleAuthentication(this, info2, data);
+                return authenticationHandler.handleAuthentication(this, info, data);
               } else {
                 return response;
               }
@@ -17611,8 +17611,8 @@ var require_lib = __commonJS({
                   }
                 }
               }
-              info2 = this._prepareRequest(verb, parsedRedirectUrl, headers);
-              response = yield this.requestRaw(info2, data);
+              info = this._prepareRequest(verb, parsedRedirectUrl, headers);
+              response = yield this.requestRaw(info, data);
               redirectsRemaining--;
             }
             if (!response.message.statusCode || !HttpResponseRetryCodes.includes(response.message.statusCode)) {
@@ -17641,7 +17641,7 @@ var require_lib = __commonJS({
        * @param info
        * @param data
        */
-      requestRaw(info2, data) {
+      requestRaw(info, data) {
         return __awaiter(this, void 0, void 0, function* () {
           return new Promise((resolve, reject) => {
             function callbackForResult(err, res) {
@@ -17653,7 +17653,7 @@ var require_lib = __commonJS({
                 resolve(res);
               }
             }
-            this.requestRawWithCallback(info2, data, callbackForResult);
+            this.requestRawWithCallback(info, data, callbackForResult);
           });
         });
       }
@@ -17663,12 +17663,12 @@ var require_lib = __commonJS({
        * @param data
        * @param onResult
        */
-      requestRawWithCallback(info2, data, onResult) {
+      requestRawWithCallback(info, data, onResult) {
         if (typeof data === "string") {
-          if (!info2.options.headers) {
-            info2.options.headers = {};
+          if (!info.options.headers) {
+            info.options.headers = {};
           }
-          info2.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
+          info.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
         }
         let callbackCalled = false;
         function handleResult(err, res) {
@@ -17677,7 +17677,7 @@ var require_lib = __commonJS({
             onResult(err, res);
           }
         }
-        const req = info2.httpModule.request(info2.options, (msg) => {
+        const req = info.httpModule.request(info.options, (msg) => {
           const res = new HttpClientResponse(msg);
           handleResult(void 0, res);
         });
@@ -17689,7 +17689,7 @@ var require_lib = __commonJS({
           if (socket) {
             socket.end();
           }
-          handleResult(new Error(`Request timeout: ${info2.options.path}`));
+          handleResult(new Error(`Request timeout: ${info.options.path}`));
         });
         req.on("error", function(err) {
           handleResult(err);
@@ -17725,27 +17725,27 @@ var require_lib = __commonJS({
         return this._getProxyAgentDispatcher(parsedUrl, proxyUrl);
       }
       _prepareRequest(method, requestUrl, headers) {
-        const info2 = {};
-        info2.parsedUrl = requestUrl;
-        const usingSsl = info2.parsedUrl.protocol === "https:";
-        info2.httpModule = usingSsl ? https : http;
+        const info = {};
+        info.parsedUrl = requestUrl;
+        const usingSsl = info.parsedUrl.protocol === "https:";
+        info.httpModule = usingSsl ? https : http;
         const defaultPort = usingSsl ? 443 : 80;
-        info2.options = {};
-        info2.options.host = info2.parsedUrl.hostname;
-        info2.options.port = info2.parsedUrl.port ? parseInt(info2.parsedUrl.port) : defaultPort;
-        info2.options.path = (info2.parsedUrl.pathname || "") + (info2.parsedUrl.search || "");
-        info2.options.method = method;
-        info2.options.headers = this._mergeHeaders(headers);
+        info.options = {};
+        info.options.host = info.parsedUrl.hostname;
+        info.options.port = info.parsedUrl.port ? parseInt(info.parsedUrl.port) : defaultPort;
+        info.options.path = (info.parsedUrl.pathname || "") + (info.parsedUrl.search || "");
+        info.options.method = method;
+        info.options.headers = this._mergeHeaders(headers);
         if (this.userAgent != null) {
-          info2.options.headers["user-agent"] = this.userAgent;
+          info.options.headers["user-agent"] = this.userAgent;
         }
-        info2.options.agent = this._getAgent(info2.parsedUrl);
+        info.options.agent = this._getAgent(info.parsedUrl);
         if (this.handlers) {
           for (const handler of this.handlers) {
-            handler.prepareRequest(info2.options);
+            handler.prepareRequest(info.options);
           }
         }
-        return info2;
+        return info;
       }
       _mergeHeaders(headers) {
         if (this.requestOptions && this.requestOptions.headers) {
@@ -19735,10 +19735,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.notice = notice;
-    function info2(message) {
+    function info(message) {
       process.stdout.write(message + os.EOL);
     }
-    exports2.info = info2;
+    exports2.info = info;
     function startGroup(name) {
       (0, command_1.issue)("group", name);
     }
@@ -19803,6 +19803,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 // src/post.ts
 var post_exports = {};
 __export(post_exports, {
+  displaySummary: () => displaySummary,
   filterConnectionsNoise: () => filterConnectionsNoise,
   getHumanFriendlyReason: () => getHumanFriendlyReason
 });
@@ -19852,7 +19853,6 @@ function parseInputs() {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
   const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
-  const apiToken = core.getInput("api-token");
   return {
     allowedDomains,
     allowedIps,
@@ -19862,9 +19862,7 @@ function parseInputs() {
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
-    controlPlaneBaseUrl: core.getInput("_control-plane-base-url"),
-    apiToken: apiToken || void 0
+    agentDownloadBaseURL: core.getInput("_agent-download-base-url")
   };
 }
 
@@ -19884,19 +19882,6 @@ function getDate(timestamp) {
 }
 
 // src/post.ts
-function getGitHubContext() {
-  const repo = process.env.GITHUB_REPOSITORY || "";
-  const [organization] = repo.split("/");
-  const workflowRunId = process.env.GITHUB_RUN_ID || "";
-  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1");
-  const jobName = process.env.GITHUB_JOB || void 0;
-  if (!organization || !repo || !workflowRunId) {
-    throw new Error(
-      "Missing GitHub context: GITHUB_REPOSITORY or GITHUB_RUN_ID not set"
-    );
-  }
-  return { workflowRunId, runAttempt, jobName, organization, repo };
-}
 var REASON_CODE_MAP = {
   "domain-allowed": "Domain allowed",
   "domain-not-allowed": "Domain not allowed",
@@ -19909,18 +19894,9 @@ var REASON_CODE_MAP = {
 function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
-async function displaySummary(connections, controlPlaneBaseUrl) {
+async function displaySummary(connections) {
   const summary2 = core3.summary;
-  if (controlPlaneBaseUrl) {
-    const { workflowRunId } = getGitHubContext();
-    const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
-    summary2.addHeading("Bullfrog Control Plane", 3).addLink(
-      "View detailed results",
-      `${baseUrl}workflow-run/${workflowRunId}`
-    );
-  } else {
-    summary2.addHeading("Bullfrog Results", 3);
-  }
+  summary2.addHeading("Bullfrog Results", 3);
   if (connections.length > 0) {
     summary2.addHeading("Connection Results", 4);
     const tableData = [
@@ -19956,46 +19932,6 @@ async function displaySummary(connections, controlPlaneBaseUrl) {
     summary2.addRaw("\n\nNo outbound connections detected.\n");
   }
   await summary2.write();
-}
-async function submitResultsToControlPlane(connections, apiToken, controlPlaneBaseUrl) {
-  try {
-    const { workflowRunId, runAttempt, jobName, organization, repo } = getGitHubContext();
-    const payload = {
-      workflowRunId,
-      runAttempt,
-      jobName,
-      organization,
-      repo,
-      connections,
-      createdAt: /* @__PURE__ */ new Date()
-    };
-    core3.debug(
-      `Submitting results to control plane: ${JSON.stringify(payload)}`
-    );
-    const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
-    const apiUrl = `${baseUrl}v1/events`;
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiToken}`
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
-    core3.info(
-      `Results successfully submitted to control plane for workflow run ${workflowRunId}`
-    );
-  } catch (error) {
-    core3.warning(
-      `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
 }
 async function getConnections() {
   await new Promise((resolve) => setTimeout(resolve, 5e3));
@@ -20100,22 +20036,12 @@ async function printAgentLogs({
   }
 }
 async function main() {
-  const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
+  const { logDirectory } = parseInputs();
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   await printAgentLogs({ agentLogFilepath });
   try {
     const connections = await getConnections();
-    await displaySummary(
-      connections,
-      apiToken ? controlPlaneBaseUrl : void 0
-    );
-    if (apiToken) {
-      await submitResultsToControlPlane(
-        connections,
-        apiToken,
-        controlPlaneBaseUrl
-      );
-    }
+    await displaySummary(connections);
   } catch (error) {
     core3.warning(
       `Failed to process results: ${error instanceof Error ? error.message : String(error)}`
@@ -20131,6 +20057,7 @@ if (require.main === module) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  displaySummary,
   filterConnectionsNoise,
   getHumanFriendlyReason
 });
