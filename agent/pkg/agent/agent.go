@@ -555,9 +555,13 @@ func (a *Agent) processDNSOverTCPPacket(packet gopacket.Packet) uint8 {
 	dstPort, srcPort, payload := tcp.DstPort, tcp.SrcPort, tcp.Payload
 
 	pkt := a.extractPacketInfo(packet)
+	fmt.Printf("Processing DNS-over-TCP packet: %s:%s -> %s:%s\n",
+		pkt.SrcIP, pkt.SrcPort, pkt.DstIP, pkt.DstPort)
 
 	if len(payload) == 0 {
 		// We only accept DNS over TCP packets with no payload since they are only used for initiating a connection
+		fmt.Printf("Accepting TCP handshake packet: %s:%s -> %s:%s\n",
+			pkt.SrcIP, pkt.SrcPort, pkt.DstIP, pkt.DstPort)
 		return ACCEPT_REQUEST
 	}
 
@@ -573,7 +577,7 @@ func (a *Agent) processDNSOverTCPPacket(packet gopacket.Packet) uint8 {
 	// Validate DNS server IP
 	if dstPort == DNS_PORT {
 		if !a.allowedDNSServers[pkt.DstIP] {
-			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
+			fmt.Printf("%s -> Blocked DNS-over-TCP Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
 			a.addConnectionLog(pkt, "blocked", "TCP-DNS", domain, "untrusted-dns-server")
 			return DROP_REQUEST
 		}

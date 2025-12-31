@@ -257,7 +257,8 @@ jobs:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
-          egress-policy: block
+          # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
+          egress-policy: audit
           allowed-domains: |
             *.canonical.com
             *.github.com
@@ -276,6 +277,8 @@ jobs:
             production.cloudflare.docker.com
             docker-images-prod.*.r2.cloudflarestorage.com
             *.hashicorp.com
+          allowed-ips: |
+            8.8.8.8
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
