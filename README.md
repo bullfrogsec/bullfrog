@@ -104,6 +104,36 @@ You can view blocked or unallowed outbound requests in the workflow summary.
 
 Monitor connection results across all workflows and repositories in your GitHub organization using the Bullfrog control plane. Visit [bullfrogsec.com](https://bullfrogsec.com) to create a free account and get your API token. A free tier is available to help you gain visibility into all outbound connections across your organization.
 
+## Security and Build Provenance
+
+Bullfrog implements multiple layers of artifact validation to ensure the integrity and trustworthiness of the action and its components.
+
+### Agent Binary Attestation
+
+The agent binary is protected using GitHub's native [build provenance attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds) system, which provides:
+
+- **SLSA Build Provenance**: Every agent binary is cryptographically signed with build provenance metadata following the [SLSA framework](https://slsa.dev/)
+- **Tamper Detection**: When you use Bullfrog, the agent binary is automatically verified against its attestation before execution, ensuring it hasn't been modified since being built
+- **Supply Chain Transparency**: Attestations are publicly verifiable and include information about the build environment, workflow, and repository state
+- **Cryptographic Signatures**: Uses Sigstore to sign attestations with ephemeral keys from GitHub's OIDC provider
+
+The attestation verification happens automatically during action execution. For CI builds, verification is skipped as artifacts haven't been published yet. For released versions, the verification ensures the downloaded binary matches exactly what was built in the official GitHub Actions workflow.
+
+You can manually verify any agent binary attestation using:
+
+```bash
+gh attestation verify agent/agent --owner bullfrogsec
+```
+
+### Action Distribution Files
+
+The action's distribution files (`action/dist`) are validated through:
+
+- **Git Diff Verification**: CI checks ensure that compiled distribution files are committed and match the source code
+- **Automated Checks**: Every pull request validates that the dist files are properly synchronized with the TypeScript source
+
+This multi-layered approach ensures both runtime components (agent binary) and the action code itself are protected against tampering, providing strong supply chain security guarantees.
+
 ## Limitations
 
 - This action is currently only supporting Github-hosted runners on Ubuntu (`ubuntu-latest`, `ubuntu-22.04` and `ubuntu-24.04`).
