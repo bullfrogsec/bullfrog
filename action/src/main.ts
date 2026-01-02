@@ -199,6 +199,8 @@ async function main() {
     localAgent,
     logDirectory,
     agentVersion,
+    apiToken,
+    controlPlaneBaseUrl,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -207,6 +209,22 @@ async function main() {
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pkg = require(`${actionDirectory}/../package.json`);
+
+  // Add control plane domain to allowed domains if API token is provided
+  if (apiToken) {
+    try {
+      const url = new URL(controlPlaneBaseUrl);
+      const controlPlaneDomain = url.hostname;
+      allowedDomains.push(controlPlaneDomain);
+      core.info(
+        `Added control plane domain to allowed domains: ${controlPlaneDomain}`,
+      );
+    } catch (error) {
+      core.warning(
+        `Failed to parse control plane URL: ${error instanceof Error ? error.message : String(error)}. Connection results will not be published to Bullfrog's control plane.`,
+      );
+    }
+  }
 
   await fs.mkdir(logDirectory, { recursive: true });
 

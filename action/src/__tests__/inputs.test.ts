@@ -17,7 +17,10 @@ describe("inputs", () => {
         "egress-policy": AUDIT,
         "dns-policy": ALLOWED_DOMAINS_ONLY,
         "_log-directory": "/var/log/test",
-        "_agent-download-base-url": "https://example.com",
+        "_agent-download-base-url":
+          "https://github.com/bullfrogsec/bullfrog/releases/download/",
+        "_control-plane-base-url": "https://control.example.com",
+        "api-token": "",
       };
       return defaults[name] || "";
     });
@@ -46,7 +49,10 @@ describe("inputs", () => {
         collectProcessInfo: true,
         localAgent: false,
         logDirectory: "/var/log/test",
-        agentDownloadBaseURL: "https://example.com",
+        agentDownloadBaseURL:
+          "https://github.com/bullfrogsec/bullfrog/releases/download/",
+        controlPlaneBaseUrl: "https://control.example.com",
+        apiToken: undefined,
       });
     });
 
@@ -183,6 +189,45 @@ describe("inputs", () => {
       const inputs = parseInputs();
 
       expect(inputs.localAgent).toBe(false);
+    });
+
+    it("should throw error for missing _agent-download-base-url when not using local agent", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "_agent-download-base-url") return "";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).toThrow(
+        `_agent-download-base-url cannot be empty`,
+      );
+    });
+
+    it("should parse api-token when provided", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "api-token") return "test-token-123";
+        if (name === "egress-policy") return AUDIT;
+        if (name === "dns-policy") return ALLOWED_DOMAINS_ONLY;
+        if (name === "_log-directory") return "/var/log/test";
+        return "";
+      });
+
+      const inputs = parseInputs();
+
+      expect(inputs.apiToken).toBe("test-token-123");
+    });
+
+    it("should set apiToken to undefined when empty", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "api-token") return "";
+        if (name === "egress-policy") return AUDIT;
+        if (name === "dns-policy") return ALLOWED_DOMAINS_ONLY;
+        if (name === "_log-directory") return "/var/log/test";
+        return "";
+      });
+
+      const inputs = parseInputs();
+
+      expect(inputs.apiToken).toBeUndefined();
     });
   });
 

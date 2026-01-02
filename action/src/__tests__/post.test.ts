@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getHumanFriendlyReason,
   filterConnectionsNoise,
   type Connection,
+  displaySummary,
 } from "../post";
+import * as core from "@actions/core";
+
+vi.mock("@actions/core");
 
 describe("post", () => {
   describe("getHumanFriendlyReason", () => {
@@ -671,6 +675,189 @@ describe("post", () => {
       // Same domain, no IP (DNS), same process -> deduplicate
       expect(result).toHaveLength(1);
       expect(result[0].protocol).toBe("DNS");
+    });
+  });
+
+  describe("displaySummary", () => {
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(() => {
+      originalEnv = { ...process.env };
+      process.env.GITHUB_REPOSITORY = "test-org/test-repo";
+      process.env.GITHUB_RUN_ID = "12345";
+      process.env.GITHUB_RUN_ATTEMPT = "1";
+      process.env.GITHUB_JOB = "test-job";
+
+      vi.clearAllMocks();
+
+      // Mock core.summary methods
+      const mockSummary = {
+        addHeading: vi.fn().mockReturnThis(),
+        addLink: vi.fn().mockReturnThis(),
+        addTable: vi.fn().mockReturnThis(),
+        addRaw: vi.fn().mockReturnThis(),
+        write: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.spyOn(core, "summary", "get").mockReturnValue(
+        mockSummary as unknown as typeof core.summary,
+      );
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.restoreAllMocks();
+    });
+
+    it("should display link to control plane when controlPlaneBaseUrl is provided", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneBaseUrl = "https://api.bullfrogsec.com/";
+
+      await displaySummary(connections, controlPlaneBaseUrl);
+
+      const summary = core.summary;
+      expect(summary.addHeading).toHaveBeenCalledWith(
+        "Bullfrog Control Plane",
+        3,
+      );
+      expect(summary.addLink).toHaveBeenCalledWith(
+        "View detailed results",
+        "https://api.bullfrogsec.com/workflow-run/12345",
+      );
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should handle controlPlaneBaseUrl without trailing slash", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneBaseUrl = "https://api.bullfrogsec.com";
+
+      await displaySummary(connections, controlPlaneBaseUrl);
+
+      const summary = core.summary;
+      expect(summary.addLink).toHaveBeenCalledWith(
+        "View detailed results",
+        "https://api.bullfrogsec.com/workflow-run/12345",
+      );
+    });
+
+    it("should display regular heading when controlPlaneBaseUrl is not provided", async () => {
+      const connections: Connection[] = [];
+
+      await displaySummary(connections, undefined);
+
+      const summary = core.summary;
+      expect(summary.addHeading).toHaveBeenCalledWith("Bullfrog Results", 3);
+      expect(summary.addLink).not.toHaveBeenCalled();
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should display connections table when connections exist", async () => {
+      const connections: Connection[] = [
+        {
+          timestamp: new Date("2024-01-01T00:00:00Z"),
+          domain: "example.com",
+          ip: "93.184.216.34",
+          port: 443,
+          blocked: false,
+          authorized: true,
+          protocol: "TCP",
+          reason: "ip-allowed",
+          process: "curl",
+        },
+      ];
+
+      await displaySummary(connections, undefined);
+
+      const summary = core.summary;
+      expect(summary.addTable).toHaveBeenCalled();
+
+      // Verify the table data structure
+      const tableCall = vi.mocked(summary.addTable).mock.calls[0][0];
+      expect(tableCall).toBeDefined();
+
+      // Check header row
+      expect(tableCall[0]).toEqual([
+        { data: "Timestamp", header: true },
+        { data: "Domain", header: true },
+        { data: "IP", header: true },
+        { data: "Port", header: true },
+        { data: "Protocol", header: true },
+        { data: "Reason", header: true },
+        { data: "Status", header: true },
+        { data: "Process", header: true },
+        { data: "Container", header: true },
+        { data: "Exe Path", header: true },
+        { data: "Command Line", header: true },
+      ]);
+
+      // Check data row
+      expect(tableCall[1]).toEqual([
+        "2024-01-01T00:00:00.000Z",
+        "example.com",
+        "93.184.216.34",
+        "443",
+        "TCP",
+        "IP allowed",
+        "✅ Authorized",
+        "curl",
+        "-",
+        "-",
+        "-",
+      ]);
+
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should throw error when GitHub context is missing for control plane URL", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneBaseUrl = "https://api.bullfrogsec.com/";
+
+      // Clear required env vars
+      delete process.env.GITHUB_REPOSITORY;
+
+      await expect(
+        displaySummary(connections, controlPlaneBaseUrl),
+      ).rejects.toThrow("Missing GitHub context");
+    });
+
+    it("should throw error when GITHUB_RUN_ID is missing for control plane URL", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneBaseUrl = "https://api.bullfrogsec.com/";
+
+      // Clear required env var
+      delete process.env.GITHUB_RUN_ID;
+
+      await expect(
+        displaySummary(connections, controlPlaneBaseUrl),
+      ).rejects.toThrow("Missing GitHub context");
+    });
+
+    it("should handle missing GITHUB_RUN_ATTEMPT gracefully", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneBaseUrl = "https://api.bullfrogsec.com/";
+
+      delete process.env.GITHUB_RUN_ATTEMPT;
+
+      await displaySummary(connections, controlPlaneBaseUrl);
+
+      const summary = core.summary;
+      expect(summary.addLink).toHaveBeenCalledWith(
+        "View detailed results",
+        "https://api.bullfrogsec.com/workflow-run/12345",
+      );
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should display no connections message when connections array is empty", async () => {
+      const connections: Connection[] = [];
+
+      await displaySummary(connections, undefined);
+
+      const summary = core.summary;
+      expect(summary.addRaw).toHaveBeenCalledWith(
+        "\n\nNo outbound connections detected.\n",
+      );
+      expect(summary.write).toHaveBeenCalled();
     });
   });
 });
