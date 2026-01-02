@@ -27,4 +27,4 @@ test.types:
 
 .PHONY: test.unit
 test.unit:
-	echo "No unit tests"
+	npx vitest run

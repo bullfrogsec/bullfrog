@@ -24,40 +24,16 @@ export async function waitForFile(
   return false;
 }
 
-export async function waitForStringInFile({
-  filePath,
-  str,
-  timeoutMs,
-}: {
-  filePath: string;
-  str: string;
-  timeoutMs: number;
-}) {
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < timeoutMs) {
-    let content = "";
-    try {
-      content = await fs.readFile(filePath, { encoding: "utf-8" });
-      // eslint-disable-next-line no-empty
-    } catch {}
-
-    if (content.includes(str)) {
-      return;
-    }
-
-    await setTimeout(500);
-  }
-
-  throw new Error(`Couldn't find ${str} in file ${filePath}`);
-}
-
-export async function getFileTimestamp(filePath: string): Promise<number> {
-  try {
-    const stats = await fs.stat(filePath);
-    return stats.mtime.getTime();
-  } catch (err) {
-    core.debug(`Error getting ${filePath} file timestamp: ${err}`);
-    return 0;
+// Determine if timestamp is in seconds, milliseconds, or nanoseconds
+export function getDate(timestamp: number) {
+  if (timestamp > 1e15) {
+    // Likely nanoseconds, divide by 1e6
+    return new Date(timestamp / 1e6);
+  } else if (timestamp > 1e12) {
+    // Likely milliseconds
+    return new Date(timestamp);
+  } else {
+    // Likely seconds
+    return new Date(timestamp * 1000);
   }
 }

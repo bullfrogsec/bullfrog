@@ -2,186 +2,210 @@ import * as core from "@actions/core";
 import fs from "node:fs/promises";
 import { parseInputs } from "./inputs";
 import path from "node:path";
-import {
-  AGENT_LOG_FILENAME,
-  AGENT_READY_PATH,
-  BLOCK,
-  TETRAGON_EVENTS_LOG_PATH,
-} from "./constants";
-import { getFileTimestamp } from "./util";
+import { AGENT_LOG_FILENAME, CONNECTIONS_LOG_PATH, BLOCK } from "./constants";
+import { getDate } from "./util";
 
-const DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
-
-async function printAnnotations() {
-  try {
-    const correlatedData = await getCorrelateData();
-    const { egressPolicy } = parseInputs();
-    const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
-
-    core.debug("\n\nCorrelated data:\n");
-
-    const annotations: string[] = [];
-
-    correlatedData.forEach((data) => {
-      core.debug(JSON.stringify(data));
-      if (data.decision !== "blocked") {
-        return;
-      }
-      const time = data.ts.toISOString();
-      if (data.domain === "unknown") {
-        annotations.push(
-          `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``,
-        );
-        return;
-      } else if (data.destIp === "unknown") {
-        annotations.push(
-          `[${time}] ${result} DNS request to ${data.domain} from unknown process`,
-        );
-      } else {
-        annotations.push(
-          `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``,
-        );
-      }
-    });
-    core.warning(annotations.join("\n"));
-    return;
-  } catch {
-    core.debug("No annotations found");
-  }
-}
-
-type TetragonLog = {
-  ts: Date;
-  destIp: string;
-  destPort: string;
-  binary: string;
-  args: string;
+// Map reason codes to human-friendly descriptions
+const REASON_CODE_MAP: Record<string, string> = {
+  "domain-allowed": "Domain allowed",
+  "domain-not-allowed": "Domain not allowed",
+  "ip-allowed": "IP allowed",
+  "ip-not-allowed": "IP not allowed",
+  "untrusted-dns-server": "Untrusted DNS server",
+  "no-network-layer": "No network layer",
+  "unknown-network-layer": "Unknown network layer",
 };
 
-type Decision = {
-  ts: Date;
-  decision: "allowed" | "blocked";
-  domain: string;
-  destIp: string;
+export function getHumanFriendlyReason(reasonCode: string): string {
+  return REASON_CODE_MAP[reasonCode] || reasonCode;
+}
+
+export async function displaySummary(connections: Connection[]): Promise<void> {
+  const summary = core.summary;
+
+  summary.addHeading("Bullfrog Results", 3);
+
+  // Add connection results table if there are any connections
+  if (connections.length > 0) {
+    summary.addHeading("Connection Results", 4);
+
+    const tableData = [
+      [
+        { data: "Timestamp", header: true },
+        { data: "Domain", header: true },
+        { data: "IP", header: true },
+        { data: "Port", header: true },
+        { data: "Protocol", header: true },
+        { data: "Reason", header: true },
+        { data: "Status", header: true },
+        { data: "Process", header: true },
+        { data: "Container", header: true },
+        { data: "Exe Path", header: true },
+        { data: "Command Line", header: true },
+      ],
+      ...connections.map((conn) => [
+        conn.timestamp.toISOString(),
+        conn.domain || "-",
+        conn.ip || "-",
+        conn.port?.toString() || "-",
+        conn.protocol,
+        getHumanFriendlyReason(conn.reason),
+        conn.blocked
+          ? "🚫 Blocked"
+          : conn.authorized
+            ? "✅ Authorized"
+            : "⚠️ Unauthorized",
+        conn.process || "-",
+        conn.docker
+          ? `${conn.docker.containerImage}:${conn.docker.containerName}`
+          : "-",
+        conn.exePath || "-",
+        conn.commandLine || "-",
+      ]),
+    ];
+
+    summary.addTable(tableData);
+  } else {
+    summary.addRaw("\n\nNo outbound connections detected.\n");
+  }
+
+  await summary.write();
+}
+
+type DockerInfo = {
+  containerImage: string;
+  containerName: string;
 };
 
-type CorrelatedData = TetragonLog & Decision;
+export type Connection = {
+  timestamp: Date;
+  domain?: string;
+  ip?: string;
+  port?: number;
+  blocked: boolean;
+  authorized: boolean;
+  protocol: string;
+  reason: string;
+  process?: string;
+  exePath?: string;
+  commandLine?: string;
+  docker?: DockerInfo;
+};
 
-async function getOutboundConnections(): Promise<TetragonLog[]> {
-  try {
-    const connections: TetragonLog[] = [];
-
-    const agentReadyTimestamp = new Date(
-      await getFileTimestamp(AGENT_READY_PATH),
-    );
-    console.log("Agent ready timestamp: ", agentReadyTimestamp);
-
-    const tetragonLogFile = await fs.open(TETRAGON_EVENTS_LOG_PATH);
-
-    const functionsToTrack = ["tcp_connect", "udp_sendmsg"];
-
-    for await (const line of tetragonLogFile.readLines()) {
-      const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
-
-      // Skip entries that are not related to the connect policy
-      if (processEntry?.["policy_name"] !== "connect") {
-        continue;
-      }
-
-      // Skip connection entries that were logged before the agent was ready
-      if (new Date(processEntry.process.start_time) < agentReadyTimestamp) {
-        continue;
-      }
-
-      // Skip entries that are not related to the functions we are tracking
-      if (!functionsToTrack.includes(processEntry.function_name)) {
-        continue;
-      }
-
-      connections.push({
-        ts: new Date(processEntry.process.start_time),
-        destIp: processEntry.args[0].sock_arg.daddr,
-        destPort: processEntry.args[0].sock_arg.dport,
-        binary: processEntry.process.binary,
-        args: processEntry.process.arguments,
-      });
-    }
-
-    return connections;
-  } catch (error) {
-    console.error("Error reading log file", error);
-    return [];
-  }
-}
-
-async function getDecisions(): Promise<Decision[]> {
-  try {
-    const decisions: Decision[] = [];
-    const log = await fs.readFile(DECISISONS_LOG_PATH, "utf8");
-    const lines = log.split("\n");
-    for (const line of lines) {
-      const values = line.split("|");
-      decisions.push({
-        ts: new Date(parseInt(values[0]) * 1000),
-        decision: values[1] as "allowed" | "blocked",
-        domain: values[2],
-        destIp: values[3],
-      });
-    }
-    return decisions;
-  } catch (error) {
-    console.error("Error reading log file", error);
-    return [];
-  }
-}
-
-async function getCorrelateData(): Promise<CorrelatedData[]> {
+async function getConnections(): Promise<Connection[]> {
   // give some time for the logs to be written
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  const connections = await getOutboundConnections();
+  try {
+    const allConnections: Connection[] = [];
+    const { egressPolicy } = parseInputs();
+    const log = await fs.readFile(CONNECTIONS_LOG_PATH, "utf8");
+    const lines = log.split("\n");
+    core.debug("\n\nConnections.log:\n");
+    lines.forEach((l) => core.debug(l));
 
-  core.debug("\n\nConnections:\n");
-  connections.forEach((c) => core.debug(JSON.stringify(c)));
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue; // Skip empty lines
+      }
 
-  const decisions = await getDecisions();
+      try {
+        // Parse JSON log entry
+        const logEntry = JSON.parse(line);
 
-  core.debug("\nDecisions:\n");
-  decisions.forEach((d) => core.debug(JSON.stringify(d)));
+        const timestamp = parseInt(logEntry.timestamp, 10);
+        if (isNaN(timestamp)) {
+          continue; // Skip invalid timestamps
+        }
 
-  const correlatedData: CorrelatedData[] = [];
+        const date = getDate(timestamp);
 
-  for (const connection of connections) {
-    let decision = decisions.find(
-      (d) => connection.destIp === d.destIp && d.domain !== "unknown",
-    );
-    if (decision === undefined) {
-      decision = decisions.find((d) => connection.destIp === d.destIp);
+        const decision = logEntry.decision as "allowed" | "blocked";
+        const protocol = logEntry.protocol;
+        const destIp = logEntry.dstIP;
+        const destPort = logEntry.dstPort;
+        const domain = logEntry.domain;
+        const reason = logEntry.reason;
+        const process = logEntry.processName;
+        const commandLine = logEntry.commandLine;
+        const exePath = logEntry.executablePath;
+        const docker = logEntry.docker;
+
+        allConnections.push({
+          timestamp: date,
+          domain: domain !== "unknown" ? domain : undefined,
+          ip: destIp !== "unknown" ? destIp : undefined,
+          port: destPort !== "unknown" ? parseInt(destPort) : undefined,
+          blocked: decision === "blocked" && egressPolicy === BLOCK,
+          authorized: decision === "allowed",
+          protocol,
+          reason,
+          process: process !== "unknown" ? process : undefined,
+          exePath: exePath !== "unknown" ? exePath : undefined,
+          commandLine: commandLine !== "unknown" ? commandLine : undefined,
+          docker: docker || undefined,
+        });
+      } catch {
+        core.warning(`Failed to parse log line: ${line}`);
+        continue;
+      }
     }
-    correlatedData.push({
-      ts: connection.ts,
-      decision: decision?.decision ?? "blocked", // if we don't have a decision, assume it's blocked because we use an allowlist
-      domain: decision?.domain ?? "unknown",
-      destIp: connection.destIp,
-      destPort: connection.destPort,
-      binary: connection.binary,
-      args: connection.args,
-    });
+
+    // Deduplicate connections by domain+ip+process+docker
+    const filtered = filterConnectionsNoise(allConnections);
+
+    core.debug("\n\nConnections:\n");
+    filtered.forEach((c) => core.debug(JSON.stringify(c)));
+
+    return filtered;
+  } catch (error) {
+    console.error("Error reading connections log file", error);
+    return [];
+  }
+}
+
+function getProcessKey(conn: Connection): string {
+  // Create a unique key for process identification using all available process info
+  const process = conn.process || "unknown-process";
+  const exePath = conn.exePath || "unknown-exePath";
+  const commandLine = conn.commandLine || "unknown-commandLine";
+  return `${process}|${exePath}|${commandLine}`;
+}
+
+function getDockerKey(conn: Connection): string {
+  // Create a unique key for docker container identification
+  if (conn.docker) {
+    return `${conn.docker.containerImage}:${conn.docker.containerName}`;
+  }
+  return "no-docker";
+}
+
+export function filterConnectionsNoise(
+  connections: Connection[],
+): Connection[] {
+  const seen = new Set<string>();
+  const result: Connection[] = [];
+
+  // Sort by timestamp to keep the first occurrence
+  const sorted = [...connections].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+  );
+
+  for (const conn of sorted) {
+    // Create deduplication key from domain+ip+process+docker
+    const domain = conn.domain || "unknown";
+    const ip = conn.ip || "unknown";
+    const processKey = getProcessKey(conn);
+    const dockerKey = getDockerKey(conn);
+    const key = `${domain}|${ip}|${processKey}|${dockerKey}`;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(conn);
+    }
   }
 
-  // Add any decisions that don't have a corresponding connection (blocked DNS queries)
-  for (const decision of decisions.filter((d) => d.destIp === "unknown")) {
-    correlatedData.push({
-      ts: decision.ts,
-      decision: decision.decision,
-      domain: decision.domain,
-      destIp: "unknown",
-      destPort: "unknown",
-      binary: "unknown",
-      args: "unknown",
-    });
-  }
-  return correlatedData;
+  return result;
 }
 
 async function printAgentLogs({
@@ -204,12 +228,25 @@ async function main() {
   const { logDirectory } = parseInputs();
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
-  await printAnnotations();
   await printAgentLogs({ agentLogFilepath });
+
+  try {
+    const connections = await getConnections();
+
+    // Always display the summary
+    await displaySummary(connections);
+  } catch (error) {
+    core.warning(
+      `Failed to process results: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
-main().catch((error) => {
-  console.error(error);
-  core.setFailed(error);
-  process.exit(1);
-});
+// Only run main if this file is executed directly (not imported for tests)
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    core.setFailed(error);
+    process.exit(1);
+  });
+}

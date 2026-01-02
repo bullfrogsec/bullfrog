@@ -1,6 +1,5 @@
 export const AGENT_LOG_FILENAME = "agent.log";
-export const TETRAGON_LOG_FILENAME = "tetragon.log";
-export const TETRAGON_EVENTS_LOG_PATH = "/var/log/tetragon/tetragon.log";
+export const CONNECTIONS_LOG_PATH = "/var/log/gha-agent/connections.log";
 
 export const AGENT_INSTALL_PATH = "/opt/bullfrog/agent";
 export const AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";

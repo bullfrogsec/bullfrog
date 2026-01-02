@@ -1,20 +1,61 @@
 # Docker mod
-# Match DNS responses (source port 53) and enqueue to userspace
-insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0
-insert rule ip filter DOCKER-USER oif "docker0" tcp sport 53 counter queue num 0
+# IMPORTANT: insert rule adds rules at the TOP of the chain
+# So we must insert in REVERSE order to get the correct execution order
+#
+# Desired execution order:
+# 1. DNS packets (all, even established) → queue for inspection
+# 2. Established/related non-DNS → accept (fast path)
+# 3. New connections → queue for logging
+# 4. Everything else → accept (audit mode)
+
+# Accept everything else (audit mode - log but don't block)
+# This will be the LAST rule checked
+insert rule ip filter DOCKER-USER iifname "docker0" counter accept
+
+# Queue new connections (non-DNS) for Go agent logging
+insert rule ip filter DOCKER-USER iifname "docker0" ct state new counter queue num 0 bypass
+
+# Accept established/related NON-DNS connections automatically (fast path)
+# These come AFTER DNS rules but BEFORE new connection queue
+insert rule ip filter DOCKER-USER oif "docker0" ct state established,related counter accept
+insert rule ip filter DOCKER-USER iifname "docker0" ct state established,related counter accept
+
+# Match DNS packets FIRST - ALL DNS traffic must be queued, even if established
+# DNS responses are established connections but we MUST inspect them to learn IPs
+insert rule ip filter DOCKER-USER oif "docker0" tcp sport 53 counter queue num 0 bypass
+insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0 bypass
+insert rule ip filter DOCKER-USER iifname "docker0" tcp dport 53 counter queue num 0 bypass
+insert rule ip filter DOCKER-USER iifname "docker0" udp dport 53 counter queue num 0 bypass
 # End of Docker mod
 
 table inet filter {
-
     chain input {
         type filter hook input priority 0; policy accept;
 
-        # Match DNS responses (source port 53) and enqueue to userspace
-        udp sport 53 queue num 0
-        tcp sport 53 queue num 0
+        # Match DNS responses FIRST (before conntrack check)
+        # Otherwise established DNS responses would bypass the queue
+        udp sport 53 counter queue num 0 bypass
+        tcp sport 53 counter queue num 0 bypass
+
+        # Accept established/related connections automatically
+        ct state established,related counter accept
+
+        # Queue new connections for Go agent logging
+        ct state new counter queue num 0 bypass
     }
 
     chain output {
         type filter hook output priority 0; policy accept;
+
+        # Match DNS requests FIRST (before conntrack check)
+        # Otherwise established DNS queries would bypass the queue
+        udp dport 53 counter queue num 0 bypass
+        tcp dport 53 counter queue num 0 bypass
+
+        # Accept established/related connections automatically
+        ct state established,related counter accept
+
+        # Queue new connections for Go agent logging
+        ct state new counter queue num 0 bypass
     }
 }

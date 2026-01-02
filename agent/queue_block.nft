@@ -1,54 +1,61 @@
-table ip filter {
-    set allowed_ips {
-        type ipv4_addr;
-        flags interval;
-        auto-merge
-    }
-}
+# Docker mod
+# IMPORTANT: insert rule adds rules at the TOP of the chain
+# So we must insert in REVERSE order to get the correct execution order
+#
+# Desired execution order:
+# 1. DNS packets (all, even established) → queue for inspection
+# 2. Established/related non-DNS → accept (fast path)
+# 3. New connections → queue for decision
+# 4. Everything else → drop
 
+# Drop everything else (shouldn't reach here if Go agent is working)
+# This will be the LAST rule checked
 insert rule ip filter DOCKER-USER iifname "docker0" counter drop
-insert rule ip filter DOCKER-USER iifname "docker0" ip daddr @allowed_ips counter accept
 
-# Accept DNS requests
-insert rule ip filter DOCKER-USER iifname "docker0" udp dport 53 counter accept
-insert rule ip filter DOCKER-USER iifname "docker0" tcp dport 53 counter accept
+# Queue new connections (non-DNS) for Go agent decision
+insert rule ip filter DOCKER-USER iifname "docker0" ct state new counter queue num 0
 
-# Queue DNS responses to userspace
-insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0
+# Accept established/related NON-DNS connections automatically (fast path)
+# These come AFTER DNS rules but BEFORE new connection queue
+insert rule ip filter DOCKER-USER oif "docker0" ct state established,related counter accept
+insert rule ip filter DOCKER-USER iifname "docker0" ct state established,related counter accept
+
+# Match DNS packets FIRST - ALL DNS traffic must be queued, even if established
+# DNS responses are established connections but we MUST inspect them to learn IPs
 insert rule ip filter DOCKER-USER oif "docker0" tcp sport 53 counter queue num 0
+insert rule ip filter DOCKER-USER oif "docker0" udp sport 53 counter queue num 0
+insert rule ip filter DOCKER-USER iifname "docker0" tcp dport 53 counter queue num 0
+insert rule ip filter DOCKER-USER iifname "docker0" udp dport 53 counter queue num 0
+# End of Docker mod
 
 table inet filter {
-    set allowed_ips {
-        type ipv4_addr;
-        flags interval;
-        auto-merge
-    }
-
     chain input {
         type filter hook input priority 0; policy accept;
 
-        # Match DNS responses (source port 53) and enqueue to userspace
-        udp sport 53 queue num 0
-        tcp sport 53 queue num 0
+        # Match DNS responses FIRST (before conntrack check)
+        # Otherwise established DNS responses would bypass the queue
+        udp sport 53 counter queue num 0
+        tcp sport 53 counter queue num 0
+
+        # Accept established/related connections automatically
+        ct state established,related counter accept
+
+        # Queue new connections for Go agent decision
+        ct state new counter queue num 0
     }
 
     chain output {
-        type filter hook output priority 0; policy drop;
+        type filter hook output priority 0; policy accept;
 
-        # Match DNS request (dest port 53) and enqueue to userspace
-        # we could decide to block DNS queries for unallowed domains, prevent DNS exfiltration
-        #udp dport 53 queue num 0 bypass
-        #tcp dport 53 queue num 0 bypass
+        # Match DNS requests FIRST (before conntrack check)
+        # Otherwise established DNS queries would bypass the queue
+        udp dport 53 counter queue num 0
+        tcp dport 53 counter queue num 0
 
-        # Allow outbound DNS requests
-        udp dport 53 accept
-        tcp dport 53 accept
+        # Accept established/related connections automatically
+        ct state established,related counter accept
 
-        # TODO: get rid of this
-        # Allow established and related traffic
-        ct state established,related accept
-
-        # Allow outbound traffic to IPs in google_ips set
-        ip daddr @allowed_ips accept
+        # Queue new connections for Go agent decision
+        ct state new counter queue num 0
     }
 }

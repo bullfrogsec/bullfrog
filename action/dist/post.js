@@ -8,6 +8,10 @@ var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -24,6 +28,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/@actions/core/lib/utils.js
 var require_utils = __commonJS({
@@ -177,7 +182,7 @@ var require_file_command = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto = __importStar(require("crypto"));
-    var fs3 = __importStar(require("fs"));
+    var fs2 = __importStar(require("fs"));
     var os = __importStar(require("os"));
     var utils_1 = require_utils();
     function issueFileCommand(command, message) {
@@ -185,10 +190,10 @@ var require_file_command = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs3.existsSync(filePath)) {
+      if (!fs2.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs3.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os.EOL}`, {
+      fs2.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -18492,12 +18497,12 @@ var require_io_util = __commonJS({
     var _a;
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getCmdPath = exports2.tryGetExecutablePath = exports2.isRooted = exports2.isDirectory = exports2.exists = exports2.READONLY = exports2.UV_FS_O_EXLOCK = exports2.IS_WINDOWS = exports2.unlink = exports2.symlink = exports2.stat = exports2.rmdir = exports2.rm = exports2.rename = exports2.readlink = exports2.readdir = exports2.open = exports2.mkdir = exports2.lstat = exports2.copyFile = exports2.chmod = void 0;
-    var fs3 = __importStar(require("fs"));
+    var fs2 = __importStar(require("fs"));
     var path2 = __importStar(require("path"));
-    _a = fs3.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
+    _a = fs2.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
     exports2.IS_WINDOWS = process.platform === "win32";
     exports2.UV_FS_O_EXLOCK = 268435456;
-    exports2.READONLY = fs3.constants.O_RDONLY;
+    exports2.READONLY = fs2.constants.O_RDONLY;
     function exists(fsPath) {
       return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -19796,16 +19801,22 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 });
 
 // src/post.ts
+var post_exports = {};
+__export(post_exports, {
+  displaySummary: () => displaySummary,
+  filterConnectionsNoise: () => filterConnectionsNoise,
+  getHumanFriendlyReason: () => getHumanFriendlyReason
+});
+module.exports = __toCommonJS(post_exports);
 var core3 = __toESM(require_core());
-var import_promises2 = __toESM(require("node:fs/promises"));
+var import_promises = __toESM(require("node:fs/promises"));
 
 // src/inputs.ts
 var core = __toESM(require_core());
 
 // src/constants.ts
 var AGENT_LOG_FILENAME = "agent.log";
-var TETRAGON_EVENTS_LOG_PATH = "/var/log/tetragon/tetragon.log";
-var AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";
+var CONNECTIONS_LOG_PATH = "/var/log/gha-agent/connections.log";
 var AUDIT = "audit";
 var BLOCK = "block";
 var ALLOWED_DOMAINS_ONLY = "allowed-domains-only";
@@ -19847,6 +19858,7 @@ function parseInputs() {
     allowedIps,
     dnsPolicy,
     enableSudo: core.getBooleanInput("enable-sudo"),
+    collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
@@ -19859,152 +19871,162 @@ var import_node_path = __toESM(require("node:path"));
 
 // src/util.ts
 var core2 = __toESM(require_core());
-var import_promises = __toESM(require("node:fs/promises"));
-async function getFileTimestamp(filePath) {
-  try {
-    const stats = await import_promises.default.stat(filePath);
-    return stats.mtime.getTime();
-  } catch (err) {
-    core2.debug(`Error getting ${filePath} file timestamp: ${err}`);
-    return 0;
+function getDate(timestamp) {
+  if (timestamp > 1e15) {
+    return new Date(timestamp / 1e6);
+  } else if (timestamp > 1e12) {
+    return new Date(timestamp);
+  } else {
+    return new Date(timestamp * 1e3);
   }
 }
 
 // src/post.ts
-var DECISISONS_LOG_PATH = "/var/log/gha-agent/decisions.log";
-async function printAnnotations() {
-  try {
-    const correlatedData = await getCorrelateData();
-    const { egressPolicy } = parseInputs();
-    const result = egressPolicy === BLOCK ? "Blocked" : "Unauthorized";
-    core3.debug("\n\nCorrelated data:\n");
-    const annotations = [];
-    correlatedData.forEach((data) => {
-      core3.debug(JSON.stringify(data));
-      if (data.decision !== "blocked") {
-        return;
-      }
-      const time = data.ts.toISOString();
-      if (data.domain === "unknown") {
-        annotations.push(
-          `[${time}] ${result} request to ${data.destIp}:${data.destPort} from processs \`${data.binary} ${data.args}\``
-        );
-        return;
-      } else if (data.destIp === "unknown") {
-        annotations.push(
-          `[${time}] ${result} DNS request to ${data.domain} from unknown process`
-        );
-      } else {
-        annotations.push(
-          `[${time}] ${result} request to ${data.domain} (${data.destIp}:${data.destPort}) from process \`${data.binary} ${data.args}\``
-        );
-      }
-    });
-    core3.warning(annotations.join("\n"));
-    return;
-  } catch {
-    core3.debug("No annotations found");
-  }
+var REASON_CODE_MAP = {
+  "domain-allowed": "Domain allowed",
+  "domain-not-allowed": "Domain not allowed",
+  "ip-allowed": "IP allowed",
+  "ip-not-allowed": "IP not allowed",
+  "untrusted-dns-server": "Untrusted DNS server",
+  "no-network-layer": "No network layer",
+  "unknown-network-layer": "Unknown network layer"
+};
+function getHumanFriendlyReason(reasonCode) {
+  return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
-async function getOutboundConnections() {
-  try {
-    const connections = [];
-    const agentReadyTimestamp = new Date(
-      await getFileTimestamp(AGENT_READY_PATH)
-    );
-    console.log("Agent ready timestamp: ", agentReadyTimestamp);
-    const tetragonLogFile = await import_promises2.default.open(TETRAGON_EVENTS_LOG_PATH);
-    const functionsToTrack = ["tcp_connect", "udp_sendmsg"];
-    for await (const line of tetragonLogFile.readLines()) {
-      const processEntry = JSON.parse(line.trimEnd())?.process_kprobe;
-      if (processEntry?.["policy_name"] !== "connect") {
-        continue;
-      }
-      if (new Date(processEntry.process.start_time) < agentReadyTimestamp) {
-        continue;
-      }
-      if (!functionsToTrack.includes(processEntry.function_name)) {
-        continue;
-      }
-      connections.push({
-        ts: new Date(processEntry.process.start_time),
-        destIp: processEntry.args[0].sock_arg.daddr,
-        destPort: processEntry.args[0].sock_arg.dport,
-        binary: processEntry.process.binary,
-        args: processEntry.process.arguments
-      });
-    }
-    return connections;
-  } catch (error) {
-    console.error("Error reading log file", error);
-    return [];
+async function displaySummary(connections) {
+  const summary2 = core3.summary;
+  summary2.addHeading("Bullfrog Results", 3);
+  if (connections.length > 0) {
+    summary2.addHeading("Connection Results", 4);
+    const tableData = [
+      [
+        { data: "Timestamp", header: true },
+        { data: "Domain", header: true },
+        { data: "IP", header: true },
+        { data: "Port", header: true },
+        { data: "Protocol", header: true },
+        { data: "Reason", header: true },
+        { data: "Status", header: true },
+        { data: "Process", header: true },
+        { data: "Container", header: true },
+        { data: "Exe Path", header: true },
+        { data: "Command Line", header: true }
+      ],
+      ...connections.map((conn) => [
+        conn.timestamp.toISOString(),
+        conn.domain || "-",
+        conn.ip || "-",
+        conn.port?.toString() || "-",
+        conn.protocol,
+        getHumanFriendlyReason(conn.reason),
+        conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized",
+        conn.process || "-",
+        conn.docker ? `${conn.docker.containerImage}:${conn.docker.containerName}` : "-",
+        conn.exePath || "-",
+        conn.commandLine || "-"
+      ])
+    ];
+    summary2.addTable(tableData);
+  } else {
+    summary2.addRaw("\n\nNo outbound connections detected.\n");
   }
+  await summary2.write();
 }
-async function getDecisions() {
-  try {
-    const decisions = [];
-    const log = await import_promises2.default.readFile(DECISISONS_LOG_PATH, "utf8");
-    const lines = log.split("\n");
-    for (const line of lines) {
-      const values = line.split("|");
-      decisions.push({
-        ts: new Date(parseInt(values[0]) * 1e3),
-        decision: values[1],
-        domain: values[2],
-        destIp: values[3]
-      });
-    }
-    return decisions;
-  } catch (error) {
-    console.error("Error reading log file", error);
-    return [];
-  }
-}
-async function getCorrelateData() {
+async function getConnections() {
   await new Promise((resolve) => setTimeout(resolve, 5e3));
-  const connections = await getOutboundConnections();
-  core3.debug("\n\nConnections:\n");
-  connections.forEach((c) => core3.debug(JSON.stringify(c)));
-  const decisions = await getDecisions();
-  core3.debug("\nDecisions:\n");
-  decisions.forEach((d) => core3.debug(JSON.stringify(d)));
-  const correlatedData = [];
-  for (const connection of connections) {
-    let decision = decisions.find(
-      (d) => connection.destIp === d.destIp && d.domain !== "unknown"
-    );
-    if (decision === void 0) {
-      decision = decisions.find((d) => connection.destIp === d.destIp);
+  try {
+    const allConnections = [];
+    const { egressPolicy } = parseInputs();
+    const log = await import_promises.default.readFile(CONNECTIONS_LOG_PATH, "utf8");
+    const lines = log.split("\n");
+    core3.debug("\n\nConnections.log:\n");
+    lines.forEach((l) => core3.debug(l));
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        const logEntry = JSON.parse(line);
+        const timestamp = parseInt(logEntry.timestamp, 10);
+        if (isNaN(timestamp)) {
+          continue;
+        }
+        const date = getDate(timestamp);
+        const decision = logEntry.decision;
+        const protocol = logEntry.protocol;
+        const destIp = logEntry.dstIP;
+        const destPort = logEntry.dstPort;
+        const domain = logEntry.domain;
+        const reason = logEntry.reason;
+        const process2 = logEntry.processName;
+        const commandLine = logEntry.commandLine;
+        const exePath = logEntry.executablePath;
+        const docker = logEntry.docker;
+        allConnections.push({
+          timestamp: date,
+          domain: domain !== "unknown" ? domain : void 0,
+          ip: destIp !== "unknown" ? destIp : void 0,
+          port: destPort !== "unknown" ? parseInt(destPort) : void 0,
+          blocked: decision === "blocked" && egressPolicy === BLOCK,
+          authorized: decision === "allowed",
+          protocol,
+          reason,
+          process: process2 !== "unknown" ? process2 : void 0,
+          exePath: exePath !== "unknown" ? exePath : void 0,
+          commandLine: commandLine !== "unknown" ? commandLine : void 0,
+          docker: docker || void 0
+        });
+      } catch {
+        core3.warning(`Failed to parse log line: ${line}`);
+        continue;
+      }
     }
-    correlatedData.push({
-      ts: connection.ts,
-      decision: decision?.decision ?? "blocked",
-      // if we don't have a decision, assume it's blocked because we use an allowlist
-      domain: decision?.domain ?? "unknown",
-      destIp: connection.destIp,
-      destPort: connection.destPort,
-      binary: connection.binary,
-      args: connection.args
-    });
+    const filtered = filterConnectionsNoise(allConnections);
+    core3.debug("\n\nConnections:\n");
+    filtered.forEach((c) => core3.debug(JSON.stringify(c)));
+    return filtered;
+  } catch (error) {
+    console.error("Error reading connections log file", error);
+    return [];
   }
-  for (const decision of decisions.filter((d) => d.destIp === "unknown")) {
-    correlatedData.push({
-      ts: decision.ts,
-      decision: decision.decision,
-      domain: decision.domain,
-      destIp: "unknown",
-      destPort: "unknown",
-      binary: "unknown",
-      args: "unknown"
-    });
+}
+function getProcessKey(conn) {
+  const process2 = conn.process || "unknown-process";
+  const exePath = conn.exePath || "unknown-exePath";
+  const commandLine = conn.commandLine || "unknown-commandLine";
+  return `${process2}|${exePath}|${commandLine}`;
+}
+function getDockerKey(conn) {
+  if (conn.docker) {
+    return `${conn.docker.containerImage}:${conn.docker.containerName}`;
   }
-  return correlatedData;
+  return "no-docker";
+}
+function filterConnectionsNoise(connections) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  const sorted = [...connections].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
+  for (const conn of sorted) {
+    const domain = conn.domain || "unknown";
+    const ip = conn.ip || "unknown";
+    const processKey = getProcessKey(conn);
+    const dockerKey = getDockerKey(conn);
+    const key = `${domain}|${ip}|${processKey}|${dockerKey}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(conn);
+    }
+  }
+  return result;
 }
 async function printAgentLogs({
   agentLogFilepath
 }) {
   try {
-    const log = await import_promises2.default.readFile(agentLogFilepath, "utf8");
+    const log = await import_promises.default.readFile(agentLogFilepath, "utf8");
     const lines = log.split("\n");
     for (const line of lines) {
       core3.debug(line);
@@ -20016,13 +20038,28 @@ async function printAgentLogs({
 async function main() {
   const { logDirectory } = parseInputs();
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
-  await printAnnotations();
   await printAgentLogs({ agentLogFilepath });
+  try {
+    const connections = await getConnections();
+    await displaySummary(connections);
+  } catch (error) {
+    core3.warning(
+      `Failed to process results: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
-main().catch((error) => {
-  console.error(error);
-  core3.setFailed(error);
-  process.exit(1);
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    core3.setFailed(error);
+    process.exit(1);
+  });
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  displaySummary,
+  filterConnectionsNoise,
+  getHumanFriendlyReason
 });
 /*! Bundled license information:
 
