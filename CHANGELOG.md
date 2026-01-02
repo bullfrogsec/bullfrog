@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.0](https://github.com/bullfrogsec/bullfrog/compare/v0.8.4...v1.0.0) (2026-01-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove dependency on tetragon and other improvements ([#216](https://github.com/bullfrogsec/bullfrog/issues/216))
+* restrict default allowed domains ([#217](https://github.com/bullfrogsec/bullfrog/issues/217))
+* update action to use node 24 ([#200](https://github.com/bullfrogsec/bullfrog/issues/200))
+
+### Features
+
+* remove dependency on tetragon and other improvements ([#216](https://github.com/bullfrogsec/bullfrog/issues/216)) ([40496a3](https://github.com/bullfrogsec/bullfrog/commit/40496a30fe1fe11af6e0e4e3abcaf3d2b60eb286))
+* restrict default allowed domains ([#217](https://github.com/bullfrogsec/bullfrog/issues/217)) ([a16a2ef](https://github.com/bullfrogsec/bullfrog/commit/a16a2ef7ac3db7b02932979fdc0a2d0e84e1ac8e))
+* update action to use node 24 ([#200](https://github.com/bullfrogsec/bullfrog/issues/200)) ([ba336b2](https://github.com/bullfrogsec/bullfrog/commit/ba336b2fc6ecde98b446b5e6a65c46a044c37ef2))
+
 ## [0.8.4](https://github.com/bullfrogsec/bullfrog/compare/v0.8.3...v0.8.4) (2025-05-14)
 
 
