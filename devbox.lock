@@ -1,8 +1,193 @@
 {
   "lockfile_version": "1",
   "packages": {
-    "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "resolved": "github:NixOS/nixpkgs/a8d610af3f1a5fb71e23e08434d8d61a466fc942?lastModified=1763618868&narHash=sha256-v5afmLjn%2FuyD9EQuPBn7nZuaZVV9r%2BJerayK%2F4wvdWA%3D"
+    "gcc@latest": {
+      "last_modified": "2025-11-23T21:50:36Z",
+      "resolved": "github:NixOS/nixpkgs/ee09932cedcef15aaf476f9343d1dea2cb77e261#gcc15",
+      "source": "devbox-search",
+      "version": "15.2.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/10c1v61i0srsfrygar8lff6m04i0f87r-gcc-wrapper-15.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/ry1wn2cchv5nhqz1fjlfvjbzri9bqsfi-gcc-wrapper-15.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/0px8m9jkrr8bw9z9blvakxbn8ai1y3z4-gcc-wrapper-15.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/10c1v61i0srsfrygar8lff6m04i0f87r-gcc-wrapper-15.2.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/sfbljndjwpaxpjlcqb1ijbwl5mrhg275-gcc-wrapper-15.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/n2yiyrp77gxvkymg89h3sc3jrwy2bsxw-gcc-wrapper-15.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/yvzyq172na36p1nci7qv8x9jf9k4jmkg-gcc-wrapper-15.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/sfbljndjwpaxpjlcqb1ijbwl5mrhg275-gcc-wrapper-15.2.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/an9sir2scyhjnj0nd46x9hmgwkzhlv37-gcc-wrapper-15.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/r35c3ssh1gwmp15xnz1jbihgzv7hpbrp-gcc-wrapper-15.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/3d8mkahyxfdm5780hr93npjqvcngj7cw-gcc-wrapper-15.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/an9sir2scyhjnj0nd46x9hmgwkzhlv37-gcc-wrapper-15.2.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/c0gzhvsgxrl8lwdy1q9qwyjzandqjw53-gcc-wrapper-15.2.0",
+              "default": true
+            },
+            {
+              "name": "man",
+              "path": "/nix/store/5s05f2faclcqkwxwk4mypwgy4fms66wl-gcc-wrapper-15.2.0-man",
+              "default": true
+            },
+            {
+              "name": "info",
+              "path": "/nix/store/hj8i63x845rcqacn7jiqqzcxfcwj169q-gcc-wrapper-15.2.0-info"
+            }
+          ],
+          "store_path": "/nix/store/c0gzhvsgxrl8lwdy1q9qwyjzandqjw53-gcc-wrapper-15.2.0"
+        }
+      }
+    },
+    "go@1.24.11": {
+      "last_modified": "2025-12-03T03:51:48Z",
+      "resolved": "github:NixOS/nixpkgs/cadcc8de247676e4751c9d4a935acb2c0b059113#go_1_24",
+      "source": "devbox-search",
+      "version": "1.24.11",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/8k6qc3a84qvq9k85d7szjrknb91baqza-go-1.24.11",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/8k6qc3a84qvq9k85d7szjrknb91baqza-go-1.24.11"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/qnfbvhrv4nv8rij76fp4pw6wjijc9dwh-go-1.24.11",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/qnfbvhrv4nv8rij76fp4pw6wjijc9dwh-go-1.24.11"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/cisrkjr39cdgwyc42r1348ly04jahh9d-go-1.24.11",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/cisrkjr39cdgwyc42r1348ly04jahh9d-go-1.24.11"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/i2yqx3x40i64g0mcb2ray2rxvz1zwbhm-go-1.24.11",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/i2yqx3x40i64g0mcb2ray2rxvz1zwbhm-go-1.24.11"
+        }
+      }
+    },
+    "libnetfilter_queue@latest": {
+      "last_modified": "2025-11-23T21:50:36Z",
+      "resolved": "github:NixOS/nixpkgs/ee09932cedcef15aaf476f9343d1dea2cb77e261#libnetfilter_queue",
+      "source": "devbox-search",
+      "version": "1.0.5",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4zb0rlc437l1id9k5vggk151py8pgk1w-libnetfilter_queue-1.0.5",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4zb0rlc437l1id9k5vggk151py8pgk1w-libnetfilter_queue-1.0.5"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/lzi6zc6z4gq2vmiaz4dhhga5vz24r17g-libnetfilter_queue-1.0.5",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/lzi6zc6z4gq2vmiaz4dhhga5vz24r17g-libnetfilter_queue-1.0.5"
+        }
+      }
+    },
+    "libnfnetlink@latest": {
+      "last_modified": "2025-11-23T21:50:36Z",
+      "resolved": "github:NixOS/nixpkgs/ee09932cedcef15aaf476f9343d1dea2cb77e261#libnfnetlink",
+      "source": "devbox-search",
+      "version": "1.0.2",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/q118sxc5fbdq6ay59l9a58as94m68wh1-libnfnetlink-1.0.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/q118sxc5fbdq6ay59l9a58as94m68wh1-libnfnetlink-1.0.2"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4r8szg26d0wp5ir82g9v7nnwwy682mmp-libnfnetlink-1.0.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4r8szg26d0wp5ir82g9v7nnwwy682mmp-libnfnetlink-1.0.2"
+        }
+      }
     },
     "nodejs@24": {
       "last_modified": "2025-11-18T03:14:24Z",

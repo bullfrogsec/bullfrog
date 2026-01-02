@@ -22,6 +22,11 @@ inputs:
     type: boolean
     default: true
 
+  collect-process-info:
+    description: "Enable this option to collect process information (PID, process name, command line) for network connections. Options: 'true' (default) or 'false'."
+    type: boolean
+    default: true
+
   _agent-download-base-url:
     description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork. The URL should end with a slash."
     type: string

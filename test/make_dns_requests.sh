@@ -1,4 +1,13 @@
 #!/bin/bash
+#
+# Expected Bullfrog Configuration:
+#   egress-policy: block
+#   allowed-domains: *.google.com
+#
+# This test verifies DNS filtering behavior:
+#   - DNS queries for allowed domains should succeed
+#   - DNS queries for blocked domains should fail
+#   - DNS queries to untrusted DNS servers should fail
 
 if timeout 5 dig example.com; then
   echo 'Expected 'dig example.com' to fail, but it succeeded'

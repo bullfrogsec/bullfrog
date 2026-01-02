@@ -11,9 +11,9 @@ apt-get install --yes jq make net-tools libnetfilter-queue-dev
 # https://askubuntu.com/questions/1367139/apt-get-upgrade-auto-restart-services
 apt-get remove --yes needrestart
 
-# install golang 1.22.4
-curl -OL https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
-tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
+# install golang 1.24.11
+curl -OL https://go.dev/dl/go1.24.11.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.24.11.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/vagrant/.bashrc
 
 # install Node.js 20.x
@@ -37,5 +37,4 @@ echo \
 apt-get update
 apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-groupadd docker
 usermod -aG docker vagrant

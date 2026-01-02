@@ -154,7 +154,9 @@ jobs:
           enable-sudo: false
 
       - name: Make HTTP requests
-        run: source test/make_http_requests.sh
+        run: |
+          source test/make_http_requests.sh
+          source test/make_docker_pull.sh
 
       - name: Make DNS requests
         run: source test/make_dns_requests.sh
@@ -186,7 +188,9 @@ jobs:
           egress-policy: block
 
       - name: Make HTTP requests
-        run: source test/make_http_requests.sh
+        run:  |
+          source test/make_http_requests.sh
+          source test/make_docker_pull.sh
 
       - name: Make DNS requests
         run: |
@@ -220,18 +224,7 @@ jobs:
           egress-policy: block
 
       - name: Test curl calls within Docker
-        run: |
-          docker run --rm --entrypoint sh alpine/curl:8.7.1 -c "
-            if ! timeout 5 curl https://www.google.com --output /dev/null; then
-              echo 'Expected curl to www.google.com to succeed, but it failed';
-              exit 1;
-            fi;
-
-            if timeout 5 curl https://www.bing.com --output /dev/null; then
-              echo 'Expected curl to www.bing.com to fail, but it succeeded';
-              exit 1;
-            fi;
-          "
+        run: source test/make_docker_requests.sh
 
       - name: Nginx
         run: source test/docker_nginx.sh
@@ -248,7 +241,8 @@ jobs:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
         with:
-          egress-policy: block
+          # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
+          egress-policy: audit
           allowed-domains: |
             *.canonical.com
             *.github.com
@@ -263,7 +257,12 @@ jobs:
             vagrantcloud-files-production.s3-accelerate.amazonaws.com
             vagrantcloud.com
             www.google.com
+            *.docker.io
+            production.cloudflare.docker.com
+            docker-images-prod.*.r2.cloudflarestorage.com
             *.hashicorp.com
+          allowed-ips: |
+            8.8.8.8
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
