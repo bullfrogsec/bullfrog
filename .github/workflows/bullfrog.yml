@@ -85,10 +85,15 @@ jobs:
             agent/agent
             action/dist
 
-      - name: Attest build provenance
+      - name: Attest agent build provenance
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: agent/agent
+
+      - name: Attest action dist build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: action/dist/*.js
 
   check-artifacts:
     needs: build
@@ -492,11 +497,17 @@ jobs:
           tar -czf agent.tar.gz agent/agent
           gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
 
-      - name: Attest release artifact
+      - name: Attest release agent artifact
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: agent/agent
+
+      - name: Attest release action dist artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: action/dist/*.js
 
   pre-release-validation:
     needs: pre-release
