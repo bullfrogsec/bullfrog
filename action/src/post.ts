@@ -76,9 +76,9 @@ export async function displaySummary(
   controlPlaneBaseUrl?: string,
 ): Promise<void> {
   const summary = core.summary;
+  const workflowRunId = process.env.GITHUB_RUN_ID;
 
-  if (controlPlaneBaseUrl) {
-    const { workflowRunId } = getGitHubContext();
+  if (controlPlaneBaseUrl && workflowRunId) {
     const baseUrl = controlPlaneBaseUrl.endsWith("/")
       ? controlPlaneBaseUrl
       : `${controlPlaneBaseUrl}/`;
@@ -140,7 +140,7 @@ export async function displaySummary(
   await summary.write();
 }
 
-async function getConnections(): Promise<{
+export async function getConnections(): Promise<{
   filtered: Connection[];
   raw: Connection[];
 }> {
@@ -275,7 +275,7 @@ async function printAgentLogs({
   }
 }
 
-async function submitResultsToControlPlane(
+export async function submitResultsToControlPlane(
   connections: Connection[],
   apiToken: string,
   controlPlaneBaseUrl: string,
