@@ -200,7 +200,7 @@ async function main() {
     logDirectory,
     agentVersion,
     apiToken,
-    controlPlaneBaseUrl,
+    controlPlaneApiBaseUrl,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -211,9 +211,9 @@ async function main() {
   const pkg = require(`${actionDirectory}/../package.json`);
 
   // Add control plane domain to allowed domains if API token is provided
-  if (apiToken) {
+  if (apiToken && controlPlaneApiBaseUrl) {
     try {
-      const url = new URL(controlPlaneBaseUrl);
+      const url = new URL(controlPlaneApiBaseUrl);
       const controlPlaneDomain = url.hostname;
       allowedDomains.push(controlPlaneDomain);
       core.info(
@@ -234,16 +234,12 @@ async function main() {
 
   // Determine version: use override or fallback to package.json
   const version = agentVersion || `v${pkg.version}`;
-  // Remove 'v' prefix if present since downloadAgent adds it
-  const versionWithoutPrefix = version.startsWith("v")
-    ? version.slice(1)
-    : version;
 
   await installAgent({
     actionDirectory,
     agentDirectory,
     localAgent,
-    version: versionWithoutPrefix,
+    version,
     agentDownloadBaseURL,
   });
 

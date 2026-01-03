@@ -31,7 +31,7 @@ inputs:
     default: true
 
   _agent-download-base-url:
-    description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork. The URL should end with a slash."
+    description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork."
     type: string
     default: "https://github.com/bullfrogsec/bullfrog/releases/download/"
 
@@ -39,10 +39,15 @@ inputs:
     description: "(Internal) Override the agent version to download. Must start with 'v' followed by semver (e.g., 'v0.8.4', 'v0.8.4-beta-feature', 'v1.0.0-rc'). If not specified, uses the version from package.json."
     type: string
 
-  _control-plane-base-url:
-    description: "(Internal) Base URL for the Bullfrog control plane API. This is useful for testing changes in a fork. The URL should end with a slash."
+  _control-plane-api-base-url:
+    description: "(Internal) Base URL for the Bullfrog control plane API. This is useful for testing changes in a fork."
     type: string
     default: "https://api.bullfrogsec.com/"
+
+  _control-plane-webapp-base-url:
+    description: "(Internal) Base URL for the Bullfrog control plane webapp. This is useful for testing changes in a fork."
+    type: string
+    default: "https://app.bullfrogsec.com/"
 
   _log-directory:
     description: "(Internal) Directory to store log files."

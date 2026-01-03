@@ -73,21 +73,17 @@ export function getHumanFriendlyReason(reasonCode: string): string {
 
 export async function displaySummary(
   connections: Connection[],
-  controlPlaneBaseUrl?: string,
+  controlPlaneWebappBaseUrl?: string,
 ): Promise<void> {
   const summary = core.summary;
   const workflowRunId = process.env.GITHUB_RUN_ID;
 
-  if (controlPlaneBaseUrl && workflowRunId) {
-    const baseUrl = controlPlaneBaseUrl.endsWith("/")
-      ? controlPlaneBaseUrl
-      : `${controlPlaneBaseUrl}/`;
-
+  if (controlPlaneWebappBaseUrl && workflowRunId) {
     summary
       .addHeading("Bullfrog Control Plane", 3)
       .addLink(
         "View detailed results",
-        `${baseUrl}workflow-run/${workflowRunId}`,
+        `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`,
       );
   } else {
     summary.addHeading("Bullfrog Results", 3);
@@ -278,7 +274,7 @@ async function printAgentLogs({
 export async function submitResultsToControlPlane(
   connections: Connection[],
   apiToken: string,
-  controlPlaneBaseUrl: string,
+  controlPlaneApiBaseUrl: string,
 ): Promise<void> {
   try {
     const { workflowRunId, runAttempt, jobName, organization, repo } =
@@ -297,11 +293,7 @@ export async function submitResultsToControlPlane(
       `Submitting results to control plane: ${JSON.stringify(payload)}`,
     );
 
-    // Ensure the base URL ends with a slash
-    const baseUrl = controlPlaneBaseUrl.endsWith("/")
-      ? controlPlaneBaseUrl
-      : `${controlPlaneBaseUrl}/`;
-    const apiUrl = `${baseUrl}v1/events`;
+    const apiUrl = `${controlPlaneApiBaseUrl}v1/events`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -330,7 +322,12 @@ export async function submitResultsToControlPlane(
 }
 
 async function main() {
-  const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
+  const {
+    logDirectory,
+    apiToken,
+    controlPlaneApiBaseUrl,
+    controlPlaneWebappBaseUrl,
+  } = parseInputs();
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   await printAgentLogs({ agentLogFilepath });
@@ -338,11 +335,17 @@ async function main() {
   try {
     const { filtered, raw } = await getConnections();
 
-    await displaySummary(filtered, apiToken ? controlPlaneBaseUrl : undefined);
+    const shouldAddControlPlaneResultsUrl =
+      apiToken && controlPlaneWebappBaseUrl;
+
+    await displaySummary(
+      filtered,
+      shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : undefined,
+    );
 
     // Submit results to control plane if API token is provided
-    if (apiToken) {
-      await submitResultsToControlPlane(raw, apiToken, controlPlaneBaseUrl);
+    if (apiToken && controlPlaneApiBaseUrl) {
+      await submitResultsToControlPlane(raw, apiToken, controlPlaneApiBaseUrl);
     }
   } catch (error) {
     core.warning(

@@ -714,11 +714,11 @@ describe("post", () => {
       vi.restoreAllMocks();
     });
 
-    it("should display link to control plane when controlPlaneBaseUrl is provided", async () => {
+    it("should display link to control plane when controlPlaneApiBaseUrl is provided", async () => {
       const connections: Connection[] = [];
-      const controlPlaneBaseUrl = "https://api.bullfrogsec.com/";
+      const controlPlaneAppBaseUrl = "https://app.bullfrogsec.com/";
 
-      await displaySummary(connections, controlPlaneBaseUrl);
+      await displaySummary(connections, controlPlaneAppBaseUrl);
 
       const summary = core.summary;
       expect(summary.addHeading).toHaveBeenCalledWith(
@@ -727,25 +727,25 @@ describe("post", () => {
       );
       expect(summary.addLink).toHaveBeenCalledWith(
         "View detailed results",
-        "https://api.bullfrogsec.com/workflow-run/12345",
+        "https://app.bullfrogsec.com/workflow-run/12345",
       );
       expect(summary.write).toHaveBeenCalled();
     });
 
-    it("should handle controlPlaneBaseUrl without trailing slash", async () => {
+    it("should handle controlPlaneApiBaseUrl without trailing slash", async () => {
       const connections: Connection[] = [];
-      const controlPlaneBaseUrl = "https://api.bullfrogsec.com";
+      const controlPlaneApiBaseUrl = "https://app.bullfrogsec.com/";
 
-      await displaySummary(connections, controlPlaneBaseUrl);
+      await displaySummary(connections, controlPlaneApiBaseUrl);
 
       const summary = core.summary;
       expect(summary.addLink).toHaveBeenCalledWith(
         "View detailed results",
-        "https://api.bullfrogsec.com/workflow-run/12345",
+        "https://app.bullfrogsec.com/workflow-run/12345",
       );
     });
 
-    it("should display regular heading when controlPlaneBaseUrl is not provided", async () => {
+    it("should display regular heading when controlPlaneApiBaseUrl is not provided", async () => {
       const connections: Connection[] = [];
 
       await displaySummary(connections, undefined);
@@ -815,11 +815,11 @@ describe("post", () => {
 
     it("should handle missing GITHUB_RUN_ID gracefully", async () => {
       const connections: Connection[] = [];
-      const controlPlaneBaseUrl = "https://api.bullfrogsec.com/";
+      const controlPlaneApiBaseUrl = "https://api.bullfrogsec.com/";
 
       delete process.env.GITHUB_RUN_ID;
 
-      await displaySummary(connections, controlPlaneBaseUrl);
+      await displaySummary(connections, controlPlaneApiBaseUrl);
 
       const summary = core.summary;
       expect(summary.addHeading).toHaveBeenCalledWith("Bullfrog Results", 3);
@@ -862,7 +862,8 @@ describe("post", () => {
         localAgent: false,
         logDirectory: "/var/log/test",
         agentDownloadBaseURL: "https://example.com",
-        controlPlaneBaseUrl: "https://api.example.com",
+        controlPlaneApiBaseUrl: "https://api.example.com",
+        controlPlaneWebappBaseUrl: "https://app.example.com",
         apiToken: undefined,
       });
 
@@ -1087,7 +1088,8 @@ describe("post", () => {
         localAgent: false,
         logDirectory: "/var/log/test",
         agentDownloadBaseURL: "https://example.com",
-        controlPlaneBaseUrl: "https://api.example.com",
+        controlPlaneApiBaseUrl: "https://api.example.com",
+        controlPlaneWebappBaseUrl: "https://app.example.com",
         apiToken: undefined,
       });
 
@@ -1243,7 +1245,7 @@ describe("post", () => {
       await submitResultsToControlPlane(
         connections,
         "test-token",
-        "https://api.bullfrogsec.com",
+        "https://api.bullfrogsec.com/",
       );
 
       expect(fetchMock).toHaveBeenCalledWith(

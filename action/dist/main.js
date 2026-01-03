@@ -19834,6 +19834,12 @@ function validateAgentVersion(version) {
     );
   }
 }
+function formatUrlWithTrailingSlash(url) {
+  if (!url) {
+    return;
+  }
+  return url.endsWith("/") ? url : `${url}/`;
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19855,6 +19861,12 @@ function parseInputs() {
     validateAgentVersion(agentVersion);
   }
   const apiToken = core.getInput("api-token");
+  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
+    core.getInput("_agent-download-base-url")
+  );
+  if (!agentDownloadBaseURL) {
+    throw new Error(`_agent-download-base-url cannot be empty`);
+  }
   return {
     allowedDomains,
     allowedIps,
@@ -19864,9 +19876,14 @@ function parseInputs() {
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
+    agentDownloadBaseURL,
     agentVersion: agentVersion || void 0,
-    controlPlaneBaseUrl: core.getInput("_control-plane-base-url"),
+    controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-api-base-url")
+    ),
+    controlPlaneWebappBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-webapp-base-url")
+    ),
     apiToken: apiToken || void 0
   };
 }
@@ -20024,14 +20041,14 @@ async function main() {
     logDirectory,
     agentVersion,
     apiToken,
-    controlPlaneBaseUrl
+    controlPlaneApiBaseUrl
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
   const pkg = require(`${actionDirectory}/../package.json`);
-  if (apiToken) {
+  if (apiToken && controlPlaneApiBaseUrl) {
     try {
-      const url = new URL(controlPlaneBaseUrl);
+      const url = new URL(controlPlaneApiBaseUrl);
       const controlPlaneDomain = url.hostname;
       allowedDomains.push(controlPlaneDomain);
       core3.info(
@@ -20047,12 +20064,11 @@ async function main() {
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   installPackages();
   const version = agentVersion || `v${pkg.version}`;
-  const versionWithoutPrefix = version.startsWith("v") ? version.slice(1) : version;
   await installAgent({
     actionDirectory,
     agentDirectory,
     localAgent,
-    version: versionWithoutPrefix,
+    version,
     agentDownloadBaseURL
   });
   await startAgent({

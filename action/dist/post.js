@@ -19846,6 +19846,12 @@ function validateAgentVersion(version) {
     );
   }
 }
+function formatUrlWithTrailingSlash(url) {
+  if (!url) {
+    return;
+  }
+  return url.endsWith("/") ? url : `${url}/`;
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19867,6 +19873,12 @@ function parseInputs() {
     validateAgentVersion(agentVersion);
   }
   const apiToken = core.getInput("api-token");
+  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
+    core.getInput("_agent-download-base-url")
+  );
+  if (!agentDownloadBaseURL) {
+    throw new Error(`_agent-download-base-url cannot be empty`);
+  }
   return {
     allowedDomains,
     allowedIps,
@@ -19876,9 +19888,14 @@ function parseInputs() {
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
+    agentDownloadBaseURL,
     agentVersion: agentVersion || void 0,
-    controlPlaneBaseUrl: core.getInput("_control-plane-base-url"),
+    controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-api-base-url")
+    ),
+    controlPlaneWebappBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-webapp-base-url")
+    ),
     apiToken: apiToken || void 0
   };
 }
@@ -19924,14 +19941,13 @@ function getGitHubContext() {
 function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
-async function displaySummary(connections, controlPlaneBaseUrl) {
+async function displaySummary(connections, controlPlaneWebappBaseUrl) {
   const summary2 = core3.summary;
   const workflowRunId = process.env.GITHUB_RUN_ID;
-  if (controlPlaneBaseUrl && workflowRunId) {
-    const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
+  if (controlPlaneWebappBaseUrl && workflowRunId) {
     summary2.addHeading("Bullfrog Control Plane", 3).addLink(
       "View detailed results",
-      `${baseUrl}workflow-run/${workflowRunId}`
+      `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`
     );
   } else {
     summary2.addHeading("Bullfrog Results", 3);
@@ -20074,7 +20090,7 @@ async function printAgentLogs({
     console.error("Error reading log file", error);
   }
 }
-async function submitResultsToControlPlane(connections, apiToken, controlPlaneBaseUrl) {
+async function submitResultsToControlPlane(connections, apiToken, controlPlaneApiBaseUrl) {
   try {
     const { workflowRunId, runAttempt, jobName, organization, repo } = getGitHubContext();
     const payload = {
@@ -20088,8 +20104,7 @@ async function submitResultsToControlPlane(connections, apiToken, controlPlaneBa
     core3.debug(
       `Submitting results to control plane: ${JSON.stringify(payload)}`
     );
-    const baseUrl = controlPlaneBaseUrl.endsWith("/") ? controlPlaneBaseUrl : `${controlPlaneBaseUrl}/`;
-    const apiUrl = `${baseUrl}v1/events`;
+    const apiUrl = `${controlPlaneApiBaseUrl}v1/events`;
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -20114,14 +20129,23 @@ async function submitResultsToControlPlane(connections, apiToken, controlPlaneBa
   }
 }
 async function main() {
-  const { logDirectory, apiToken, controlPlaneBaseUrl } = parseInputs();
+  const {
+    logDirectory,
+    apiToken,
+    controlPlaneApiBaseUrl,
+    controlPlaneWebappBaseUrl
+  } = parseInputs();
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   await printAgentLogs({ agentLogFilepath });
   try {
     const { filtered, raw } = await getConnections();
-    await displaySummary(filtered, apiToken ? controlPlaneBaseUrl : void 0);
-    if (apiToken) {
-      await submitResultsToControlPlane(raw, apiToken, controlPlaneBaseUrl);
+    const shouldAddControlPlaneResultsUrl = apiToken && controlPlaneWebappBaseUrl;
+    await displaySummary(
+      filtered,
+      shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : void 0
+    );
+    if (apiToken && controlPlaneApiBaseUrl) {
+      await submitResultsToControlPlane(raw, apiToken, controlPlaneApiBaseUrl);
     }
   } catch (error) {
     core3.warning(
