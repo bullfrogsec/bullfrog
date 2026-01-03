@@ -30,13 +30,15 @@ async function downloadAgent({
   version: string;
   agentDownloadBaseURL: string;
 }) {
-  console.log(`Downloading agent v${version}`);
+  // Add 'v' prefix if not present
+  const versionTag = version.startsWith("v") ? version : `v${version}`;
+  console.log(`Downloading agent ${versionTag}`);
 
   const { status } = spawnSync(
     "bash",
     [
       path.join(actionDirectory, "scripts", "download_agent.sh"),
-      `v${version}`,
+      versionTag,
       agentDownloadBaseURL,
     ],
     {
@@ -196,6 +198,7 @@ async function main() {
     collectProcessInfo,
     localAgent,
     logDirectory,
+    agentVersion,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -211,11 +214,18 @@ async function main() {
 
   installPackages();
 
+  // Determine version: use override or fallback to package.json
+  const version = agentVersion || `v${pkg.version}`;
+  // Remove 'v' prefix if present since downloadAgent adds it
+  const versionWithoutPrefix = version.startsWith("v")
+    ? version.slice(1)
+    : version;
+
   await installAgent({
     actionDirectory,
     agentDirectory,
     localAgent,
-    version: pkg.version,
+    version: versionWithoutPrefix,
     agentDownloadBaseURL,
   });
 

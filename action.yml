@@ -32,6 +32,10 @@ inputs:
     type: string
     default: "https://github.com/bullfrogsec/bullfrog/releases/download/"
 
+  _agent-version:
+    description: "(Internal) Override the agent version to download. Must start with 'v' followed by semver (e.g., 'v0.8.4', 'v0.8.4-beta-feature', 'v1.0.0-rc'). If not specified, uses the version from package.json."
+    type: string
+
   _log-directory:
     description: "(Internal) Directory to store log files."
     type: string

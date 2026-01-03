@@ -19837,6 +19837,13 @@ function validateDomains(domains) {
     }
   });
 }
+function validateAgentVersion(version) {
+  if (!version.match(/^v\d+\.\d+\.\d+(-[A-Za-z0-9-]+)?$/)) {
+    throw new Error(
+      `Invalid agent version format: ${version}. Must start with 'v' followed by semver (e.g., 'v0.8.4' or 'v0.8.4-beta-feature')`
+    );
+  }
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19853,6 +19860,10 @@ function parseInputs() {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
   const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
+  const agentVersion = core.getInput("_agent-version");
+  if (agentVersion) {
+    validateAgentVersion(agentVersion);
+  }
   return {
     allowedDomains,
     allowedIps,
@@ -19862,7 +19873,8 @@ function parseInputs() {
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL: core.getInput("_agent-download-base-url")
+    agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
+    agentVersion: agentVersion || void 0
   };
 }
 
