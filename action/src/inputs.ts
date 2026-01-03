@@ -13,7 +13,7 @@ export interface Inputs {
   egressPolicy: EgressPolicy;
   localAgent: boolean;
   logDirectory: string;
-  agentDownloadBaseURL: string;
+  agentDownloadBaseURL?: string;
   agentVersion?: string;
   controlPlaneApiBaseUrl?: string;
   controlPlaneWebappBaseUrl?: string;

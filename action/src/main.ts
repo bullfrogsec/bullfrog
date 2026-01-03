@@ -65,7 +65,7 @@ async function installAgent({
   agentDirectory: string;
   localAgent: boolean;
   version: string;
-  agentDownloadBaseURL: string;
+  agentDownloadBaseURL?: string;
 }): Promise<void> {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
@@ -73,7 +73,8 @@ async function installAgent({
     await downloadAgent({
       actionDirectory,
       agentDirectory,
-      agentDownloadBaseURL,
+      // Input validation will ensure there is a value when localAgent = false
+      agentDownloadBaseURL: agentDownloadBaseURL!,
       version,
     });
   }

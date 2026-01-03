@@ -19876,7 +19876,7 @@ function parseInputs() {
   const agentDownloadBaseURL = formatUrlWithTrailingSlash(
     core.getInput("_agent-download-base-url")
   );
-  if (!agentDownloadBaseURL) {
+  if (!agentDownloadBaseURL && !localAgent) {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
   return {

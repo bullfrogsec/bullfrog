@@ -19864,7 +19864,7 @@ function parseInputs() {
   const agentDownloadBaseURL = formatUrlWithTrailingSlash(
     core.getInput("_agent-download-base-url")
   );
-  if (!agentDownloadBaseURL) {
+  if (!agentDownloadBaseURL && !localAgent) {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
   return {
@@ -19952,6 +19952,7 @@ async function installAgent({
     await downloadAgent({
       actionDirectory,
       agentDirectory,
+      // Input validation will ensure there is a value when localAgent = false
       agentDownloadBaseURL,
       version
     });
