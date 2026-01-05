@@ -43,6 +43,9 @@ For complete documentation, visit [docs.bullfrogsec.com](https://docs.bullfrogse
     # This is useful for workflows that require elevated privileges to perform certain tasks.
     # Options: `true` (default) or `false`.
     enable-sudo:
+
+    # API token for submitting connection results to the Bullfrog control plane. If not provided, results will not be published.
+    api-token:
 ```
 
 <!-- end usage -->
@@ -96,6 +99,10 @@ The default usage will run in audit mode and will not block any request.
 ## Reviewing blocked or unallowed outbound requests
 
 You can view blocked or unallowed outbound requests in the workflow summary.
+
+## Control Plane
+
+Monitor connection results across all workflows and repositories in your GitHub organization using the Bullfrog control plane. Visit [bullfrogsec.com](https://bullfrogsec.com) to create a free account and get your API token. A free tier is available to help you gain visibility into all outbound connections across your organization.
 
 ## Limitations
 
