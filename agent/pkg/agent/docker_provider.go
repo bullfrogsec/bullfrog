@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,6 +15,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
 
@@ -59,16 +63,21 @@ type cachedContainer struct {
 }
 
 // containerIPCache provides thread-safe caching of IP-to-container mappings
+// with event-driven invalidation to handle Docker IP reuse
 type containerIPCache struct {
-	mu      sync.RWMutex
+	mu sync.RWMutex
+	// IP -> ContainerInfo (for fast lookups)
 	entries map[string]*cachedContainer
+	// ContainerID -> []IPs (for invalidation when container stops)
+	containerIPs map[string][]string
 }
 
-const cacheExpiry = 60 * time.Second
+const cacheExpiry = 30 * time.Second
 
 func newContainerIPCache() *containerIPCache {
 	return &containerIPCache{
-		entries: make(map[string]*cachedContainer),
+		entries:      make(map[string]*cachedContainer),
+		containerIPs: make(map[string][]string),
 	}
 }
 
@@ -96,12 +105,49 @@ func (c *containerIPCache) set(ip string, info *ContainerInfo) {
 		info:      info,
 		expiresAt: time.Now().Add(cacheExpiry),
 	}
+
+	// Track this IP under the container ID for invalidation
+	containerID := info.ID
+	if !c.ipInSlice(ip, c.containerIPs[containerID]) {
+		c.containerIPs[containerID] = append(c.containerIPs[containerID], ip)
+	}
+}
+
+// invalidateContainer removes all cache entries associated with a container ID
+func (c *containerIPCache) invalidateContainer(containerID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Get all IPs associated with this container
+	ips, exists := c.containerIPs[containerID]
+	if !exists {
+		return
+	}
+
+	// Remove cache entries for all IPs
+	for _, ip := range ips {
+		delete(c.entries, ip)
+	}
+
+	// Remove the container tracking
+	delete(c.containerIPs, containerID)
+}
+
+func (c *containerIPCache) ipInSlice(ip string, slice []string) bool {
+	for _, item := range slice {
+		if item == ip {
+			return true
+		}
+	}
+	return false
 }
 
 // DockerProvider implements IDockerProvider using Docker SDK
 type DockerProvider struct {
-	client *client.Client
-	cache  *containerIPCache
+	client       *client.Client
+	cache        *containerIPCache
+	eventCancel  context.CancelFunc
+	eventStopped chan struct{}
 }
 
 // NewDockerProvider creates a new Docker provider
@@ -126,60 +172,154 @@ func NewDockerProvider() (*DockerProvider, error) {
 		return nil, fmt.Errorf("failed to ping Docker daemon: %w", err)
 	}
 
-	return &DockerProvider{
-		client: cli,
-		cache:  newContainerIPCache(),
-	}, nil
+	// Create provider with event monitoring
+	eventCtx, eventCancel := context.WithCancel(context.Background())
+	provider := &DockerProvider{
+		client:       cli,
+		cache:        newContainerIPCache(),
+		eventCancel:  eventCancel,
+		eventStopped: make(chan struct{}),
+	}
+
+	// Start event monitoring in background
+	go provider.monitorDockerEvents(eventCtx)
+
+	return provider, nil
 }
 
 func (d *DockerProvider) Close() error {
+	// Stop event monitoring
+	if d.eventCancel != nil {
+		d.eventCancel()
+		// Wait for event monitoring to stop (with timeout)
+		select {
+		case <-d.eventStopped:
+		case <-time.After(2 * time.Second):
+			log.Printf("Warning: Docker event monitoring did not stop within timeout")
+		}
+	}
+
+	// Close Docker client
 	if d.client != nil {
 		return d.client.Close()
 	}
 	return nil
 }
 
+// monitorDockerEvents listens to Docker events and invalidates cache on container lifecycle changes
+func (d *DockerProvider) monitorDockerEvents(ctx context.Context) {
+	defer close(d.eventStopped)
+
+	// Filter for container die, stop, and kill events
+	eventFilters := filters.NewArgs()
+	eventFilters.Add("type", "container")
+	eventFilters.Add("event", "die")
+	eventFilters.Add("event", "stop")
+	eventFilters.Add("event", "kill")
+
+	eventChan, errChan := d.client.Events(ctx, events.ListOptions{
+		Filters: eventFilters,
+	})
+
+	log.Printf("Docker event monitoring started")
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("Docker event monitoring stopped")
+			return
+
+		case err := <-errChan:
+			if err != nil && err != io.EOF && ctx.Err() == nil {
+				log.Printf("Docker event error: %v", err)
+				// Reconnect after delay
+				time.Sleep(5 * time.Second)
+				if ctx.Err() != nil {
+					return
+				}
+				eventChan, errChan = d.client.Events(ctx, events.ListOptions{
+					Filters: eventFilters,
+				})
+			}
+
+		case event := <-eventChan:
+			// Extract container ID (short form)
+			containerID := event.Actor.ID
+			if len(containerID) > 12 {
+				containerID = containerID[:12]
+			}
+
+			log.Printf("Container event: %s %s (invalidating cache)", event.Action, containerID)
+			d.cache.invalidateContainer(containerID)
+		}
+	}
+}
+
 // FindContainerByIP finds a Docker container by IP address
+// Includes retry logic to handle race conditions when containers are starting
 func (d *DockerProvider) FindContainerByIP(ipStr string) (*ContainerInfo, error) {
-	// Check cache first
+	// Check cache first - invalidated automatically on container stop/die/kill events
 	if cached, found := d.cache.get(ipStr); found {
 		return cached, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Retry logic for race conditions when containers are just starting up
+	// Container network settings may not be immediately available in Docker API
+	const maxRetries = 3
+	const retryDelay = 50 * time.Millisecond
 
-	containers, err := d.client.ContainerList(ctx, container.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
-	}
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(retryDelay)
+		}
 
-	for _, c := range containers {
-		// Inspect container to get network settings
-		inspect, err := d.client.ContainerInspect(ctx, c.ID)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		containers, err := d.client.ContainerList(ctx, container.ListOptions{})
+		cancel()
+
 		if err != nil {
+			lastErr = fmt.Errorf("failed to list containers: %w", err)
 			continue
 		}
 
-		// Check all networks the container is connected to
-		for _, network := range inspect.NetworkSettings.Networks {
-			if network.IPAddress == ipStr {
-				containerInfo := &ContainerInfo{
-					ID:      c.ID[:12], // Short ID
-					Name:    strings.TrimPrefix(c.Names[0], "/"),
-					Image:   c.Image,
-					RootPID: inspect.State.Pid,
+		for _, c := range containers {
+			// Inspect container to get network settings
+			inspectCtx, inspectCancel := context.WithTimeout(context.Background(), 1*time.Second)
+			inspect, err := d.client.ContainerInspect(inspectCtx, c.ID)
+			inspectCancel()
+
+			if err != nil {
+				continue
+			}
+
+			// Skip containers that aren't running yet
+			if inspect.State == nil || !inspect.State.Running {
+				continue
+			}
+
+			// Check all networks the container is connected to
+			for _, network := range inspect.NetworkSettings.Networks {
+				if network.IPAddress == ipStr {
+					containerInfo := &ContainerInfo{
+						ID:      c.ID[:12], // Short ID
+						Name:    strings.TrimPrefix(c.Names[0], "/"),
+						Image:   c.Image,
+						RootPID: inspect.State.Pid,
+					}
+
+					// Cache the result - will be invalidated on container lifecycle events
+					d.cache.set(ipStr, containerInfo)
+
+					return containerInfo, nil
 				}
-
-				// Cache the result
-				d.cache.set(ipStr, containerInfo)
-
-				return containerInfo, nil
 			}
 		}
+
+		lastErr = fmt.Errorf("no container found with IP %s", ipStr)
 	}
 
-	return nil, fmt.Errorf("no container found with IP %s", ipStr)
+	return nil, lastErr
 }
 
 // GetProcessInContainer gets process info from within a container's network namespace

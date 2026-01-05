@@ -74,4 +74,7 @@ grep -E --quiet 'www\.google\.com</td><td>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+</td><td
 # Docker Requests - www.bing.com DNS from container (should be blocked)
 grep -E --quiet 'www\.bing\.com</td><td>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+</td><td>53</td><td>DNS</td><td>Domain not allowed</td><td>🚫 Blocked</td><td>curl</td><td>alpine/curl:8\.7\.1:[^<]+</td><td>/usr/bin/curl</td><td>curl https://www\.bing\.com' $GITHUB_STEP_SUMMARY
 
+# Docker Requests - www.msn.com DNS from 2nd container (should be blocked)
+grep -E --quiet 'www\.msn\.com</td><td>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+</td><td>53</td><td>DNS</td><td>Domain not allowed</td><td>🚫 Blocked</td><td>curl</td><td>alpine/curl:8\.17\.0:[^<]+</td><td>/usr/bin/curl</td><td>curl https://www\.msn\.com' $GITHUB_STEP_SUMMARY
+
 echo "Tests passed successfully"
