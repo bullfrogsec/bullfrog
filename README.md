@@ -4,6 +4,10 @@ Increase the security of your Github Actions workflows using Bullfrog! With Bull
 
 Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode to get a list of all outbound network connections, without impacting your existing workflows.
 
+## Documentation
+
+For complete documentation, visit [docs.bullfrogsec.com](https://docs.bullfrogsec.com).
+
 ## Usage
 
 <!-- start usage -->
@@ -11,7 +15,7 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 ```yaml
 # This action should be the first step of your job, and should be loaded on every separate job.
 # If this action is not loaded first, it will not be able to see or block any requests that occured prior to the action running.
-- uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
+- uses: bullfrogsec/bullfrog@dabf76d162f4dcab6cff8fd80621aefebef86ede # v0.9.0
   with:
     # List of IPs to allow outbound connections to.
     # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
@@ -55,13 +59,13 @@ Not sure what IPs or domains? Simply use the default `egress-policy: audit` mode
 The default usage will run in audit mode and will not block any request.
 
 ```yaml
-- uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
+- uses: bullfrogsec/bullfrog@dabf76d162f4dcab6cff8fd80621aefebef86ede # v0.9.0
 ```
 
 ### Block every outbound connections
 
 ```yaml
-- uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
+- uses: bullfrogsec/bullfrog@dabf76d162f4dcab6cff8fd80621aefebef86ede # v0.9.0
   with:
     egress-policy: block
 ```
@@ -69,7 +73,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to domains required for pulling a docker image from the docker hub
 
 ```yaml
-- uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
+- uses: bullfrogsec/bullfrog@dabf76d162f4dcab6cff8fd80621aefebef86ede # v0.9.0
   with:
     egress-policy: block
     allowed-domains: |
@@ -81,7 +85,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to a specific IP address without blocking DNS requests
 
 ```yaml
-- uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
+- uses: bullfrogsec/bullfrog@dabf76d162f4dcab6cff8fd80621aefebef86ede # v0.9.0
   with:
     egress-policy: block
     allowed-ips: |
@@ -92,7 +96,6 @@ The default usage will run in audit mode and will not block any request.
 ## Reviewing blocked or unallowed outbound requests
 
 You can view blocked or unallowed outbound requests in the workflow summary.
-![blocked or unallowed outbound requests are available in the workflow summary](.github/assets/annotations.png)
 
 ## Limitations
 
@@ -102,7 +105,7 @@ You can view blocked or unallowed outbound requests in the workflow summary.
 
 ## Support or Feedback
 
-If you need support or have any feedback to share, join us on [Slack](https://join.slack.com/t/bullfogsec/shared_invite/zt-2mbf603gn-TRfhXvf_x8J7yB9fJ3Os7Q). And if you find Bullfrog useful, please leave a star ⭐️.
+If you need support or have any feedback to share, join us on [Reddit](https://www.reddit.com/r/bullfrogsec). And if you find Bullfrog useful, please leave a star ⭐️.
 
 ## License
 
