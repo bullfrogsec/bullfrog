@@ -3,6 +3,10 @@
 ## [0.9.0](https://github.com/bullfrogsec/bullfrog/compare/v0.8.4...v0.9.0) (2026-01-05)
 
 
+### ⚠ BREAKING CHANGES
+
+* **Default allowed domains have been restricted.** Previously, `github.com`, `api.github.com`, and `*.blob.core.windows.net` were allowed by default. These domains are no longer implicitly allowed in v0.9.0. If your workflows depend on these domains, you must now explicitly allow them in your configuration when upgrading to v0.9.0.
+
 ### Features
 
 * publish connection results to control plane ([#219](https://github.com/bullfrogsec/bullfrog/issues/219)) ([9d88757](https://github.com/bullfrogsec/bullfrog/commit/9d88757b0fb6df713d2cdc16e91635daccf14229))
