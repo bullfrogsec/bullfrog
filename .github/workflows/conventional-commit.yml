@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@dabf76d162f4dcab6cff8fd80621aefebef86ede
         with:
           egress-policy: block
 
