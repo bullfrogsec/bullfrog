@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.0](https://github.com/bullfrogsec/bullfrog/compare/v0.8.4...v0.9.0) (2026-01-05)
+
+
+### Features
+
+* publish connection results to control plane ([#219](https://github.com/bullfrogsec/bullfrog/issues/219)) ([9d88757](https://github.com/bullfrogsec/bullfrog/commit/9d88757b0fb6df713d2cdc16e91635daccf14229))
+* remove dependency on tetragon and other improvements ([#216](https://github.com/bullfrogsec/bullfrog/issues/216)) ([02b45b4](https://github.com/bullfrogsec/bullfrog/commit/02b45b49786877c019535ca037c4b61e61c89f91))
+* restrict default allowed domains ([#217](https://github.com/bullfrogsec/bullfrog/issues/217)) ([8089b5e](https://github.com/bullfrogsec/bullfrog/commit/8089b5edd3a5782a768326c628e938568e154d5f))
+* update action to use node 24 ([#200](https://github.com/bullfrogsec/bullfrog/issues/200)) ([65a0913](https://github.com/bullfrogsec/bullfrog/commit/65a0913e3892df178e55283562c265590b614eb5))
+
 ## [0.8.4](https://github.com/bullfrogsec/bullfrog/compare/v0.8.3...v0.8.4) (2025-05-14)
 
 
