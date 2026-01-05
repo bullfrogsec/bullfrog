@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/bullfrogsec/bullfrog/compare/v0.9.0...v0.9.1) (2026-01-05)
+
+
+### Bug Fixes
+
+* missing docker info due to race condition ([#221](https://github.com/bullfrogsec/bullfrog/issues/221)) ([31047fb](https://github.com/bullfrogsec/bullfrog/commit/31047fb975a8c888ff0843892bf91bf975a7ac38))
+
 ## [0.9.0](https://github.com/bullfrogsec/bullfrog/compare/v0.8.4...v0.9.0) (2026-01-05)
 
 
