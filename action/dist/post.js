@@ -13038,7 +13038,7 @@ var require_fetch = __commonJS({
         this.emit("terminated", error);
       }
     };
-    function fetch(input, init = {}) {
+    function fetch2(input, init = {}) {
       webidl.argumentLengthCheck(arguments, 1, { header: "globalThis.fetch" });
       const p = createDeferredPromise();
       let requestObject;
@@ -13968,7 +13968,7 @@ var require_fetch = __commonJS({
       }
     }
     module2.exports = {
-      fetch,
+      fetch: fetch2,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -17224,7 +17224,7 @@ var require_undici = __commonJS({
     module2.exports.getGlobalDispatcher = getGlobalDispatcher;
     if (util.nodeMajor > 16 || util.nodeMajor === 16 && util.nodeMinor >= 8) {
       let fetchImpl = null;
-      module2.exports.fetch = async function fetch(resource) {
+      module2.exports.fetch = async function fetch2(resource) {
         if (!fetchImpl) {
           fetchImpl = require_fetch().fetch;
         }
@@ -17573,12 +17573,12 @@ var require_lib = __commonJS({
             throw new Error("Client has already been disposed.");
           }
           const parsedUrl = new URL(requestUrl);
-          let info = this._prepareRequest(verb, parsedUrl, headers);
+          let info2 = this._prepareRequest(verb, parsedUrl, headers);
           const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb) ? this._maxRetries + 1 : 1;
           let numTries = 0;
           let response;
           do {
-            response = yield this.requestRaw(info, data);
+            response = yield this.requestRaw(info2, data);
             if (response && response.message && response.message.statusCode === HttpCodes.Unauthorized) {
               let authenticationHandler;
               for (const handler of this.handlers) {
@@ -17588,7 +17588,7 @@ var require_lib = __commonJS({
                 }
               }
               if (authenticationHandler) {
-                return authenticationHandler.handleAuthentication(this, info, data);
+                return authenticationHandler.handleAuthentication(this, info2, data);
               } else {
                 return response;
               }
@@ -17611,8 +17611,8 @@ var require_lib = __commonJS({
                   }
                 }
               }
-              info = this._prepareRequest(verb, parsedRedirectUrl, headers);
-              response = yield this.requestRaw(info, data);
+              info2 = this._prepareRequest(verb, parsedRedirectUrl, headers);
+              response = yield this.requestRaw(info2, data);
               redirectsRemaining--;
             }
             if (!response.message.statusCode || !HttpResponseRetryCodes.includes(response.message.statusCode)) {
@@ -17641,7 +17641,7 @@ var require_lib = __commonJS({
        * @param info
        * @param data
        */
-      requestRaw(info, data) {
+      requestRaw(info2, data) {
         return __awaiter(this, void 0, void 0, function* () {
           return new Promise((resolve, reject) => {
             function callbackForResult(err, res) {
@@ -17653,7 +17653,7 @@ var require_lib = __commonJS({
                 resolve(res);
               }
             }
-            this.requestRawWithCallback(info, data, callbackForResult);
+            this.requestRawWithCallback(info2, data, callbackForResult);
           });
         });
       }
@@ -17663,12 +17663,12 @@ var require_lib = __commonJS({
        * @param data
        * @param onResult
        */
-      requestRawWithCallback(info, data, onResult) {
+      requestRawWithCallback(info2, data, onResult) {
         if (typeof data === "string") {
-          if (!info.options.headers) {
-            info.options.headers = {};
+          if (!info2.options.headers) {
+            info2.options.headers = {};
           }
-          info.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
+          info2.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
         }
         let callbackCalled = false;
         function handleResult(err, res) {
@@ -17677,7 +17677,7 @@ var require_lib = __commonJS({
             onResult(err, res);
           }
         }
-        const req = info.httpModule.request(info.options, (msg) => {
+        const req = info2.httpModule.request(info2.options, (msg) => {
           const res = new HttpClientResponse(msg);
           handleResult(void 0, res);
         });
@@ -17689,7 +17689,7 @@ var require_lib = __commonJS({
           if (socket) {
             socket.end();
           }
-          handleResult(new Error(`Request timeout: ${info.options.path}`));
+          handleResult(new Error(`Request timeout: ${info2.options.path}`));
         });
         req.on("error", function(err) {
           handleResult(err);
@@ -17725,27 +17725,27 @@ var require_lib = __commonJS({
         return this._getProxyAgentDispatcher(parsedUrl, proxyUrl);
       }
       _prepareRequest(method, requestUrl, headers) {
-        const info = {};
-        info.parsedUrl = requestUrl;
-        const usingSsl = info.parsedUrl.protocol === "https:";
-        info.httpModule = usingSsl ? https : http;
+        const info2 = {};
+        info2.parsedUrl = requestUrl;
+        const usingSsl = info2.parsedUrl.protocol === "https:";
+        info2.httpModule = usingSsl ? https : http;
         const defaultPort = usingSsl ? 443 : 80;
-        info.options = {};
-        info.options.host = info.parsedUrl.hostname;
-        info.options.port = info.parsedUrl.port ? parseInt(info.parsedUrl.port) : defaultPort;
-        info.options.path = (info.parsedUrl.pathname || "") + (info.parsedUrl.search || "");
-        info.options.method = method;
-        info.options.headers = this._mergeHeaders(headers);
+        info2.options = {};
+        info2.options.host = info2.parsedUrl.hostname;
+        info2.options.port = info2.parsedUrl.port ? parseInt(info2.parsedUrl.port) : defaultPort;
+        info2.options.path = (info2.parsedUrl.pathname || "") + (info2.parsedUrl.search || "");
+        info2.options.method = method;
+        info2.options.headers = this._mergeHeaders(headers);
         if (this.userAgent != null) {
-          info.options.headers["user-agent"] = this.userAgent;
+          info2.options.headers["user-agent"] = this.userAgent;
         }
-        info.options.agent = this._getAgent(info.parsedUrl);
+        info2.options.agent = this._getAgent(info2.parsedUrl);
         if (this.handlers) {
           for (const handler of this.handlers) {
-            handler.prepareRequest(info.options);
+            handler.prepareRequest(info2.options);
           }
         }
-        return info;
+        return info2;
       }
       _mergeHeaders(headers) {
         if (this.requestOptions && this.requestOptions.headers) {
@@ -19735,10 +19735,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.notice = notice;
-    function info(message) {
+    function info2(message) {
       process.stdout.write(message + os.EOL);
     }
-    exports2.info = info;
+    exports2.info = info2;
     function startGroup(name) {
       (0, command_1.issue)("group", name);
     }
@@ -19805,7 +19805,9 @@ var post_exports = {};
 __export(post_exports, {
   displaySummary: () => displaySummary,
   filterConnectionsNoise: () => filterConnectionsNoise,
-  getHumanFriendlyReason: () => getHumanFriendlyReason
+  getConnections: () => getConnections,
+  getHumanFriendlyReason: () => getHumanFriendlyReason,
+  submitResultsToControlPlane: () => submitResultsToControlPlane
 });
 module.exports = __toCommonJS(post_exports);
 var core3 = __toESM(require_core());
@@ -19837,6 +19839,19 @@ function validateDomains(domains) {
     }
   });
 }
+function validateAgentVersion(version) {
+  if (!version.match(/^v\d+\.\d+\.\d+(-[A-Za-z0-9-]+)?$/)) {
+    throw new Error(
+      `Invalid agent version format: ${version}. Must start with 'v' followed by semver (e.g., 'v0.8.4' or 'v0.8.4-beta-feature')`
+    );
+  }
+}
+function formatUrlWithTrailingSlash(url) {
+  if (!url) {
+    return;
+  }
+  return url.endsWith("/") ? url : `${url}/`;
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19853,6 +19868,17 @@ function parseInputs() {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
   const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
+  const agentVersion = core.getInput("_agent-version");
+  if (agentVersion) {
+    validateAgentVersion(agentVersion);
+  }
+  const apiToken = core.getInput("api-token");
+  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
+    core.getInput("_agent-download-base-url")
+  );
+  if (!agentDownloadBaseURL && !localAgent) {
+    throw new Error(`_agent-download-base-url cannot be empty`);
+  }
   return {
     allowedDomains,
     allowedIps,
@@ -19862,7 +19888,15 @@ function parseInputs() {
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL: core.getInput("_agent-download-base-url")
+    agentDownloadBaseURL,
+    agentVersion: agentVersion || void 0,
+    controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-api-base-url")
+    ),
+    controlPlaneWebappBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-webapp-base-url")
+    ),
+    apiToken: apiToken || void 0
   };
 }
 
@@ -19891,12 +19925,33 @@ var REASON_CODE_MAP = {
   "no-network-layer": "No network layer",
   "unknown-network-layer": "Unknown network layer"
 };
+function getGitHubContext() {
+  const repo = process.env.GITHUB_REPOSITORY || "";
+  const [organization] = repo.split("/");
+  const workflowRunId = process.env.GITHUB_RUN_ID || "";
+  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1");
+  const jobName = process.env.GITHUB_JOB || void 0;
+  if (!organization || !repo || !workflowRunId) {
+    throw new Error(
+      "Missing GitHub context: GITHUB_REPOSITORY or GITHUB_RUN_ID not set"
+    );
+  }
+  return { workflowRunId, runAttempt, jobName, organization, repo };
+}
 function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
-async function displaySummary(connections) {
+async function displaySummary(connections, controlPlaneWebappBaseUrl) {
   const summary2 = core3.summary;
-  summary2.addHeading("Bullfrog Results", 3);
+  const workflowRunId = process.env.GITHUB_RUN_ID;
+  if (controlPlaneWebappBaseUrl && workflowRunId) {
+    summary2.addHeading("Bullfrog Control Plane", 3).addLink(
+      "View detailed results",
+      `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`
+    );
+  } else {
+    summary2.addHeading("Bullfrog Results", 3);
+  }
   if (connections.length > 0) {
     summary2.addHeading("Connection Results", 4);
     const tableData = [
@@ -19985,10 +20040,10 @@ async function getConnections() {
     const filtered = filterConnectionsNoise(allConnections);
     core3.debug("\n\nConnections:\n");
     filtered.forEach((c) => core3.debug(JSON.stringify(c)));
-    return filtered;
+    return { filtered, raw: allConnections };
   } catch (error) {
     console.error("Error reading connections log file", error);
-    return [];
+    return { filtered: [], raw: [] };
   }
 }
 function getProcessKey(conn) {
@@ -20035,13 +20090,63 @@ async function printAgentLogs({
     console.error("Error reading log file", error);
   }
 }
+async function submitResultsToControlPlane(connections, apiToken, controlPlaneApiBaseUrl) {
+  try {
+    const { workflowRunId, runAttempt, jobName, organization, repo } = getGitHubContext();
+    const payload = {
+      workflowRunId,
+      runAttempt,
+      jobName,
+      organization,
+      repo,
+      connections
+    };
+    core3.debug(
+      `Submitting results to control plane: ${JSON.stringify(payload)}`
+    );
+    const apiUrl = `${controlPlaneApiBaseUrl}v1/events`;
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+    core3.info(
+      `Results successfully submitted to control plane for workflow run ${workflowRunId}`
+    );
+  } catch (error) {
+    core3.warning(
+      `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
 async function main() {
-  const { logDirectory } = parseInputs();
+  const {
+    logDirectory,
+    apiToken,
+    controlPlaneApiBaseUrl,
+    controlPlaneWebappBaseUrl
+  } = parseInputs();
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   await printAgentLogs({ agentLogFilepath });
   try {
-    const connections = await getConnections();
-    await displaySummary(connections);
+    const { filtered, raw } = await getConnections();
+    const shouldAddControlPlaneResultsUrl = apiToken && controlPlaneWebappBaseUrl;
+    await displaySummary(
+      filtered,
+      shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : void 0
+    );
+    if (apiToken && controlPlaneApiBaseUrl) {
+      await submitResultsToControlPlane(raw, apiToken, controlPlaneApiBaseUrl);
+    }
   } catch (error) {
     core3.warning(
       `Failed to process results: ${error instanceof Error ? error.message : String(error)}`
@@ -20059,7 +20164,9 @@ if (require.main === module) {
 0 && (module.exports = {
   displaySummary,
   filterConnectionsNoise,
-  getHumanFriendlyReason
+  getConnections,
+  getHumanFriendlyReason,
+  submitResultsToControlPlane
 });
 /*! Bundled license information:
 

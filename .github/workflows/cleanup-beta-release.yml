@@ -1,0 +1,64 @@
+name: Cleanup Beta Release
+
+on:
+  delete:
+    # This triggers when any ref is deleted
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-beta:
+    runs-on: ubuntu-22.04
+    # Only run for beta branch deletions
+    if: github.event.ref_type == 'branch' && startsWith(github.event.ref, 'beta/')
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Delete beta release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get version from package.json on main
+          VERSION=$(jq -r '.version' package.json)
+
+          # Reconstruct the sanitized branch name
+          BRANCH_NAME="${{ github.event.ref }}"
+          BRANCH_NAME="${BRANCH_NAME#beta/}"
+          SANITIZED=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+
+          TAG_NAME="v${VERSION}-beta-${SANITIZED}"
+
+          echo "Cleaning up beta release: $TAG_NAME"
+
+          # Delete release and tag (ignore errors if they don't exist)
+          gh release delete "$TAG_NAME" --yes || true
+          git push origin ":refs/tags/$TAG_NAME" || true
+  cleanup-rc:
+    runs-on: ubuntu-22.04
+    # Only run for release-please PRs
+    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--branches--') }}
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Delete RC release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract version from the manifest on main branch
+          VERSION=$(jq -r '.[]' .release-please-manifest.json | head -1)
+          TAG_NAME="v${VERSION}-rc"
+
+          echo "Cleaning up RC release: $TAG_NAME"
+
+          # Delete release and tag (ignore errors if they don't exist)
+          gh release delete "$TAG_NAME" --yes || true
+          git push origin ":refs/tags/$TAG_NAME" || true

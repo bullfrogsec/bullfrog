@@ -13,7 +13,11 @@ export interface Inputs {
   egressPolicy: EgressPolicy;
   localAgent: boolean;
   logDirectory: string;
-  agentDownloadBaseURL: string;
+  agentDownloadBaseURL?: string;
+  agentVersion?: string;
+  controlPlaneApiBaseUrl?: string;
+  controlPlaneWebappBaseUrl?: string;
+  apiToken?: string;
 }
 
 function validateIps(ips: Array<string>): void {
@@ -32,6 +36,22 @@ function validateDomains(domains: Array<string>): void {
       throw new Error(`Invalid domain: ${domain}`);
     }
   });
+}
+
+function validateAgentVersion(version: string): void {
+  // Must start with 'v' followed by semver with optional prerelease suffix
+  if (!version.match(/^v\d+\.\d+\.\d+(-[A-Za-z0-9-]+)?$/)) {
+    throw new Error(
+      `Invalid agent version format: ${version}. Must start with 'v' followed by semver (e.g., 'v0.8.4' or 'v0.8.4-beta-feature')`,
+    );
+  }
+}
+
+function formatUrlWithTrailingSlash(url: string): string | undefined {
+  if (!url) {
+    return;
+  }
+  return url.endsWith("/") ? url : `${url}/`;
 }
 
 export function parseInputs(): Inputs {
@@ -62,6 +82,19 @@ export function parseInputs(): Inputs {
 
   const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
 
+  const agentVersion = core.getInput("_agent-version");
+  if (agentVersion) {
+    validateAgentVersion(agentVersion);
+  }
+  const apiToken = core.getInput("api-token");
+
+  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
+    core.getInput("_agent-download-base-url"),
+  );
+  if (!agentDownloadBaseURL && !localAgent) {
+    throw new Error(`_agent-download-base-url cannot be empty`);
+  }
+
   return {
     allowedDomains,
     allowedIps,
@@ -71,6 +104,14 @@ export function parseInputs(): Inputs {
     egressPolicy,
     localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL: core.getInput("_agent-download-base-url"),
+    agentDownloadBaseURL,
+    agentVersion: agentVersion || undefined,
+    controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-api-base-url"),
+    ),
+    controlPlaneWebappBaseUrl: formatUrlWithTrailingSlash(
+      core.getInput("_control-plane-webapp-base-url"),
+    ),
+    apiToken: apiToken || undefined,
   };
 }

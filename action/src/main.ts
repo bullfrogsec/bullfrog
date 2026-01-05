@@ -30,13 +30,15 @@ async function downloadAgent({
   version: string;
   agentDownloadBaseURL: string;
 }) {
-  console.log(`Downloading agent v${version}`);
+  // Add 'v' prefix if not present
+  const versionTag = version.startsWith("v") ? version : `v${version}`;
+  console.log(`Downloading agent ${versionTag}`);
 
   const { status } = spawnSync(
     "bash",
     [
       path.join(actionDirectory, "scripts", "download_agent.sh"),
-      `v${version}`,
+      versionTag,
       agentDownloadBaseURL,
     ],
     {
@@ -63,7 +65,7 @@ async function installAgent({
   agentDirectory: string;
   localAgent: boolean;
   version: string;
-  agentDownloadBaseURL: string;
+  agentDownloadBaseURL?: string;
 }): Promise<void> {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
@@ -71,7 +73,8 @@ async function installAgent({
     await downloadAgent({
       actionDirectory,
       agentDirectory,
-      agentDownloadBaseURL,
+      // Input validation will ensure there is a value when localAgent = false
+      agentDownloadBaseURL: agentDownloadBaseURL!,
       version,
     });
   }
@@ -196,6 +199,9 @@ async function main() {
     collectProcessInfo,
     localAgent,
     logDirectory,
+    agentVersion,
+    apiToken,
+    controlPlaneApiBaseUrl,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -205,17 +211,36 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pkg = require(`${actionDirectory}/../package.json`);
 
+  // Add control plane domain to allowed domains if API token is provided
+  if (apiToken && controlPlaneApiBaseUrl) {
+    try {
+      const url = new URL(controlPlaneApiBaseUrl);
+      const controlPlaneDomain = url.hostname;
+      allowedDomains.push(controlPlaneDomain);
+      core.info(
+        `Added control plane domain to allowed domains: ${controlPlaneDomain}`,
+      );
+    } catch (error) {
+      core.warning(
+        `Failed to parse control plane URL: ${error instanceof Error ? error.message : String(error)}. Connection results will not be published to Bullfrog's control plane.`,
+      );
+    }
+  }
+
   await fs.mkdir(logDirectory, { recursive: true });
 
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   installPackages();
 
+  // Determine version: use override or fallback to package.json
+  const version = agentVersion || `v${pkg.version}`;
+
   await installAgent({
     actionDirectory,
     agentDirectory,
     localAgent,
-    version: pkg.version,
+    version,
     agentDownloadBaseURL,
   });
 

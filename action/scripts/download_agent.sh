@@ -14,7 +14,7 @@ FINAL_BIN_DIR="/opt/bullfrog"
 if [ -f "$AGENT_FILE" ]; then
     echo "$AGENT_FILE exists."
 else
-    curl -L ${DOWNLOAD_URL}/${VERSION}/agent.tar.gz -o "$AGENT_FILE"
+    curl -L ${DOWNLOAD_URL}${VERSION}/agent.tar.gz -o "$AGENT_FILE"
 fi
 
 tar -xvf "$AGENT_FILE" -C $TMP_DIR

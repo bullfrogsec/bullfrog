@@ -16,14 +16,78 @@ const REASON_CODE_MAP: Record<string, string> = {
   "unknown-network-layer": "Unknown network layer",
 };
 
+type DockerInfo = {
+  containerImage: string;
+  containerName: string;
+};
+
+export type Connection = {
+  timestamp: Date;
+  domain?: string;
+  ip?: string;
+  port?: number;
+  blocked: boolean;
+  authorized: boolean;
+  protocol: string;
+  reason: string;
+  process?: string;
+  exePath?: string;
+  commandLine?: string;
+  docker?: DockerInfo;
+};
+
+interface WorkflowJobConnectionResults {
+  workflowRunId: string;
+  runAttempt: number;
+  jobName?: string; // Human-readable job name
+  organization: string;
+  repo: string;
+  connections: Array<Connection>;
+}
+
+function getGitHubContext(): {
+  workflowRunId: string;
+  runAttempt: number;
+  jobName?: string;
+  organization: string;
+  repo: string;
+} {
+  const repo = process.env.GITHUB_REPOSITORY || "";
+  const [organization] = repo.split("/");
+  const workflowRunId = process.env.GITHUB_RUN_ID || "";
+  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1");
+  const jobName = process.env.GITHUB_JOB || undefined;
+
+  if (!organization || !repo || !workflowRunId) {
+    throw new Error(
+      "Missing GitHub context: GITHUB_REPOSITORY or GITHUB_RUN_ID not set",
+    );
+  }
+
+  return { workflowRunId, runAttempt, jobName, organization, repo };
+}
+
 export function getHumanFriendlyReason(reasonCode: string): string {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
 
-export async function displaySummary(connections: Connection[]): Promise<void> {
+export async function displaySummary(
+  connections: Connection[],
+  controlPlaneWebappBaseUrl?: string,
+): Promise<void> {
   const summary = core.summary;
+  const workflowRunId = process.env.GITHUB_RUN_ID;
 
-  summary.addHeading("Bullfrog Results", 3);
+  if (controlPlaneWebappBaseUrl && workflowRunId) {
+    summary
+      .addHeading("Bullfrog Control Plane", 3)
+      .addLink(
+        "View detailed results",
+        `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`,
+      );
+  } else {
+    summary.addHeading("Bullfrog Results", 3);
+  }
 
   // Add connection results table if there are any connections
   if (connections.length > 0) {
@@ -72,27 +136,10 @@ export async function displaySummary(connections: Connection[]): Promise<void> {
   await summary.write();
 }
 
-type DockerInfo = {
-  containerImage: string;
-  containerName: string;
-};
-
-export type Connection = {
-  timestamp: Date;
-  domain?: string;
-  ip?: string;
-  port?: number;
-  blocked: boolean;
-  authorized: boolean;
-  protocol: string;
-  reason: string;
-  process?: string;
-  exePath?: string;
-  commandLine?: string;
-  docker?: DockerInfo;
-};
-
-async function getConnections(): Promise<Connection[]> {
+export async function getConnections(): Promise<{
+  filtered: Connection[];
+  raw: Connection[];
+}> {
   // give some time for the logs to be written
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
@@ -157,10 +204,10 @@ async function getConnections(): Promise<Connection[]> {
     core.debug("\n\nConnections:\n");
     filtered.forEach((c) => core.debug(JSON.stringify(c)));
 
-    return filtered;
+    return { filtered, raw: allConnections };
   } catch (error) {
     console.error("Error reading connections log file", error);
-    return [];
+    return { filtered: [], raw: [] };
   }
 }
 
@@ -224,17 +271,82 @@ async function printAgentLogs({
   }
 }
 
+export async function submitResultsToControlPlane(
+  connections: Connection[],
+  apiToken: string,
+  controlPlaneApiBaseUrl: string,
+): Promise<void> {
+  try {
+    const { workflowRunId, runAttempt, jobName, organization, repo } =
+      getGitHubContext();
+
+    const payload: WorkflowJobConnectionResults = {
+      workflowRunId,
+      runAttempt,
+      jobName,
+      organization,
+      repo,
+      connections,
+    };
+
+    core.debug(
+      `Submitting results to control plane: ${JSON.stringify(payload)}`,
+    );
+
+    const apiUrl = `${controlPlaneApiBaseUrl}v1/events`;
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to submit results to control plane: ${response.status} ${response.statusText} - ${errorText}`,
+      );
+    }
+
+    core.info(
+      `Results successfully submitted to control plane for workflow run ${workflowRunId}`,
+    );
+  } catch (error) {
+    core.warning(
+      `Failed to submit results to control plane: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 async function main() {
-  const { logDirectory } = parseInputs();
+  const {
+    logDirectory,
+    apiToken,
+    controlPlaneApiBaseUrl,
+    controlPlaneWebappBaseUrl,
+  } = parseInputs();
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   await printAgentLogs({ agentLogFilepath });
 
   try {
-    const connections = await getConnections();
+    const { filtered, raw } = await getConnections();
 
-    // Always display the summary
-    await displaySummary(connections);
+    const shouldAddControlPlaneResultsUrl =
+      apiToken && controlPlaneWebappBaseUrl;
+
+    await displaySummary(
+      filtered,
+      shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : undefined,
+    );
+
+    // Submit results to control plane if API token is provided
+    if (apiToken && controlPlaneApiBaseUrl) {
+      await submitResultsToControlPlane(raw, apiToken, controlPlaneApiBaseUrl);
+    }
   } catch (error) {
     core.warning(
       `Failed to process results: ${error instanceof Error ? error.message : String(error)}`,

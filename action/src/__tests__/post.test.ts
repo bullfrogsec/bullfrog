@@ -1,9 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getHumanFriendlyReason,
   filterConnectionsNoise,
   type Connection,
+  displaySummary,
+  getConnections,
+  submitResultsToControlPlane,
 } from "../post";
+import * as core from "@actions/core";
+import * as fs from "node:fs/promises";
+
+vi.mock("@actions/core");
+vi.mock("node:fs/promises");
+vi.mock("../inputs");
 
 describe("post", () => {
   describe("getHumanFriendlyReason", () => {
@@ -671,6 +680,714 @@ describe("post", () => {
       // Same domain, no IP (DNS), same process -> deduplicate
       expect(result).toHaveLength(1);
       expect(result[0].protocol).toBe("DNS");
+    });
+  });
+
+  describe("displaySummary", () => {
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(() => {
+      originalEnv = { ...process.env };
+      process.env.GITHUB_REPOSITORY = "test-org/test-repo";
+      process.env.GITHUB_RUN_ID = "12345";
+      process.env.GITHUB_RUN_ATTEMPT = "1";
+      process.env.GITHUB_JOB = "test-job";
+
+      vi.clearAllMocks();
+
+      // Mock core.summary methods
+      const mockSummary = {
+        addHeading: vi.fn().mockReturnThis(),
+        addLink: vi.fn().mockReturnThis(),
+        addTable: vi.fn().mockReturnThis(),
+        addRaw: vi.fn().mockReturnThis(),
+        write: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.spyOn(core, "summary", "get").mockReturnValue(
+        mockSummary as unknown as typeof core.summary,
+      );
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.restoreAllMocks();
+    });
+
+    it("should display link to control plane when controlPlaneApiBaseUrl is provided", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneAppBaseUrl = "https://app.bullfrogsec.com/";
+
+      await displaySummary(connections, controlPlaneAppBaseUrl);
+
+      const summary = core.summary;
+      expect(summary.addHeading).toHaveBeenCalledWith(
+        "Bullfrog Control Plane",
+        3,
+      );
+      expect(summary.addLink).toHaveBeenCalledWith(
+        "View detailed results",
+        "https://app.bullfrogsec.com/workflow-run/12345",
+      );
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should handle controlPlaneApiBaseUrl without trailing slash", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneApiBaseUrl = "https://app.bullfrogsec.com/";
+
+      await displaySummary(connections, controlPlaneApiBaseUrl);
+
+      const summary = core.summary;
+      expect(summary.addLink).toHaveBeenCalledWith(
+        "View detailed results",
+        "https://app.bullfrogsec.com/workflow-run/12345",
+      );
+    });
+
+    it("should display regular heading when controlPlaneApiBaseUrl is not provided", async () => {
+      const connections: Connection[] = [];
+
+      await displaySummary(connections, undefined);
+
+      const summary = core.summary;
+      expect(summary.addHeading).toHaveBeenCalledWith("Bullfrog Results", 3);
+      expect(summary.addLink).not.toHaveBeenCalled();
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should display connections table when connections exist", async () => {
+      const connections: Connection[] = [
+        {
+          timestamp: new Date("2024-01-01T00:00:00Z"),
+          domain: "example.com",
+          ip: "93.184.216.34",
+          port: 443,
+          blocked: false,
+          authorized: true,
+          protocol: "TCP",
+          reason: "ip-allowed",
+          process: "curl",
+        },
+      ];
+
+      await displaySummary(connections, undefined);
+
+      const summary = core.summary;
+      expect(summary.addTable).toHaveBeenCalled();
+
+      // Verify the table data structure
+      const tableCall = vi.mocked(summary.addTable).mock.calls[0][0];
+      expect(tableCall).toBeDefined();
+
+      // Check header row
+      expect(tableCall[0]).toEqual([
+        { data: "Timestamp", header: true },
+        { data: "Domain", header: true },
+        { data: "IP", header: true },
+        { data: "Port", header: true },
+        { data: "Protocol", header: true },
+        { data: "Reason", header: true },
+        { data: "Status", header: true },
+        { data: "Process", header: true },
+        { data: "Container", header: true },
+        { data: "Exe Path", header: true },
+        { data: "Command Line", header: true },
+      ]);
+
+      // Check data row
+      expect(tableCall[1]).toEqual([
+        "2024-01-01T00:00:00.000Z",
+        "example.com",
+        "93.184.216.34",
+        "443",
+        "TCP",
+        "IP allowed",
+        "✅ Authorized",
+        "curl",
+        "-",
+        "-",
+        "-",
+      ]);
+
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should handle missing GITHUB_RUN_ID gracefully", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneApiBaseUrl = "https://api.bullfrogsec.com/";
+
+      delete process.env.GITHUB_RUN_ID;
+
+      await displaySummary(connections, controlPlaneApiBaseUrl);
+
+      const summary = core.summary;
+      expect(summary.addHeading).toHaveBeenCalledWith("Bullfrog Results", 3);
+      expect(summary.addLink).not.toHaveBeenCalled();
+      expect(summary.write).toHaveBeenCalled();
+    });
+
+    it("should display no connections message when connections array is empty", async () => {
+      const connections: Connection[] = [];
+
+      await displaySummary(connections, undefined);
+
+      const summary = core.summary;
+      expect(summary.addRaw).toHaveBeenCalledWith(
+        "\n\nNo outbound connections detected.\n",
+      );
+      expect(summary.write).toHaveBeenCalled();
+    });
+  });
+
+  describe("getConnections", () => {
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(async () => {
+      originalEnv = { ...process.env };
+      vi.clearAllMocks();
+
+      // Mock timers to skip the 5-second delay
+      vi.useFakeTimers();
+
+      // Mock parseInputs
+      const { parseInputs } = await import("../inputs");
+      vi.mocked(parseInputs).mockReturnValue({
+        allowedDomains: [],
+        allowedIps: [],
+        dnsPolicy: "allowed-domains-only",
+        egressPolicy: "audit",
+        enableSudo: true,
+        collectProcessInfo: true,
+        localAgent: false,
+        logDirectory: "/var/log/test",
+        agentDownloadBaseURL: "https://example.com",
+        controlPlaneApiBaseUrl: "https://api.example.com",
+        controlPlaneWebappBaseUrl: "https://app.example.com",
+        apiToken: undefined,
+      });
+
+      // Mock core.debug
+      vi.mocked(core.debug).mockImplementation(() => {});
+      vi.mocked(core.warning).mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    // Helper to call getConnections and advance timers
+    async function callGetConnections() {
+      const promise = getConnections();
+      await vi.advanceTimersByTimeAsync(5000);
+      return promise;
+    }
+
+    it("should parse valid connection log entries", async () => {
+      const logContent = JSON.stringify({
+        timestamp: "1704067200000",
+        decision: "allowed",
+        protocol: "TCP",
+        dstIP: "93.184.216.34",
+        dstPort: "443",
+        domain: "example.com",
+        reason: "ip-allowed",
+        processName: "curl",
+        commandLine: "curl https://example.com",
+        executablePath: "/usr/bin/curl",
+      });
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(1);
+      expect(result.raw[0]).toMatchObject({
+        domain: "example.com",
+        ip: "93.184.216.34",
+        port: 443,
+        authorized: true,
+        blocked: false,
+        protocol: "TCP",
+        reason: "ip-allowed",
+        process: "curl",
+      });
+    });
+
+    it("should handle multiple log entries", async () => {
+      const logContent = [
+        JSON.stringify({
+          timestamp: "1704067200000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "93.184.216.34",
+          dstPort: "443",
+          domain: "example.com",
+          reason: "ip-allowed",
+          processName: "curl",
+        }),
+        JSON.stringify({
+          timestamp: "1704067201000",
+          decision: "blocked",
+          protocol: "TCP",
+          dstIP: "1.2.3.4",
+          dstPort: "443",
+          domain: "malicious.com",
+          reason: "domain-not-allowed",
+          processName: "wget",
+        }),
+      ].join("\n");
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(2);
+      expect(result.raw[0].authorized).toBe(true);
+      expect(result.raw[1].authorized).toBe(false);
+    });
+
+    it("should handle unknown values by converting to undefined", async () => {
+      const logContent = JSON.stringify({
+        timestamp: "1704067200000",
+        decision: "allowed",
+        protocol: "TCP",
+        dstIP: "unknown",
+        dstPort: "unknown",
+        domain: "unknown",
+        reason: "ip-allowed",
+        processName: "unknown",
+        commandLine: "unknown",
+        executablePath: "unknown",
+      });
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(1);
+      expect(result.raw[0].domain).toBeUndefined();
+      expect(result.raw[0].ip).toBeUndefined();
+      expect(result.raw[0].port).toBeUndefined();
+      expect(result.raw[0].process).toBeUndefined();
+      expect(result.raw[0].exePath).toBeUndefined();
+      expect(result.raw[0].commandLine).toBeUndefined();
+    });
+
+    it("should skip empty lines", async () => {
+      const logContent = [
+        JSON.stringify({
+          timestamp: "1704067200000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "93.184.216.34",
+          dstPort: "443",
+          domain: "example.com",
+          reason: "ip-allowed",
+          processName: "curl",
+        }),
+        "",
+        "   ",
+        JSON.stringify({
+          timestamp: "1704067201000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "1.2.3.4",
+          dstPort: "443",
+          domain: "test.com",
+          reason: "ip-allowed",
+          processName: "wget",
+        }),
+      ].join("\n");
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(2);
+    });
+
+    it("should skip lines with invalid JSON", async () => {
+      const logContent = [
+        JSON.stringify({
+          timestamp: "1704067200000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "93.184.216.34",
+          dstPort: "443",
+          domain: "example.com",
+          reason: "ip-allowed",
+          processName: "curl",
+        }),
+        "invalid json line",
+        JSON.stringify({
+          timestamp: "1704067201000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "1.2.3.4",
+          dstPort: "443",
+          domain: "test.com",
+          reason: "ip-allowed",
+          processName: "wget",
+        }),
+      ].join("\n");
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(2);
+      expect(core.warning).toHaveBeenCalledWith(
+        "Failed to parse log line: invalid json line",
+      );
+    });
+
+    it("should skip lines with invalid timestamps", async () => {
+      const logContent = [
+        JSON.stringify({
+          timestamp: "invalid",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "93.184.216.34",
+          dstPort: "443",
+          domain: "example.com",
+          reason: "ip-allowed",
+          processName: "curl",
+        }),
+        JSON.stringify({
+          timestamp: "1704067201000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "1.2.3.4",
+          dstPort: "443",
+          domain: "test.com",
+          reason: "ip-allowed",
+          processName: "wget",
+        }),
+      ].join("\n");
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(1);
+      expect(result.raw[0].domain).toBe("test.com");
+    });
+
+    it("should handle blocked connections when egress-policy is block", async () => {
+      const { parseInputs } = await import("../inputs");
+      vi.mocked(parseInputs).mockReturnValue({
+        allowedDomains: [],
+        allowedIps: [],
+        dnsPolicy: "allowed-domains-only",
+        egressPolicy: "block",
+        enableSudo: true,
+        collectProcessInfo: true,
+        localAgent: false,
+        logDirectory: "/var/log/test",
+        agentDownloadBaseURL: "https://example.com",
+        controlPlaneApiBaseUrl: "https://api.example.com",
+        controlPlaneWebappBaseUrl: "https://app.example.com",
+        apiToken: undefined,
+      });
+
+      const logContent = JSON.stringify({
+        timestamp: "1704067200000",
+        decision: "blocked",
+        protocol: "TCP",
+        dstIP: "1.2.3.4",
+        dstPort: "443",
+        domain: "malicious.com",
+        reason: "domain-not-allowed",
+        processName: "curl",
+      });
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(1);
+      expect(result.raw[0].blocked).toBe(true);
+      expect(result.raw[0].authorized).toBe(false);
+    });
+
+    it("should return filtered connections using filterConnectionsNoise", async () => {
+      const logContent = [
+        JSON.stringify({
+          timestamp: "1704067200000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "93.184.216.34",
+          dstPort: "443",
+          domain: "example.com",
+          reason: "ip-allowed",
+          processName: "curl",
+        }),
+        JSON.stringify({
+          timestamp: "1704067201000",
+          decision: "allowed",
+          protocol: "TCP",
+          dstIP: "93.184.216.34",
+          dstPort: "443",
+          domain: "example.com",
+          reason: "ip-allowed",
+          processName: "curl",
+        }),
+      ].join("\n");
+
+      vi.mocked(fs.readFile).mockResolvedValue(logContent);
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toHaveLength(2);
+      expect(result.filtered).toHaveLength(1); // Deduplicated
+    });
+
+    it("should return empty arrays on file read error", async () => {
+      vi.mocked(fs.readFile).mockRejectedValue(new Error("File not found"));
+      console.error = vi.fn(); // Mock console.error to avoid noise
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toEqual([]);
+      expect(result.filtered).toEqual([]);
+    });
+
+    it("should handle empty log file", async () => {
+      vi.mocked(fs.readFile).mockResolvedValue("");
+
+      const result = await callGetConnections();
+
+      expect(result.raw).toEqual([]);
+      expect(result.filtered).toEqual([]);
+    });
+  });
+
+  describe("submitResultsToControlPlane", () => {
+    let originalEnv: NodeJS.ProcessEnv;
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      originalEnv = { ...process.env };
+      process.env.GITHUB_REPOSITORY = "test-org/test-repo";
+      process.env.GITHUB_RUN_ID = "12345";
+      process.env.GITHUB_RUN_ATTEMPT = "1";
+      process.env.GITHUB_JOB = "test-job";
+
+      vi.clearAllMocks();
+
+      // Mock fetch
+      fetchMock = vi.fn();
+      global.fetch = fetchMock as typeof fetch;
+
+      // Mock core methods
+      vi.mocked(core.debug).mockImplementation(() => {});
+      vi.mocked(core.info).mockImplementation(() => {});
+      vi.mocked(core.warning).mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.restoreAllMocks();
+    });
+
+    it("should successfully submit results to control plane", async () => {
+      const connections: Connection[] = [
+        {
+          timestamp: new Date("2024-01-01T00:00:00Z"),
+          domain: "example.com",
+          ip: "93.184.216.34",
+          port: 443,
+          blocked: false,
+          authorized: true,
+          protocol: "TCP",
+          reason: "ip-allowed",
+          process: "curl",
+        },
+      ];
+
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+      });
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.bullfrogsec.com/v1/events",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-token",
+          },
+          body: expect.stringContaining('"workflowRunId":"12345"'),
+        },
+      );
+    });
+
+    it("should handle control plane URL without trailing slash", async () => {
+      const connections: Connection[] = [];
+
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+      });
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.bullfrogsec.com/v1/events",
+        expect.any(Object),
+      );
+    });
+
+    it("should include all GitHub context in payload", async () => {
+      const connections: Connection[] = [];
+
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+      });
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      const callArgs = fetchMock.mock.calls[0];
+      const payload = JSON.parse(callArgs[1].body);
+
+      expect(payload).toEqual({
+        workflowRunId: "12345",
+        runAttempt: 1,
+        jobName: "test-job",
+        organization: "test-org",
+        repo: "test-org/test-repo",
+        connections: [],
+      });
+    });
+
+    it("should handle non-OK response", async () => {
+      const connections: Connection[] = [];
+
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: async () => "Invalid payload",
+      });
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to submit results to control plane"),
+      );
+    });
+
+    it("should handle fetch error", async () => {
+      const connections: Connection[] = [];
+
+      fetchMock.mockRejectedValue(new Error("Network error"));
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to submit results to control plane"),
+      );
+    });
+
+    it("should handle missing GitHub context gracefully", async () => {
+      const connections: Connection[] = [];
+
+      delete process.env.GITHUB_REPOSITORY;
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Missing GitHub context"),
+      );
+    });
+
+    it("should include all connection data in payload", async () => {
+      const connections: Connection[] = [
+        {
+          timestamp: new Date("2024-01-01T00:00:00Z"),
+          domain: "example.com",
+          ip: "93.184.216.34",
+          port: 443,
+          blocked: false,
+          authorized: true,
+          protocol: "TCP",
+          reason: "ip-allowed",
+          process: "curl",
+          exePath: "/usr/bin/curl",
+          commandLine: "curl https://example.com",
+          docker: {
+            containerImage: "nginx:latest",
+            containerName: "web",
+          },
+        },
+      ];
+
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+      });
+
+      await submitResultsToControlPlane(
+        connections,
+        "test-token",
+        "https://api.bullfrogsec.com/",
+      );
+
+      const callArgs = fetchMock.mock.calls[0];
+      const payload = JSON.parse(callArgs[1].body);
+
+      expect(payload.connections).toHaveLength(1);
+      expect(payload.connections[0]).toMatchObject({
+        domain: "example.com",
+        ip: "93.184.216.34",
+        port: 443,
+        blocked: false,
+        authorized: true,
+        protocol: "TCP",
+        reason: "ip-allowed",
+        process: "curl",
+        exePath: "/usr/bin/curl",
+        commandLine: "curl https://example.com",
+        docker: {
+          containerImage: "nginx:latest",
+          containerName: "web",
+        },
+      });
     });
   });
 });

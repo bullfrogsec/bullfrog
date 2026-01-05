@@ -8,6 +8,14 @@ inputs:
   allowed-domains:
     description: "List of allowed domains for outbound connections."
 
+  api-token:
+    description: "API token for submitting connection results to the Bullfrog control plane. If not provided, results will not be published."
+
+  collect-process-info:
+    description: "Enable this option to collect process information (PID, process name, command line) for network connections. Options: 'true' (default) or 'false'."
+    type: boolean
+    default: true
+
   dns-policy:
     description: "DNS policy to enforce when egress-policy is set to 'block'. Options: 'allowed-domains-only' (default) or 'any'."
     default: "allowed-domains-only"
@@ -22,15 +30,24 @@ inputs:
     type: boolean
     default: true
 
-  collect-process-info:
-    description: "Enable this option to collect process information (PID, process name, command line) for network connections. Options: 'true' (default) or 'false'."
-    type: boolean
-    default: true
-
   _agent-download-base-url:
-    description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork. The URL should end with a slash."
+    description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork."
     type: string
     default: "https://github.com/bullfrogsec/bullfrog/releases/download/"
+
+  _agent-version:
+    description: "(Internal) Override the agent version to download. Must start with 'v' followed by semver (e.g., 'v0.8.4', 'v0.8.4-beta-feature', 'v1.0.0-rc'). If not specified, uses the version from package.json."
+    type: string
+
+  _control-plane-api-base-url:
+    description: "(Internal) Base URL for the Bullfrog control plane API. This is useful for testing changes in a fork."
+    type: string
+    default: "https://api.bullfrogsec.com/"
+
+  _control-plane-webapp-base-url:
+    description: "(Internal) Base URL for the Bullfrog control plane webapp. This is useful for testing changes in a fork."
+    type: string
+    default: "https://app.bullfrogsec.com/"
 
   _log-directory:
     description: "(Internal) Directory to store log files."
