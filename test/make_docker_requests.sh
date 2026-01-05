@@ -21,3 +21,9 @@ docker run --rm --entrypoint sh alpine/curl:8.7.1 -c "
         exit 1;
     fi;
 "
+docker run --rm --entrypoint sh alpine/curl:8.17.0 -c "
+    if timeout 5 curl https://www.msn.com --output /dev/null; then
+        echo 'Expected curl to www.msn.com to fail, but it succeeded';
+        exit 1;
+    fi;
+"

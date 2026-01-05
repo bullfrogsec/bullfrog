@@ -753,7 +753,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		agent.ProcessPacket(packet)
 
 		// Process info should be "unknown"
-		cacheKey := "127.0.0.1:12345:tcp"
+		cacheKey := "127.0.0.1:12345:93.184.216.34:443:tcp"
 		if cached, exists := agent.processInfoCache[cacheKey]; exists {
 			t.Errorf("Expected no cache entry when collection disabled, got %v", cached)
 		}
@@ -793,7 +793,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		agent.ProcessPacket(packet)
 
 		// Check cache
-		cacheKey := "127.0.0.1:12345:tcp"
+		cacheKey := "127.0.0.1:12345:93.184.216.34:443:tcp"
 		cached, exists := agent.processInfoCache[cacheKey]
 		if !exists {
 			t.Errorf("Expected cache entry for process info")
@@ -930,7 +930,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		agent.ProcessPacket(packet)
 
 		// Check that process info was cached with Docker details
-		cacheKey := "172.18.0.2:8080:tcp"
+		cacheKey := "172.18.0.2:8080:93.184.216.34:443:tcp"
 		cached, exists := agent.processInfoCache[cacheKey]
 		if !exists {
 			t.Errorf("Expected cache entry for Docker process")
@@ -1003,7 +1003,7 @@ func TestProcessInfoCollection(t *testing.T) {
 		agent.ProcessPacket(packet)
 
 		// Check that process info was cached with host process details (fallback)
-		cacheKey := "172.17.0.3:12345:tcp"
+		cacheKey := "172.17.0.3:12345:93.184.216.34:443:tcp"
 		cached, exists := agent.processInfoCache[cacheKey]
 		if !exists {
 			t.Errorf("Expected cache entry for host process (fallback)")

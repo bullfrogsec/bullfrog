@@ -9,6 +9,7 @@ import (
 	"path"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -184,7 +185,7 @@ func (a *Agent) isIpAllowed(ipStr string) bool {
 	return false
 }
 
-func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) *ProcessInfo {
+func (a *Agent) getCachedOrLookupProcess(pkt PacketInfo, protocol string) *ProcessInfo {
 	// If process info collection is disabled, return default/unknown info
 	if !a.collectProcessInfo {
 		return &ProcessInfo{
@@ -197,7 +198,7 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) *Proce
 		}
 	}
 
-	cacheKey := fmt.Sprintf("%s:%s:%s", srcIP, srcPort, protocol)
+	cacheKey := fmt.Sprintf("%s:%s:%s:%s:%s", pkt.SrcIP, pkt.SrcPort, pkt.DstIP, pkt.DstPort, protocol)
 
 	// Check cache first
 	if cached, exists := a.processInfoCache[cacheKey]; exists {
@@ -205,10 +206,10 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) *Proce
 	}
 
 	// Try Docker container lookup first, but only if the IP is from a Docker network
-	if isDockerIP(srcIP) {
-		if container, err := a.dockerProvider.FindContainerByIP(srcIP); err == nil && container != nil {
+	if isDockerIP(pkt.SrcIP) {
+		if container, err := a.dockerProvider.FindContainerByIP(pkt.SrcIP); err == nil && container != nil {
 			pid, processName, cmdLine, execPath, err := a.dockerProvider.GetProcessInContainer(
-				container, srcIP, srcPort, protocol)
+				container, pkt.SrcIP, pkt.SrcPort, protocol)
 
 			if err == nil {
 				// Cache the result with Docker info
@@ -227,17 +228,19 @@ func (a *Agent) getCachedOrLookupProcess(srcIP, srcPort, protocol string) *Proce
 				return processInfo
 			}
 
-			// Log error per user's preference
-			log.Printf("Docker process lookup failed for %s in container %s: %v",
-				cacheKey, container.Name, err)
-		} else if err != nil && err.Error() != "Docker not available" {
-			// Log Docker API errors (but not if Docker is simply unavailable)
-			log.Printf("Docker container lookup failed for IP %s: %v", srcIP, err)
+			// Only log unexpected errors (not socket lookup failures)
+			if err != nil && !strings.Contains(err.Error(), "socket not found") {
+				log.Printf("Docker process lookup failed for %s in container %s: %v",
+					cacheKey, container.Name, err)
+			}
+		} else if err != nil && err.Error() != "Docker not available" && !strings.Contains(err.Error(), "no container found") {
+			// Log Docker API errors (but not race conditions during container startup)
+			log.Printf("Docker container lookup failed for IP %s: %v", pkt.SrcIP, err)
 		}
 	}
 
 	// Fallback to host process lookup
-	pid, processName, cmdLine, execPath, err := getProcessInfo(a.procProvider, srcIP, srcPort, protocol)
+	pid, processName, cmdLine, execPath, err := getProcessInfo(a.procProvider, pkt.SrcIP, pkt.SrcPort, protocol)
 	if err != nil {
 		fmt.Printf("Process lookup failed for %s: %v\n", cacheKey, err)
 		return &ProcessInfo{
@@ -367,7 +370,7 @@ func (a *Agent) extractPacketInfo(packet gopacket.Packet) PacketInfo {
 
 	// Lookup process information
 	if protocol != "" && info.SrcIP != "unknown" && info.SrcPort != "unknown" && info.SrcPort != "53" {
-		processInfo := a.getCachedOrLookupProcess(info.SrcIP, info.SrcPort, protocol)
+		processInfo := a.getCachedOrLookupProcess(info, protocol)
 		info.PID = processInfo.PID
 		info.ProcessName = processInfo.ProcessName
 		info.CommandLine = processInfo.CommandLine
