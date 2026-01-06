@@ -24,9 +24,13 @@ jobs:
       diff: ${{ steps.changes.outputs.src }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            github.com
+            api.github.com
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - uses: fallard84/paths-filter@dfb4213208eb30382ee3e27b8a810fc3fb8cc911 # v3.0.3
@@ -45,14 +49,14 @@ jobs:
     if: ${{ needs.check-diff.outputs.diff == 'true' }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.blob.core.windows.net
             *.docker.io
             *.golang.org
-            *.github.com
+            github.com
             deb.debian.org
             production.cloudflare.docker.com
             registry.npmjs.org
@@ -84,11 +88,12 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.github.com
+            github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -148,12 +153,14 @@ jobs:
       contents: write
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.github.com
+            github.com
             uploads.github.com
+            api.github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -279,10 +286,10 @@ jobs:
         env:
           _LOCAL_AGENT: true
         with:
-          allowed-domains: |
-            *.google.com
           egress-policy: block
           enable-sudo: false
+          allowed-domains: |
+            *.google.com
 
       - name: Make HTTP requests
         run: |
@@ -313,10 +320,10 @@ jobs:
         env:
           _LOCAL_AGENT: true
         with:
-          allowed-domains: |
-            *.google.com
           dns-policy: any
           egress-policy: block
+          allowed-domains: |
+            *.google.com
 
       - name: Make HTTP requests
         run: |
@@ -346,13 +353,13 @@ jobs:
         env:
           _LOCAL_AGENT: true
         with:
+          egress-policy: block
           allowed-ips: |
             172.17.0.0/16
           allowed-domains: |
             *.docker.io
             production.cloudflare.docker.com
             www.google.com
-          egress-policy: block
 
       - name: Test curl calls within Docker
         run: source test/make_docker_requests.sh
@@ -370,7 +377,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
           egress-policy: audit
@@ -422,13 +429,15 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
             *.golang.org
             registry.npmjs.org
             storage.googleapis.com
+            github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -469,10 +478,13 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
+            github.com
+            api.github.com
             uploads.github.com
 
       - name: Checkout
@@ -531,9 +543,13 @@ jobs:
     needs: [pre-release, pre-release-validation]
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            github.com
+            api.github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
