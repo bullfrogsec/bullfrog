@@ -106,51 +106,15 @@ jobs:
         run: |
           make test.artifacts
 
-  determine-version:
-    runs-on: ubuntu-22.04
-    outputs:
-      version_tag: ${{ steps.version.outputs.tag }}
-      is_beta: ${{ steps.version.outputs.is_beta }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-        with:
-          ref: ${{ github.head_ref || github.ref }}
-
-      - name: Determine version tag
-        id: version
-        run: |
-          if [[ "${{ github.head_ref }}" != release-please--branches--* ]] && [[ "${{ github.ref }}" != refs/heads/beta/* ]]; then
-            echo "Not a candidate for a beta release"
-            echo "is_beta=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          VERSION=$(jq -r '.version' package.json)
-
-          # Determine context: beta push or release-please PR
-          if [[ "${{ github.head_ref }}" == release-please--branches--* ]]; then
-            # RC release for release-please PR
-            RC_VERSION=$(jq -r '.[]' .release-please-manifest.json | head -1)
-            TAG_NAME="v${RC_VERSION}-rc"
-          elif [[ "${{ github.ref }}" == refs/heads/beta/* ]]; then
-            # Beta release
-            BRANCH_NAME="${GITHUB_REF#refs/heads/beta/}"
-            SANITIZED=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
-            TAG_NAME="v${VERSION}-beta-${SANITIZED}"
-          fi
-
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "is_beta=true" >> $GITHUB_OUTPUT
-          echo "Creating beta release: $TAG_NAME"
-
   create-beta-prerelease:
-    needs: [determine-version, build, check-artifacts]
-    if: needs.determine-version.outputs.is_beta == 'true'
+    needs: [build, check-artifacts]
+    if: startsWith(github.head_ref, 'release-please--branches--') || startsWith(github.ref, 'refs/heads/beta/')
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     permissions:
       contents: write
+    outputs:
+      version_tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
@@ -167,6 +131,29 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref }}
 
+      - name: Determine version tag
+        id: version
+        env:
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+
+          # Determine context: beta push or release-please PR
+          if [[ "$GITHUB_HEAD_REF" == release-please--branches--* ]]; then
+            # RC release for release-please PR
+            RC_VERSION=$(jq -r '.[]' .release-please-manifest.json | head -1)
+            TAG_NAME="v${RC_VERSION}-rc"
+          elif [[ "$GITHUB_REF" == refs/heads/beta/* ]]; then
+            # Beta release
+            BRANCH_NAME="${GITHUB_REF#refs/heads/beta/}"
+            SANITIZED=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+            TAG_NAME="v${VERSION}-beta-${SANITIZED}"
+          fi
+
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Creating beta release: $TAG_NAME"
+
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: build-artifacts
@@ -176,8 +163,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}
         run: |
-          TAG_NAME="${{ needs.determine-version.outputs.version_tag }}"
-          IS_BETA="${{ needs.determine-version.outputs.is_beta }}"
+          TAG_NAME="${{ steps.version.outputs.tag }}"
 
           # Delete existing release and tag if they exist
           gh release delete "$TAG_NAME" --yes || true
@@ -206,8 +192,7 @@ jobs:
             agent.tar.gz
 
   test-beta-release:
-    needs: [determine-version, create-beta-prerelease]
-    if: needs.determine-version.outputs.is_beta == 'true'
+    needs: [create-beta-prerelease]
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
@@ -219,7 +204,7 @@ jobs:
       - name: Test beta release with action
         uses: ./
         with:
-          _agent-version: ${{ needs.determine-version.outputs.version_tag }}
+          _agent-version: ${{ needs.create-beta-prerelease.outputs.version_tag }}
           egress-policy: block
           allowed-domains: www.google.com
 
