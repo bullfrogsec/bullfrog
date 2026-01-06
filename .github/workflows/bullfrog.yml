@@ -24,9 +24,13 @@ jobs:
       diff: ${{ steps.changes.outputs.src }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            github.com
+            api.github.com
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - uses: fallard84/paths-filter@dfb4213208eb30382ee3e27b8a810fc3fb8cc911 # v3.0.3
@@ -45,14 +49,14 @@ jobs:
     if: ${{ needs.check-diff.outputs.diff == 'true' }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.blob.core.windows.net
             *.docker.io
             *.golang.org
-            *.github.com
+            github.com
             deb.debian.org
             production.cloudflare.docker.com
             registry.npmjs.org
@@ -84,11 +88,12 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.github.com
+            github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -101,12 +106,26 @@ jobs:
         run: |
           make test.artifacts
 
-  determine-version:
+  create-beta-prerelease:
+    needs: [build, check-artifacts]
+    if: startsWith(github.head_ref, 'release-please--branches--') || startsWith(github.ref, 'refs/heads/beta/')
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
     outputs:
       version_tag: ${{ steps.version.outputs.tag }}
-      is_beta: ${{ steps.version.outputs.is_beta }}
     steps:
+      - name: Enable egress filtering
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
+        with:
+          egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            github.com
+            uploads.github.com
+            api.github.com
+
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
@@ -114,21 +133,18 @@ jobs:
 
       - name: Determine version tag
         id: version
+        env:
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REF: ${{ github.ref }}
         run: |
-          if [[ "${{ github.head_ref }}" != release-please--branches--* ]] && [[ "${{ github.ref }}" != refs/heads/beta/* ]]; then
-            echo "Not a candidate for a beta release"
-            echo "is_beta=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           VERSION=$(jq -r '.version' package.json)
 
           # Determine context: beta push or release-please PR
-          if [[ "${{ github.head_ref }}" == release-please--branches--* ]]; then
+          if [[ "$GITHUB_HEAD_REF" == release-please--branches--* ]]; then
             # RC release for release-please PR
             RC_VERSION=$(jq -r '.[]' .release-please-manifest.json | head -1)
             TAG_NAME="v${RC_VERSION}-rc"
-          elif [[ "${{ github.ref }}" == refs/heads/beta/* ]]; then
+          elif [[ "$GITHUB_REF" == refs/heads/beta/* ]]; then
             # Beta release
             BRANCH_NAME="${GITHUB_REF#refs/heads/beta/}"
             SANITIZED=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
@@ -136,29 +152,7 @@ jobs:
           fi
 
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "is_beta=true" >> $GITHUB_OUTPUT
           echo "Creating beta release: $TAG_NAME"
-
-  create-beta-prerelease:
-    needs: [determine-version, build, check-artifacts]
-    if: needs.determine-version.outputs.is_beta == 'true'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
-        with:
-          egress-policy: block
-          allowed-domains: |
-            *.github.com
-            uploads.github.com
-
-      - name: Checkout
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-        with:
-          ref: ${{ github.head_ref || github.ref }}
 
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
@@ -169,8 +163,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}
         run: |
-          TAG_NAME="${{ needs.determine-version.outputs.version_tag }}"
-          IS_BETA="${{ needs.determine-version.outputs.is_beta }}"
+          TAG_NAME="${{ steps.version.outputs.tag }}"
 
           # Delete existing release and tag if they exist
           gh release delete "$TAG_NAME" --yes || true
@@ -199,8 +192,7 @@ jobs:
             agent.tar.gz
 
   test-beta-release:
-    needs: [determine-version, create-beta-prerelease]
-    if: needs.determine-version.outputs.is_beta == 'true'
+    needs: [create-beta-prerelease]
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
@@ -212,7 +204,7 @@ jobs:
       - name: Test beta release with action
         uses: ./
         with:
-          _agent-version: ${{ needs.determine-version.outputs.version_tag }}
+          _agent-version: ${{ needs.create-beta-prerelease.outputs.version_tag }}
           egress-policy: block
           allowed-domains: www.google.com
 
@@ -279,10 +271,10 @@ jobs:
         env:
           _LOCAL_AGENT: true
         with:
-          allowed-domains: |
-            *.google.com
           egress-policy: block
           enable-sudo: false
+          allowed-domains: |
+            *.google.com
 
       - name: Make HTTP requests
         run: |
@@ -313,10 +305,10 @@ jobs:
         env:
           _LOCAL_AGENT: true
         with:
-          allowed-domains: |
-            *.google.com
           dns-policy: any
           egress-policy: block
+          allowed-domains: |
+            *.google.com
 
       - name: Make HTTP requests
         run: |
@@ -346,13 +338,13 @@ jobs:
         env:
           _LOCAL_AGENT: true
         with:
+          egress-policy: block
           allowed-ips: |
             172.17.0.0/16
           allowed-domains: |
             *.docker.io
             production.cloudflare.docker.com
             www.google.com
-          egress-policy: block
 
       - name: Test curl calls within Docker
         run: source test/make_docker_requests.sh
@@ -370,7 +362,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
           egress-policy: audit
@@ -422,13 +414,15 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
             *.golang.org
             registry.npmjs.org
             storage.googleapis.com
+            github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -469,10 +463,13 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
+            github.com
+            api.github.com
             uploads.github.com
 
       - name: Checkout
@@ -531,9 +528,13 @@ jobs:
     needs: [pre-release, pre-release-validation]
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            github.com
+            api.github.com
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0

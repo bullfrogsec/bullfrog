@@ -9,11 +9,13 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   cleanup-beta:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     # Only run for beta branch deletions
     if: github.event.ref_type == 'branch' && startsWith(github.event.ref, 'beta/')
     timeout-minutes: 2
@@ -42,6 +44,8 @@ jobs:
           git push origin ":refs/tags/$TAG_NAME" || true
   cleanup-rc:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     # Only run for release-please PRs
     if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--branches--') }}
     timeout-minutes: 2

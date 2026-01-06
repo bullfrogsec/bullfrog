@@ -13,9 +13,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3
+        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
         with:
           egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            api.github.com
 
       - name: PR Conventional Commit Validation
         uses: ytanikin/PRConventionalCommits@b628c5a234cc32513014b7bfdd1e47b532124d98 # v1.3.0
