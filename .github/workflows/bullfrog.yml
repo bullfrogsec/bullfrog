@@ -370,31 +370,32 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
-        with:
-          # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
-          egress-policy: audit
-          allowed-domains: |
-            *.canonical.com
-            *.github.com
-            *.ubuntu.com
-            archivist.vagrantup.com
-            deb.nodesource.com
-            dl.google.com
-            download.docker.com
-            go.dev
-            *.githubusercontent.com
-            packages.microsoft.com
-            vagrantcloud-files-production.s3-accelerate.amazonaws.com
-            vagrantcloud.com
-            www.google.com
-            *.docker.io
-            production.cloudflare.docker.com
-            docker-images-prod.*.r2.cloudflarestorage.com
-            *.hashicorp.com
-          allowed-ips: |
-            8.8.8.8
+      # TODO: Re-enable after we fix the bug with audit mode blocking untrusted DNS servers
+      # - name: Enable egress filtering
+      #   uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
+      #   with:
+      #     # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
+      #     egress-policy: audit
+      #     allowed-domains: |
+      #       *.canonical.com
+      #       *.github.com
+      #       *.ubuntu.com
+      #       archivist.vagrantup.com
+      #       deb.nodesource.com
+      #       dl.google.com
+      #       download.docker.com
+      #       go.dev
+      #       *.githubusercontent.com
+      #       packages.microsoft.com
+      #       vagrantcloud-files-production.s3-accelerate.amazonaws.com
+      #       vagrantcloud.com
+      #       www.google.com
+      #       *.docker.io
+      #       production.cloudflare.docker.com
+      #       docker-images-prod.*.r2.cloudflarestorage.com
+      #       *.hashicorp.com
+      #     allowed-ips: |
+      #       1.1.1.1
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
