@@ -282,6 +282,8 @@ jobs:
           enable-sudo: false
           allowed-domains: |
             *.google.com
+          allowed-ips: |
+            1.1.1.1
 
       - name: Make HTTP requests
         run: |

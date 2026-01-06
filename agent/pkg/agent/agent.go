@@ -501,7 +501,8 @@ func (a *Agent) processDNSPacket(packet gopacket.Packet) uint8 {
 	// if we are blocking DNS queries, intercept the DNS queries and decide whether to block or allow them
 	if !dns.QR {
 		// making sure the DNS query is using a trusted DNS server
-		if !a.allowedDNSServers[pkt.DstIP] {
+		// Trust DNS servers in allowedDNSServers OR in allowedIps
+		if !a.allowedDNSServers[pkt.DstIP] && !a.isIpAllowed(pkt.DstIP) {
 			fmt.Printf("%s -> Blocked DNS Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
 			a.addConnectionLog(pkt, "blocked", "DNS", domain, "untrusted-dns-server")
 			if a.blocking {
@@ -581,7 +582,8 @@ func (a *Agent) processDNSOverTCPPacket(packet gopacket.Packet) uint8 {
 
 	// Validate DNS server IP
 	if dstPort == DNS_PORT {
-		if !a.allowedDNSServers[pkt.DstIP] {
+		// Trust DNS servers in allowedDNSServers OR in allowedIps
+		if !a.allowedDNSServers[pkt.DstIP] && !a.isIpAllowed(pkt.DstIP) {
 			fmt.Printf("%s -> Blocked DNS-over-TCP Query. Untrusted DNS server %s\n", domain, pkt.DstIP)
 			a.addConnectionLog(pkt, "blocked", "TCP-DNS", domain, "untrusted-dns-server")
 			if a.blocking {

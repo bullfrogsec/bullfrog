@@ -1127,6 +1127,93 @@ func TestDomainWildcardMatching(t *testing.T) {
 	}
 }
 
+func TestAllowedIPsAsTrustedDNSServers(t *testing.T) {
+	// Test that DNS servers in allowedIps are trusted
+	t.Run("Accept DNS query to DNS server in allowedIps", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{"8.8.8.8"}, // Google DNS in allowed IPs
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// 8.8.8.8 is in allowedIps, so it should be trusted as a DNS server
+		packet := GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for DNS server in allowedIps, got %v", decision)
+		}
+	})
+
+	t.Run("Accept DNS over TCP query to DNS server in allowedIps", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{"1.1.1.1"}, // Cloudflare DNS in allowed IPs
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// 1.1.1.1 is in allowedIps, so it should be trusted for DNS over TCP
+		packet := GenerateDNSOverTCPPacket("trusted.com", net.IP{1, 1, 1, 1}, true)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for DNS-over-TCP server in allowedIps, got %v", decision)
+		}
+	})
+
+	t.Run("Accept DNS query to DNS server in CIDR range", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{"8.8.0.0/16"}, // CIDR range including 8.8.8.8
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// 8.8.8.8 is in the 8.8.0.0/16 CIDR range
+		packet := GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST for DNS server in CIDR range, got %v", decision)
+		}
+	})
+
+	t.Run("Block DNS query to DNS server NOT in allowedIps", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_BLOCK,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{"1.1.1.1"}, // Only Cloudflare, not Google
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// 8.8.8.8 is NOT in allowedIps and NOT in default DNS servers
+		packet := GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != DROP_REQUEST {
+			t.Errorf("Expected DROP_REQUEST for DNS server not in allowedIps, got %v", decision)
+		}
+	})
+}
+
 func TestAuditModeUntrustedDNSServer(t *testing.T) {
 	// Test that audit mode does not block DNS queries to untrusted DNS servers
 	t.Run("Accept DNS query to untrusted DNS server in audit mode", func(t *testing.T) {
