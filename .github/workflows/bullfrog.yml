@@ -248,6 +248,13 @@ jobs:
           timeout 5 curl https://www.google.com --output /dev/null
           timeout 5 curl https://www.bing.com --output /dev/null
 
+      - name: Test DNS queries to untrusted DNS servers work in audit mode
+        run: |
+          # In audit mode, DNS queries to untrusted DNS servers should be logged but not blocked
+          # 8.8.8.8 (Google DNS) is not in the default allowed DNS servers
+          timeout 5 dig @8.8.8.8 www.google.com
+          timeout 5 dig @8.8.8.8 www.bing.com
+
   test-block:
     needs: build
     runs-on: ${{ matrix.os }}

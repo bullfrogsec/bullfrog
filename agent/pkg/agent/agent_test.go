@@ -1127,6 +1127,52 @@ func TestDomainWildcardMatching(t *testing.T) {
 	}
 }
 
+func TestAuditModeUntrustedDNSServer(t *testing.T) {
+	// Test that audit mode does not block DNS queries to untrusted DNS servers
+	t.Run("Accept DNS query to untrusted DNS server in audit mode", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_AUDIT,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// 8.8.8.8 is not in the allowed DNS servers (only 127.0.0.53 is by default)
+		packet := GenerateDNSRequestPacket("trusted.com", net.IP{8, 8, 8, 8})
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST in audit mode for untrusted DNS server, got %v", decision)
+		}
+	})
+
+	// Test that audit mode does not block DNS over TCP queries to untrusted DNS servers
+	t.Run("Accept DNS over TCP query to untrusted DNS server in audit mode", func(t *testing.T) {
+		agent := NewAgent(AgentConfig{
+			EgressPolicy:    EGRESS_POLICY_AUDIT,
+			DNSPolicy:       DNS_POLICY_ALLOWED_DOMAINS_ONLY,
+			AllowedDomains:  []string{"trusted.com"},
+			AllowedIPs:      []string{},
+			EnableSudo:      true,
+			NetInfoProvider: &mockNetInfoProvider{},
+			FileSystem:      &mockFileSystem{},
+			ProcProvider:    newMockProcProvider(),
+		})
+
+		// 8.8.8.8 is not in the allowed DNS servers
+		packet := GenerateDNSOverTCPPacket("trusted.com", net.IP{8, 8, 8, 8}, true)
+		decision := agent.ProcessPacket(packet)
+
+		if decision != ACCEPT_REQUEST {
+			t.Errorf("Expected ACCEPT_REQUEST in audit mode for untrusted DNS server (TCP), got %v", decision)
+		}
+	})
+}
+
 func TestDNSSRVResponse(t *testing.T) {
 	t.Run("Accept SRV response for allowed domain", func(t *testing.T) {
 		agent := NewAgent(AgentConfig{
