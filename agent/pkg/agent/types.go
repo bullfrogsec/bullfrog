@@ -23,6 +23,7 @@ var (
 		"*.actions.githubusercontent.com",
 		"*.githubapp.com",
 		"glb-*.github.com",
+		"productionresultssa0.blob.core.windows.net",
 		"productionresultssa1.blob.core.windows.net",
 		"productionresultssa2.blob.core.windows.net",
 		"productionresultssa3.blob.core.windows.net",
