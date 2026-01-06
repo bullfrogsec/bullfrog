@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/bullfrogsec/bullfrog/compare/v0.9.1...v0.9.2) (2026-01-06)
+
+
+### Bug Fixes
+
+* untrusted dns server blocking in audit mode and can't add custom dns server ([#226](https://github.com/bullfrogsec/bullfrog/issues/226)) ([bcb0125](https://github.com/bullfrogsec/bullfrog/commit/bcb01253bac3b5814db5ac003bad0791c4636259))
+
 ## [0.9.1](https://github.com/bullfrogsec/bullfrog/compare/v0.9.0...v0.9.1) (2026-01-05)
 
 
