@@ -65,6 +65,12 @@ grep -E --quiet 'www\.google\.com</td><td>8\.8\.8\.8</td><td>53</td><td>DNS</td>
 # DNS Requests - www.google.com to untrusted DNS server with TCP (should be blocked)
 grep -E --quiet 'www\.google\.com</td><td>8\.8\.8\.8</td><td>53</td><td>TCP-DNS</td><td>Untrusted DNS server</td><td>🚫 Blocked</td><td>dig</td><td>[-]</td><td>/usr/bin/dig</td><td>dig @8\.8\.8\.8 www\.google\.com \+tcp' $GITHUB_STEP_SUMMARY
 
+# DNS Requests - www.google.com to additional DNS server (should succeed)
+grep -E --quiet 'www\.google\.com</td><td>1\.1\.1\.1</td><td>53</td><td>DNS</td><td>Domain allowed</td><td>✅ Authorized</td><td>dig</td><td>[-]</td><td>/usr/bin/dig</td><td>dig @1\.1\.1\.1 www\.google\.com' $GITHUB_STEP_SUMMARY
+
+# DNS Requests - www.google.com to additional DNS server with TCP (should succeed)
+grep -E --quiet 'www\.google\.com</td><td>1\.1\.1\.1</td><td>53</td><td>DNS</td><td>Domain allowed</td><td>✅ Authorized</td><td>dig</td><td>[-]</td><td>/usr/bin/dig</td><td>dig @1\.1\.1\.1 www\.google\.com \+tcp' $GITHUB_STEP_SUMMARY
+
 # Docker Requests - www.google.com DNS from container (should succeed)
 grep -E --quiet 'www\.google\.com</td><td>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+</td><td>53</td><td>DNS</td><td>Domain allowed</td><td>✅ Authorized</td><td>curl</td><td>alpine/curl:8\.7\.1:[^<]+</td><td>/usr/bin/curl</td><td>curl https://www\.google\.com' $GITHUB_STEP_SUMMARY
 

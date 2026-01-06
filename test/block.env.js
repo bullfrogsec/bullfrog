@@ -5,6 +5,9 @@ www.google.com
 production.cloudflare.docker.com
 docker-images-prod.*.r2.cloudflarestorage.com
 `;
+process.env["INPUT_ALLOWED-IPS"] = `
+1.1.1.1
+`;
 process.env["INPUT_EGRESS-POLICY"] = "block";
 process.env["INPUT_DNS-POLICY"] = "allowed-domains-only";
 process.env["INPUT_ENABLE-SUDO"] = "true";

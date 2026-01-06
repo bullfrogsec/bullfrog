@@ -248,6 +248,13 @@ jobs:
           timeout 5 curl https://www.google.com --output /dev/null
           timeout 5 curl https://www.bing.com --output /dev/null
 
+      - name: Test DNS queries to untrusted DNS servers work in audit mode
+        run: |
+          # In audit mode, DNS queries to untrusted DNS servers should be logged but not blocked
+          # 8.8.8.8 (Google DNS) is not in the default allowed DNS servers
+          timeout 5 dig @8.8.8.8 www.google.com
+          timeout 5 dig @8.8.8.8 www.bing.com
+
   test-block:
     needs: build
     runs-on: ${{ matrix.os }}
@@ -275,6 +282,8 @@ jobs:
           enable-sudo: false
           allowed-domains: |
             *.google.com
+          allowed-ips: |
+            1.1.1.1
 
       - name: Make HTTP requests
         run: |
@@ -361,31 +370,32 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
-        with:
-          # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
-          egress-policy: audit
-          allowed-domains: |
-            *.canonical.com
-            *.github.com
-            *.ubuntu.com
-            archivist.vagrantup.com
-            deb.nodesource.com
-            dl.google.com
-            download.docker.com
-            go.dev
-            *.githubusercontent.com
-            packages.microsoft.com
-            vagrantcloud-files-production.s3-accelerate.amazonaws.com
-            vagrantcloud.com
-            www.google.com
-            *.docker.io
-            production.cloudflare.docker.com
-            docker-images-prod.*.r2.cloudflarestorage.com
-            *.hashicorp.com
-          allowed-ips: |
-            8.8.8.8
+      # TODO: Re-enable after we fix the bug with audit mode blocking untrusted DNS servers
+      # - name: Enable egress filtering
+      #   uses: bullfrogsec/bullfrog@4a9cb341c9259028c5aa8a132452004399f8c2db # v0.9.1
+      #   with:
+      #     # Don't put in blocking mode, we don't want to interfere with the integration test running in the vagrant VM
+      #     egress-policy: audit
+      #     allowed-domains: |
+      #       *.canonical.com
+      #       *.github.com
+      #       *.ubuntu.com
+      #       archivist.vagrantup.com
+      #       deb.nodesource.com
+      #       dl.google.com
+      #       download.docker.com
+      #       go.dev
+      #       *.githubusercontent.com
+      #       packages.microsoft.com
+      #       vagrantcloud-files-production.s3-accelerate.amazonaws.com
+      #       vagrantcloud.com
+      #       www.google.com
+      #       *.docker.io
+      #       production.cloudflare.docker.com
+      #       docker-images-prod.*.r2.cloudflarestorage.com
+      #       *.hashicorp.com
+      #     allowed-ips: |
+      #       1.1.1.1
 
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
