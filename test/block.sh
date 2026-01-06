@@ -6,7 +6,20 @@ set -x
 # Stop on failure
 set -e
 
-export GITHUB_STEP_SUMMARY="/tmp/github_step_summary"
+# Detect environment: Vagrant vs GitHub Actions
+if [ -d "/vagrant" ]; then
+  # Running in Vagrant
+  BASE_PATH="/vagrant"
+  STEP_SUMMARY_PATH="/tmp/github_step_summary"
+else
+  # Running in GitHub Actions or locally
+  BASE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  STEP_SUMMARY_PATH="${RUNNER_TEMP:-/tmp}/github_step_summary"
+fi
+
+echo "Running in environment with BASE_PATH: $BASE_PATH"
+
+export GITHUB_STEP_SUMMARY="$STEP_SUMMARY_PATH"
 sudo rm -f $GITHUB_STEP_SUMMARY
 touch $GITHUB_STEP_SUMMARY
 
@@ -22,16 +35,16 @@ sudo rm -f /var/run/bullfrog/agent-ready
 sudo touch /etc/sudoers.d/runner
 
 sudo NODE_OPTIONS=--enable-source-maps node \
-  --require /vagrant/test/block.env.js \
-  /vagrant/action/dist/main.js
+  --require "$BASE_PATH/test/block.env.js" \
+  "$BASE_PATH/action/dist/main.js"
 
-source /vagrant/test/make_http_requests.sh
-source /vagrant/test/make_dns_requests.sh
-source /vagrant/test/make_docker_requests.sh
+source "$BASE_PATH/test/make_http_requests.sh"
+source "$BASE_PATH/test/make_dns_requests.sh"
+source "$BASE_PATH/test/make_docker_requests.sh"
 
 NODE_OPTIONS=--enable-source-maps node \
-  --require /vagrant/test/block.env.js \
-  /vagrant/action/dist/post.js
+  --require "$BASE_PATH/test/block.env.js" \
+  "$BASE_PATH/action/dist/post.js"
 
 echo "Content of $GITHUB_STEP_SUMMARY"
 echo "-------------------------------"
