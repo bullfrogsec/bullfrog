@@ -19941,14 +19941,14 @@ function getGitHubContext() {
 function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
-async function displaySummary(connections, controlPlaneWebappBaseUrl) {
+async function displaySummary(connections, controlPlaneWebappBaseUrl, workflowRunId, runAttempt) {
   const summary2 = core3.summary;
-  const workflowRunId = process.env.GITHUB_RUN_ID;
   if (controlPlaneWebappBaseUrl && workflowRunId) {
-    summary2.addHeading("Bullfrog Control Plane", 3).addLink(
-      "View detailed results",
-      `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`
-    );
+    let url = `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`;
+    if (runAttempt && runAttempt >= 2) {
+      url += `?attempt=${runAttempt}`;
+    }
+    summary2.addHeading("Bullfrog Control Plane", 3).addLink("View detailed results", url);
   } else {
     summary2.addHeading("Bullfrog Results", 3);
   }
@@ -20140,9 +20140,12 @@ async function main() {
   try {
     const { filtered, raw } = await getConnections();
     const shouldAddControlPlaneResultsUrl = apiToken && controlPlaneWebappBaseUrl;
+    const { workflowRunId, runAttempt } = getGitHubContext();
     await displaySummary(
       filtered,
-      shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : void 0
+      shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : void 0,
+      workflowRunId,
+      runAttempt
     );
     if (apiToken && controlPlaneApiBaseUrl) {
       await submitResultsToControlPlane(raw, apiToken, controlPlaneApiBaseUrl);

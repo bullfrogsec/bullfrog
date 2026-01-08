@@ -74,17 +74,19 @@ export function getHumanFriendlyReason(reasonCode: string): string {
 export async function displaySummary(
   connections: Connection[],
   controlPlaneWebappBaseUrl?: string,
+  workflowRunId?: string,
+  runAttempt?: number,
 ): Promise<void> {
   const summary = core.summary;
-  const workflowRunId = process.env.GITHUB_RUN_ID;
 
   if (controlPlaneWebappBaseUrl && workflowRunId) {
+    let url = `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`;
+    if (runAttempt && runAttempt >= 2) {
+      url += `?attempt=${runAttempt}`;
+    }
     summary
       .addHeading("Bullfrog Control Plane", 3)
-      .addLink(
-        "View detailed results",
-        `${controlPlaneWebappBaseUrl}workflow-run/${workflowRunId}`,
-      );
+      .addLink("View detailed results", url);
   } else {
     summary.addHeading("Bullfrog Results", 3);
   }
@@ -338,9 +340,13 @@ async function main() {
     const shouldAddControlPlaneResultsUrl =
       apiToken && controlPlaneWebappBaseUrl;
 
+    const { workflowRunId, runAttempt } = getGitHubContext();
+
     await displaySummary(
       filtered,
       shouldAddControlPlaneResultsUrl ? controlPlaneWebappBaseUrl : undefined,
+      workflowRunId,
+      runAttempt,
     );
 
     // Submit results to control plane if API token is provided
