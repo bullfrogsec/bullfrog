@@ -717,8 +717,15 @@ describe("post", () => {
     it("should display link to control plane when controlPlaneApiBaseUrl is provided", async () => {
       const connections: Connection[] = [];
       const controlPlaneAppBaseUrl = "https://app.bullfrogsec.com/";
+      const workflowRunId = "12345";
+      const runAttempt = 1;
 
-      await displaySummary(connections, controlPlaneAppBaseUrl);
+      await displaySummary(
+        connections,
+        controlPlaneAppBaseUrl,
+        workflowRunId,
+        runAttempt,
+      );
 
       const summary = core.summary;
       expect(summary.addHeading).toHaveBeenCalledWith(
@@ -735,8 +742,15 @@ describe("post", () => {
     it("should handle controlPlaneApiBaseUrl without trailing slash", async () => {
       const connections: Connection[] = [];
       const controlPlaneApiBaseUrl = "https://app.bullfrogsec.com/";
+      const workflowRunId = "12345";
+      const runAttempt = 1;
 
-      await displaySummary(connections, controlPlaneApiBaseUrl);
+      await displaySummary(
+        connections,
+        controlPlaneApiBaseUrl,
+        workflowRunId,
+        runAttempt,
+      );
 
       const summary = core.summary;
       expect(summary.addLink).toHaveBeenCalledWith(
@@ -745,10 +759,30 @@ describe("post", () => {
       );
     });
 
+    it("should include attempt query parameter when run attempt is 2 or more", async () => {
+      const connections: Connection[] = [];
+      const controlPlaneAppBaseUrl = "https://app.bullfrogsec.com/";
+      const workflowRunId = "12345";
+      const runAttempt = 2;
+
+      await displaySummary(
+        connections,
+        controlPlaneAppBaseUrl,
+        workflowRunId,
+        runAttempt,
+      );
+
+      const summary = core.summary;
+      expect(summary.addLink).toHaveBeenCalledWith(
+        "View detailed results",
+        "https://app.bullfrogsec.com/workflow-run/12345?attempt=2",
+      );
+    });
+
     it("should display regular heading when controlPlaneApiBaseUrl is not provided", async () => {
       const connections: Connection[] = [];
 
-      await displaySummary(connections, undefined);
+      await displaySummary(connections, undefined, undefined, undefined);
 
       const summary = core.summary;
       expect(summary.addHeading).toHaveBeenCalledWith("Bullfrog Results", 3);
@@ -771,7 +805,7 @@ describe("post", () => {
         },
       ];
 
-      await displaySummary(connections, undefined);
+      await displaySummary(connections, undefined, undefined, undefined);
 
       const summary = core.summary;
       expect(summary.addTable).toHaveBeenCalled();
@@ -819,7 +853,7 @@ describe("post", () => {
 
       delete process.env.GITHUB_RUN_ID;
 
-      await displaySummary(connections, controlPlaneApiBaseUrl);
+      await displaySummary(connections, controlPlaneApiBaseUrl, undefined, 1);
 
       const summary = core.summary;
       expect(summary.addHeading).toHaveBeenCalledWith("Bullfrog Results", 3);
@@ -830,7 +864,7 @@ describe("post", () => {
     it("should display no connections message when connections array is empty", async () => {
       const connections: Connection[] = [];
 
-      await displaySummary(connections, undefined);
+      await displaySummary(connections, undefined, undefined, undefined);
 
       const summary = core.summary;
       expect(summary.addRaw).toHaveBeenCalledWith(
