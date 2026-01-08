@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/bullfrogsec/bullfrog/compare/v0.9.2...v0.9.3) (2026-01-08)
+
+
+### Bug Fixes
+
+* link to control plane doesn't redirect to correct run attempt ([#232](https://github.com/bullfrogsec/bullfrog/issues/232)) ([f36bd9a](https://github.com/bullfrogsec/bullfrog/commit/f36bd9a9cd3e32120ef9af29014bc11ea9cad4f5))
+
 ## [0.9.2](https://github.com/bullfrogsec/bullfrog/compare/v0.9.1...v0.9.2) (2026-01-06)
 
 
