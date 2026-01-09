@@ -197,6 +197,16 @@ jobs:
               _agent-version: '$TAG_NAME'
               egress-policy: block
               allowed-domains: example.com
+          \`\`\`
+
+          ## Verifying the Agent Binary
+
+          You can manually verify the agent release artifact attestation using:
+
+          \`\`\`bash
+          # Download and verify the release tarball
+          curl -L https://github.com/bullfrogsec/bullfrog/releases/download/${TAG_NAME}/agent.tar.gz -o agent.tar.gz
+          gh attestation verify agent.tar.gz --owner bullfrogsec
           \`\`\`"
 
           # Create release with attested tarball
@@ -501,6 +511,32 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
+
+      - name: Add attestation verification instructions to release notes
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ steps.release.outputs.tag_name }}"
+
+          # Get current release body
+          CURRENT_BODY=$(gh release view "$TAG_NAME" --json body --jq .body)
+
+          # Append attestation verification instructions
+          ATTESTATION_NOTE="
+
+          ## Verifying the Agent Binary
+
+          You can manually verify the agent release artifact attestation using:
+
+          \`\`\`bash
+          # Download and verify the release tarball
+          curl -L https://github.com/bullfrogsec/bullfrog/releases/download/${TAG_NAME}/agent.tar.gz -o agent.tar.gz
+          gh attestation verify agent.tar.gz --owner bullfrogsec
+          \`\`\`"
+
+          # Update release with appended notes
+          gh release edit "$TAG_NAME" --notes "${CURRENT_BODY}${ATTESTATION_NOTE}"
 
   pre-release-validation:
     needs: pre-release
