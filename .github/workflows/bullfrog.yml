@@ -61,10 +61,12 @@ jobs:
             *.docker.io
             *.golang.org
             github.com
+            api.github.com
             deb.debian.org
             production.cloudflare.docker.com
             registry.npmjs.org
             storage.googleapis.com
+            *.sigstore.dev
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -108,6 +110,8 @@ jobs:
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
             github.com
+            *.sigstore.dev
+            tuf-repo.github.com
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -472,6 +476,7 @@ jobs:
             github.com
             api.github.com
             uploads.github.com
+            *.sigstore.dev
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
