@@ -104,57 +104,6 @@ You can view blocked or unallowed outbound requests in the workflow summary.
 
 Monitor connection results across all workflows and repositories in your GitHub organization using the Bullfrog control plane. Visit [bullfrogsec.com](https://bullfrogsec.com) to create a free account and get your API token. A free tier is available to help you gain visibility into all outbound connections across your organization.
 
-## Security and Build Provenance
-
-Bullfrog implements multiple layers of artifact validation to ensure the integrity and trustworthiness of the action and its components.
-
-### Agent Binary Attestation
-
-The agent binary is protected using GitHub's native [build provenance attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds) system, which provides:
-
-- **SLSA Build Provenance**: Every agent binary is cryptographically signed with build provenance metadata following the [SLSA framework](https://slsa.dev/)
-- **Tamper Detection**: When you use Bullfrog, the agent binary is automatically verified against its attestation before execution, ensuring it hasn't been modified since being built
-- **Supply Chain Transparency**: Attestations are publicly verifiable and include information about the build environment, workflow, and repository state
-- **Cryptographic Signatures**: Uses Sigstore to sign attestations with ephemeral keys from GitHub's OIDC provider
-
-The attestation verification happens automatically during action execution. For CI builds, verification is skipped as artifacts haven't been published yet. For released versions, the verification ensures the downloaded binary matches exactly what was built in the official GitHub Actions workflow.
-
-You can manually verify the agent release artifact using:
-
-```bash
-# Download and verify the release tarball
-curl -L https://github.com/bullfrogsec/bullfrog/releases/download/v0.9.2/agent.tar.gz -o agent.tar.gz
-gh attestation verify agent.tar.gz --owner bullfrogsec
-```
-
-### Action Distribution Files
-
-The action's distribution files (`action/dist`) are the compiled JavaScript code that executes when you use the Bullfrog action. These files are protected through multiple mechanisms:
-
-- **Build Provenance Attestation**: Every build generates cryptographically signed attestations for `dist/main.js` and `dist/post.js`, proving they were built from source in the official CI pipeline
-- **Git Diff Verification**: CI checks ensure that compiled distribution files are committed and match the source code
-- **Automated Checks**: Every pull request validates that the dist files are properly synchronized with the TypeScript source
-
-#### Why aren't dist files auto-verified at runtime?
-
-Unlike the agent binary which is downloaded and can be verified before execution, the action's dist files are checked out directly by GitHub Actions and already executing when your workflow runs. This creates a chicken-and-egg problem where the action can't verify itself before running.
-
-However, **users can manually verify** the dist files before trusting a release:
-
-```bash
-# Clone the repository at a specific release tag
-git clone --depth 1 --branch v0.8.4 https://github.com/bullfrogsec/bullfrog.git
-cd bullfrog
-
-# Verify the attestations for the dist files
-gh attestation verify action/dist/main.js --owner bullfrogsec
-gh attestation verify action/dist/post.js --owner bullfrogsec
-```
-
-The attestations prove that the committed dist files were built in GitHub's CI from the corresponding source code, not manually modified or injected by an attacker.
-
-This multi-layered approach ensures both runtime components (agent binary with automatic verification) and the action code itself (with attestations available for manual verification) are protected against tampering, providing strong supply chain security guarantees.
-
 ## Limitations
 
 - This action is currently only supporting Github-hosted runners on Ubuntu (`ubuntu-latest`, `ubuntu-22.04` and `ubuntu-24.04`).
