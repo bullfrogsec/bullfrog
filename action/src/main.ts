@@ -79,7 +79,7 @@ async function installAgent({
     });
   }
 
-  await verifyAgent({ agentDirectory });
+  await verifyAgent();
 }
 
 function installPackages() {
@@ -175,7 +175,7 @@ async function startAgent({
   console.timeEnd("Agent startup time");
 }
 
-async function verifyAgent({ agentDirectory }: { agentDirectory: string }) {
+async function verifyAgent() {
   // When using local agent (in CI), skip attestation verification
   // as the artifact hasn't been published yet
   if (process.env._LOCAL_AGENT === "true") {
@@ -187,15 +187,12 @@ async function verifyAgent({ agentDirectory }: { agentDirectory: string }) {
 
   try {
     const owner = process.env.GITHUB_REPOSITORY_OWNER || "bullfrogsec";
-    await exec(
-      `gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`,
-      {
-        env: {
-          ...process.env,
-          GH_TOKEN: process.env.GITHUB_TOKEN,
-        },
+    await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
+      env: {
+        ...process.env,
+        GH_TOKEN: process.env.GITHUB_TOKEN,
       },
-    );
+    });
     console.log("Agent attestation verified successfully");
   } catch (error) {
     console.error("Failed to verify agent attestation:", error);
