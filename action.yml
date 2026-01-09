@@ -30,6 +30,11 @@ inputs:
     type: boolean
     default: true
 
+  github-token:
+    description: "Github Personal access token (PAT) used for verifying the attestation of the agent binary. We recommend leaving the default value to use the runner Github Actions ephemeral token."
+    type: string
+    default: ${{ github.token }}
+
   _agent-download-base-url:
     description: "(Internal) Base URL for fetching the agent binary. This is useful for testing changes in a fork."
     type: string

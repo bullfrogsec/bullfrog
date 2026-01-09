@@ -18,6 +18,7 @@ export interface Inputs {
   controlPlaneApiBaseUrl?: string;
   controlPlaneWebappBaseUrl?: string;
   apiToken?: string;
+  githubToken?: string;
 }
 
 function validateIps(ips: Array<string>): void {
@@ -95,6 +96,12 @@ export function parseInputs(): Inputs {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
 
+  const githubToken = core.getInput("github-token");
+
+  if (!localAgent && !githubToken) {
+    throw new Error(`github-token cannot be empty`);
+  }
+
   return {
     allowedDomains,
     allowedIps,
@@ -113,5 +120,6 @@ export function parseInputs(): Inputs {
       core.getInput("_control-plane-webapp-base-url"),
     ),
     apiToken: apiToken || undefined,
+    githubToken: githubToken || undefined,
   };
 }

@@ -16,6 +16,7 @@ describe("inputs", () => {
     "_control-plane-api-base-url": "https://api.example.com",
     "_control-plane-webapp-base-url": "https://app.example.com",
     "api-token": "",
+    "github-token": "test-github-token",
   };
   beforeEach(() => {
     vi.clearAllMocks();
@@ -171,6 +172,55 @@ describe("inputs", () => {
       const inputs = parseInputs();
 
       expect(inputs.apiToken).toBe("test-token-123");
+    });
+
+    it("should parse github-token when provided", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "github-token") return "ghp_test123";
+        return defaultInputs[name] || "";
+      });
+
+      const inputs = parseInputs();
+
+      expect(inputs.githubToken).toBe("ghp_test123");
+    });
+
+    it("should throw error for missing github-token when not using local agent", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "github-token") return "";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).toThrow("github-token cannot be empty");
+    });
+
+    it("should not require github-token when using local agent", () => {
+      process.env["_LOCAL_AGENT"] = "true";
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "github-token") return "";
+        if (name === "_agent-download-base-url") return "";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).not.toThrow();
+
+      const inputs = parseInputs();
+      expect(inputs.localAgent).toBe(true);
+      expect(inputs.githubToken).toBeUndefined();
+    });
+
+    it("should accept github-token when using local agent", () => {
+      process.env["_LOCAL_AGENT"] = "true";
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "github-token") return "ghp_test123";
+        if (name === "_agent-download-base-url") return "";
+        return defaultInputs[name] || "";
+      });
+
+      const inputs = parseInputs();
+
+      expect(inputs.localAgent).toBe(true);
+      expect(inputs.githubToken).toBe("ghp_test123");
     });
   });
 

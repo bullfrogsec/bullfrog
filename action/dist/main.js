@@ -19867,6 +19867,10 @@ function parseInputs() {
   if (!agentDownloadBaseURL && !localAgent) {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
+  const githubToken = core.getInput("github-token");
+  if (!localAgent && !githubToken) {
+    throw new Error(`github-token cannot be empty`);
+  }
   return {
     allowedDomains,
     allowedIps,
@@ -19884,7 +19888,8 @@ function parseInputs() {
     controlPlaneWebappBaseUrl: formatUrlWithTrailingSlash(
       core.getInput("_control-plane-webapp-base-url")
     ),
-    apiToken: apiToken || void 0
+    apiToken: apiToken || void 0,
+    githubToken: githubToken || void 0
   };
 }
 
@@ -19944,20 +19949,21 @@ async function installAgent({
   agentDirectory,
   localAgent,
   version,
-  agentDownloadBaseURL
+  agentDownloadBaseURL,
+  githubToken
 }) {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
-  } else {
-    await downloadAgent({
-      actionDirectory,
-      agentDirectory,
-      // Input validation will ensure there is a value when localAgent = false
-      agentDownloadBaseURL,
-      version
-    });
+    return;
   }
-  await verifyAgent();
+  await downloadAgent({
+    actionDirectory,
+    agentDirectory,
+    // Input validation will ensure there is a value when localAgent = false
+    agentDownloadBaseURL,
+    version
+  });
+  await verifyAgent(githubToken);
 }
 function installPackages() {
   console.log("Installing packages");
@@ -20020,18 +20026,14 @@ async function startAgent({
   }
   console.timeEnd("Agent startup time");
 }
-async function verifyAgent() {
-  if (process.env._LOCAL_AGENT === "true") {
-    console.log("Using local agent, skipping attestation verification");
-    return;
-  }
+async function verifyAgent(githubToken) {
   console.log("Verifying agent build provenance attestation");
   try {
     const owner = process.env.GITHUB_REPOSITORY_OWNER || "bullfrogsec";
     await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
       env: {
         ...process.env,
-        GH_TOKEN: process.env.GITHUB_TOKEN
+        GH_TOKEN: githubToken
       }
     });
     console.log("Agent attestation verified successfully");
@@ -20055,7 +20057,8 @@ async function main() {
     logDirectory,
     agentVersion,
     apiToken,
-    controlPlaneApiBaseUrl
+    controlPlaneApiBaseUrl,
+    githubToken
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
@@ -20083,7 +20086,8 @@ async function main() {
     agentDirectory,
     localAgent,
     version,
-    agentDownloadBaseURL
+    agentDownloadBaseURL,
+    githubToken
   });
   await startAgent({
     agentLogFilepath,

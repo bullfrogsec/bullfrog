@@ -60,26 +60,29 @@ async function installAgent({
   localAgent,
   version,
   agentDownloadBaseURL,
+  githubToken,
 }: {
   actionDirectory: string;
   agentDirectory: string;
   localAgent: boolean;
   version: string;
   agentDownloadBaseURL?: string;
+  githubToken?: string;
 }): Promise<void> {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
-  } else {
-    await downloadAgent({
-      actionDirectory,
-      agentDirectory,
-      // Input validation will ensure there is a value when localAgent = false
-      agentDownloadBaseURL: agentDownloadBaseURL!,
-      version,
-    });
+    return;
   }
 
-  await verifyAgent();
+  await downloadAgent({
+    actionDirectory,
+    agentDirectory,
+    // Input validation will ensure there is a value when localAgent = false
+    agentDownloadBaseURL: agentDownloadBaseURL!,
+    version,
+  });
+  // Input validation will ensure there is a value when localAgent = false
+  await verifyAgent(githubToken!);
 }
 
 function installPackages() {
@@ -175,14 +178,7 @@ async function startAgent({
   console.timeEnd("Agent startup time");
 }
 
-async function verifyAgent() {
-  // When using local agent (in CI), skip attestation verification
-  // as the artifact hasn't been published yet
-  if (process.env._LOCAL_AGENT === "true") {
-    console.log("Using local agent, skipping attestation verification");
-    return;
-  }
-
+async function verifyAgent(githubToken: string) {
   console.log("Verifying agent build provenance attestation");
 
   try {
@@ -190,7 +186,7 @@ async function verifyAgent() {
     await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
       env: {
         ...process.env,
-        GH_TOKEN: process.env.GITHUB_TOKEN,
+        GH_TOKEN: githubToken,
       },
     });
     console.log("Agent attestation verified successfully");
@@ -216,6 +212,7 @@ async function main() {
     agentVersion,
     apiToken,
     controlPlaneApiBaseUrl,
+    githubToken,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -256,6 +253,7 @@ async function main() {
     localAgent,
     version,
     agentDownloadBaseURL,
+    githubToken,
   });
 
   await startAgent({

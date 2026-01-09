@@ -899,6 +899,7 @@ describe("post", () => {
         controlPlaneApiBaseUrl: "https://api.example.com",
         controlPlaneWebappBaseUrl: "https://app.example.com",
         apiToken: undefined,
+        githubToken: undefined,
       });
 
       // Mock core.debug
@@ -1125,6 +1126,7 @@ describe("post", () => {
         controlPlaneApiBaseUrl: "https://api.example.com",
         controlPlaneWebappBaseUrl: "https://app.example.com",
         apiToken: undefined,
+        githubToken: undefined,
       });
 
       const logContent = JSON.stringify({
