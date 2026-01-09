@@ -1,0 +1,76 @@
+name: Fuzzing
+
+on:
+  pull_request:
+    paths:
+      - 'agent/**/*.go'
+      - '.github/workflows/fuzz.yml'
+  schedule:
+    # Run fuzzing daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzz-time:
+        description: 'Fuzzing time per test (e.g., 60s, 5m, 1h)'
+        required: false
+        default: '60s'
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Enable egress filtering
+        uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
+        with:
+          egress-policy: block
+          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
+          allowed-domains: |
+            *.golang.org
+            github.com
+            storage.googleapis.com
+
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version-file: 'agent/go.mod'
+          cache-dependency-path: 'agent/go.sum'
+
+      - name: Run Fuzz Tests
+        working-directory: ./agent
+        env:
+          FUZZ_TIME: ${{ github.event.inputs.fuzz-time || '60s' }}
+        run: |
+          # Run each fuzz test for the specified time
+          echo "Running fuzz tests for ${FUZZ_TIME} each..."
+
+          # Find all fuzz tests
+          FUZZ_TESTS=$(go test ./pkg/agent -list=Fuzz.*)
+
+          # Run each fuzz test
+          for TEST in $FUZZ_TESTS; do
+            if [[ $TEST == Fuzz* ]]; then
+              echo "Running $TEST for ${FUZZ_TIME}..."
+              go test ./pkg/agent -run=^$ -fuzz=^${TEST}$ -fuzztime=${FUZZ_TIME} || {
+                echo "::error::Fuzz test $TEST found a crash"
+                exit 1
+              }
+            fi
+          done
+
+          echo "All fuzz tests passed!"
+
+      - name: Upload Crash Artifacts
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: fuzz-crashes
+          path: agent/pkg/agent/testdata/fuzz/
+          if-no-files-found: ignore
