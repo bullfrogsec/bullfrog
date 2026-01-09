@@ -19,6 +19,7 @@ export interface Inputs {
   controlPlaneWebappBaseUrl?: string;
   apiToken?: string;
   githubToken?: string;
+  agentBinaryOwner: string;
 }
 
 function validateIps(ips: Array<string>): void {
@@ -53,6 +54,43 @@ function formatUrlWithTrailingSlash(url: string): string | undefined {
     return;
   }
   return url.endsWith("/") ? url : `${url}/`;
+}
+
+export function extractOwnerFromUrl(url: string): string {
+  try {
+    // Expected format: https://github.com/{owner}/{repo}/releases/download/
+    const urlObj = new URL(url);
+    if (urlObj.hostname === "github.com") {
+      const pathParts = urlObj.pathname.split("/").filter((p) => p);
+      if (pathParts.length >= 1) {
+        return pathParts[0]; // First part is the owner
+      }
+    }
+  } catch {
+    // URL parsing failed
+  }
+  return "bullfrogsec";
+}
+
+function validateAgentDownloadUrl(url: string): void {
+  try {
+    const urlObj = new URL(url);
+    // Must be a GitHub releases download URL
+    // Expected format: https://github.com/{owner}/{repo}/releases/download/
+    if (
+      urlObj.hostname !== "github.com" ||
+      !urlObj.pathname.includes("/releases/download/")
+    ) {
+      throw new Error(
+        `_agent-download-base-url must be a GitHub releases download URL (e.g., 'https://github.com/{owner}/{repo}/releases/download/')`,
+      );
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`_agent-download-base-url is not a valid URL: ${url}`);
+    }
+    throw error;
+  }
 }
 
 export function parseInputs(): Inputs {
@@ -96,6 +134,12 @@ export function parseInputs(): Inputs {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
 
+  let agentBinaryOwner = "bullfrogsec";
+  if (agentDownloadBaseURL) {
+    validateAgentDownloadUrl(agentDownloadBaseURL);
+    agentBinaryOwner = extractOwnerFromUrl(agentDownloadBaseURL);
+  }
+
   const githubToken = core.getInput("github-token");
 
   if (!localAgent && !githubToken) {
@@ -121,5 +165,6 @@ export function parseInputs(): Inputs {
     ),
     apiToken: apiToken || undefined,
     githubToken: githubToken || undefined,
+    agentBinaryOwner,
   };
 }

@@ -61,6 +61,7 @@ async function installAgent({
   version,
   agentDownloadBaseURL,
   githubToken,
+  agentBinaryOwner,
 }: {
   actionDirectory: string;
   agentDirectory: string;
@@ -68,6 +69,7 @@ async function installAgent({
   version: string;
   agentDownloadBaseURL?: string;
   githubToken?: string;
+  agentBinaryOwner: string;
 }): Promise<void> {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
@@ -82,7 +84,7 @@ async function installAgent({
     version,
   });
   // Input validation will ensure there is a value when localAgent = false
-  await verifyAgent(githubToken!);
+  await verifyAgent(githubToken!, agentBinaryOwner);
 }
 
 function installPackages() {
@@ -178,11 +180,11 @@ async function startAgent({
   console.timeEnd("Agent startup time");
 }
 
-async function verifyAgent(githubToken: string) {
+async function verifyAgent(githubToken: string, owner: string) {
   console.log("Verifying agent build provenance attestation");
+  console.log(`Using owner for attestation verification: ${owner}`);
 
   try {
-    const owner = process.env.GITHUB_REPOSITORY_OWNER || "bullfrogsec";
     await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
       env: {
         ...process.env,
@@ -213,6 +215,7 @@ async function main() {
     apiToken,
     controlPlaneApiBaseUrl,
     githubToken,
+    agentBinaryOwner,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -254,6 +257,7 @@ async function main() {
     version,
     agentDownloadBaseURL,
     githubToken,
+    agentBinaryOwner,
   });
 
   await startAgent({

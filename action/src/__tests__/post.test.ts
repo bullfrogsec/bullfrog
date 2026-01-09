@@ -900,6 +900,7 @@ describe("post", () => {
         controlPlaneWebappBaseUrl: "https://app.example.com",
         apiToken: undefined,
         githubToken: undefined,
+        agentBinaryOwner: "bullfrogsec",
       });
 
       // Mock core.debug
@@ -1127,6 +1128,7 @@ describe("post", () => {
         controlPlaneWebappBaseUrl: "https://app.example.com",
         apiToken: undefined,
         githubToken: undefined,
+        agentBinaryOwner: "bullfrogsec",
       });
 
       const logContent = JSON.stringify({

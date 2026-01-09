@@ -19840,6 +19840,34 @@ function formatUrlWithTrailingSlash(url) {
   }
   return url.endsWith("/") ? url : `${url}/`;
 }
+function extractOwnerFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === "github.com") {
+      const pathParts = urlObj.pathname.split("/").filter((p) => p);
+      if (pathParts.length >= 1) {
+        return pathParts[0];
+      }
+    }
+  } catch {
+  }
+  return "bullfrogsec";
+}
+function validateAgentDownloadUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname !== "github.com" || !urlObj.pathname.includes("/releases/download/")) {
+      throw new Error(
+        `_agent-download-base-url must be a GitHub releases download URL (e.g., 'https://github.com/{owner}/{repo}/releases/download/')`
+      );
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`_agent-download-base-url is not a valid URL: ${url}`);
+    }
+    throw error;
+  }
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19867,6 +19895,11 @@ function parseInputs() {
   if (!agentDownloadBaseURL && !localAgent) {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
+  let agentBinaryOwner = "bullfrogsec";
+  if (agentDownloadBaseURL) {
+    validateAgentDownloadUrl(agentDownloadBaseURL);
+    agentBinaryOwner = extractOwnerFromUrl(agentDownloadBaseURL);
+  }
   const githubToken = core.getInput("github-token");
   if (!localAgent && !githubToken) {
     throw new Error(`github-token cannot be empty`);
@@ -19889,7 +19922,8 @@ function parseInputs() {
       core.getInput("_control-plane-webapp-base-url")
     ),
     apiToken: apiToken || void 0,
-    githubToken: githubToken || void 0
+    githubToken: githubToken || void 0,
+    agentBinaryOwner
   };
 }
 
@@ -19950,7 +19984,8 @@ async function installAgent({
   localAgent,
   version,
   agentDownloadBaseURL,
-  githubToken
+  githubToken,
+  agentBinaryOwner
 }) {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
@@ -19963,7 +19998,7 @@ async function installAgent({
     agentDownloadBaseURL,
     version
   });
-  await verifyAgent(githubToken);
+  await verifyAgent(githubToken, agentBinaryOwner);
 }
 function installPackages() {
   console.log("Installing packages");
@@ -20026,10 +20061,10 @@ async function startAgent({
   }
   console.timeEnd("Agent startup time");
 }
-async function verifyAgent(githubToken) {
+async function verifyAgent(githubToken, owner) {
   console.log("Verifying agent build provenance attestation");
+  console.log(`Using owner for attestation verification: ${owner}`);
   try {
-    const owner = process.env.GITHUB_REPOSITORY_OWNER || "bullfrogsec";
     await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
       env: {
         ...process.env,
@@ -20058,7 +20093,8 @@ async function main() {
     agentVersion,
     apiToken,
     controlPlaneApiBaseUrl,
-    githubToken
+    githubToken,
+    agentBinaryOwner
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
@@ -20087,7 +20123,8 @@ async function main() {
     localAgent,
     version,
     agentDownloadBaseURL,
-    githubToken
+    githubToken,
+    agentBinaryOwner
   });
   await startAgent({
     agentLogFilepath,

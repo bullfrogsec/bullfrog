@@ -19852,6 +19852,34 @@ function formatUrlWithTrailingSlash(url) {
   }
   return url.endsWith("/") ? url : `${url}/`;
 }
+function extractOwnerFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === "github.com") {
+      const pathParts = urlObj.pathname.split("/").filter((p) => p);
+      if (pathParts.length >= 1) {
+        return pathParts[0];
+      }
+    }
+  } catch {
+  }
+  return "bullfrogsec";
+}
+function validateAgentDownloadUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname !== "github.com" || !urlObj.pathname.includes("/releases/download/")) {
+      throw new Error(
+        `_agent-download-base-url must be a GitHub releases download URL (e.g., 'https://github.com/{owner}/{repo}/releases/download/')`
+      );
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`_agent-download-base-url is not a valid URL: ${url}`);
+    }
+    throw error;
+  }
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19879,6 +19907,11 @@ function parseInputs() {
   if (!agentDownloadBaseURL && !localAgent) {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
+  let agentBinaryOwner = "bullfrogsec";
+  if (agentDownloadBaseURL) {
+    validateAgentDownloadUrl(agentDownloadBaseURL);
+    agentBinaryOwner = extractOwnerFromUrl(agentDownloadBaseURL);
+  }
   const githubToken = core.getInput("github-token");
   if (!localAgent && !githubToken) {
     throw new Error(`github-token cannot be empty`);
@@ -19901,7 +19934,8 @@ function parseInputs() {
       core.getInput("_control-plane-webapp-base-url")
     ),
     apiToken: apiToken || void 0,
-    githubToken: githubToken || void 0
+    githubToken: githubToken || void 0,
+    agentBinaryOwner
   };
 }
 

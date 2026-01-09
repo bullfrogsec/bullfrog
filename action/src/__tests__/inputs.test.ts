@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { parseInputs } from "../inputs";
+import { parseInputs, extractOwnerFromUrl } from "../inputs";
 import * as core from "@actions/core";
 import { AUDIT, BLOCK, ALLOWED_DOMAINS_ONLY, ANY } from "../constants";
 
@@ -12,7 +12,8 @@ describe("inputs", () => {
     "egress-policy": AUDIT,
     "dns-policy": ALLOWED_DOMAINS_ONLY,
     "_log-directory": "/var/log/test",
-    "_agent-download-base-url": "https://example.com/releases/download",
+    "_agent-download-base-url":
+      "https://github.com/example/example/releases/download",
     "_control-plane-api-base-url": "https://api.example.com",
     "_control-plane-webapp-base-url": "https://app.example.com",
     "api-token": "",
@@ -50,10 +51,12 @@ describe("inputs", () => {
         collectProcessInfo: true,
         localAgent: false,
         logDirectory: "/var/log/test",
-        agentDownloadBaseURL: "https://example.com/releases/download/",
+        agentDownloadBaseURL:
+          "https://github.com/example/example/releases/download/",
         controlPlaneApiBaseUrl: "https://api.example.com/",
         controlPlaneWebappBaseUrl: "https://app.example.com/",
         apiToken: undefined,
+        agentBinaryOwner: "example",
       });
     });
 
@@ -389,6 +392,98 @@ describe("inputs", () => {
 
       expect(inputs.allowedIps).toHaveLength(3);
       expect(inputs.allowedDomains).toHaveLength(3);
+    });
+  });
+
+  describe("extractOwnerFromUrl", () => {
+    it("should extract owner from GitHub releases URL", () => {
+      const url = "https://github.com/bullfrogsec/bullfrog/releases/download/";
+      expect(extractOwnerFromUrl(url)).toBe("bullfrogsec");
+    });
+
+    it("should extract owner from different org", () => {
+      const url = "https://github.com/my-org/my-repo/releases/download/";
+      expect(extractOwnerFromUrl(url)).toBe("my-org");
+    });
+
+    it("should return bullfrogsec for non-GitHub URL", () => {
+      const url = "https://example.com/releases/download/";
+      expect(extractOwnerFromUrl(url)).toBe("bullfrogsec");
+    });
+
+    it("should return bullfrogsec for invalid URL", () => {
+      const url = "not-a-valid-url";
+      expect(extractOwnerFromUrl(url)).toBe("bullfrogsec");
+    });
+
+    it("should return bullfrogsec for GitHub URL without path", () => {
+      const url = "https://github.com/";
+      expect(extractOwnerFromUrl(url)).toBe("bullfrogsec");
+    });
+
+    it("should handle URL with query parameters", () => {
+      const url =
+        "https://github.com/bullfrogsec/bullfrog/releases/download/?foo=bar";
+      expect(extractOwnerFromUrl(url)).toBe("bullfrogsec");
+    });
+  });
+
+  describe("Agent download URL validation", () => {
+    it("should validate correct GitHub releases URL", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "_agent-download-base-url")
+          return "https://github.com/bullfrogsec/bullfrog/releases/download";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).not.toThrow();
+    });
+
+    it("should throw error for non-GitHub URL", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "_agent-download-base-url")
+          return "https://example.com/releases/download";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).toThrow(
+        "_agent-download-base-url must be a GitHub releases download URL",
+      );
+    });
+
+    it("should throw error for GitHub URL without /releases/download/", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "_agent-download-base-url")
+          return "https://github.com/bullfrogsec/bullfrog/archive/refs/heads/main.zip";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).toThrow(
+        "_agent-download-base-url must be a GitHub releases download URL",
+      );
+    });
+
+    it("should throw error for invalid URL format", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "_agent-download-base-url") return "not-a-valid-url";
+        return defaultInputs[name] || "";
+      });
+
+      expect(() => parseInputs()).toThrow(
+        "_agent-download-base-url is not a valid URL",
+      );
+    });
+
+    it("should extract and return agentBinaryOwner from URL", () => {
+      vi.mocked(core.getInput).mockImplementation((name: string) => {
+        if (name === "_agent-download-base-url")
+          return "https://github.com/my-fork/bullfrog/releases/download";
+        return defaultInputs[name] || "";
+      });
+
+      const inputs = parseInputs();
+
+      expect(inputs.agentBinaryOwner).toBe("my-fork");
     });
   });
 });
