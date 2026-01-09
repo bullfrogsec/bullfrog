@@ -47,10 +47,6 @@ jobs:
     timeout-minutes: 5
     needs: check-diff
     if: ${{ needs.check-diff.outputs.diff == 'true' }}
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     steps:
       - name: Enable egress filtering
         uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
@@ -61,12 +57,10 @@ jobs:
             *.docker.io
             *.golang.org
             github.com
-            api.github.com
             deb.debian.org
             production.cloudflare.docker.com
             registry.npmjs.org
             storage.googleapis.com
-            *.sigstore.dev
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -87,16 +81,6 @@ jobs:
             agent/agent
             action/dist
 
-      - name: Attest agent build provenance
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: agent/agent
-
-      - name: Attest action dist build provenance
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: action/dist/*.js
-
   check-artifacts:
     needs: build
     runs-on: ubuntu-22.04
@@ -110,8 +94,6 @@ jobs:
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
             github.com
-            *.sigstore.dev
-            tuf-repo.github.com
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -119,19 +101,6 @@ jobs:
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: build-artifacts
-
-      - name: Verify agent build provenance attestation
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh attestation verify agent/agent --owner ${{ github.repository_owner }}
-
-      - name: Verify action dist build provenance attestation
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh attestation verify action/dist/main.js --owner ${{ github.repository_owner }}
-          gh attestation verify action/dist/post.js --owner ${{ github.repository_owner }}
 
       - name: Check action artifacts
         run: |
@@ -144,6 +113,8 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     outputs:
       version_tag: ${{ steps.version.outputs.tag }}
     steps:
@@ -156,6 +127,7 @@ jobs:
             github.com
             uploads.github.com
             api.github.com
+            *.sigstore.dev
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -189,6 +161,20 @@ jobs:
         with:
           name: build-artifacts
 
+      - name: Create beta tarball
+        run: |
+          tar -czf agent.tar.gz agent/agent
+
+      - name: Attest beta agent artifact
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: agent.tar.gz
+
+      - name: Attest beta action dist artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: action/dist/*.js
+
       - name: Create or update beta release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -213,8 +199,7 @@ jobs:
               allowed-domains: example.com
           \`\`\`"
 
-          # Create release
-          tar -czf agent.tar.gz agent/agent
+          # Create release with attested tarball
           gh release create "$TAG_NAME" \
             --title "$TITLE" \
             --notes "$NOTES" \
@@ -493,26 +478,29 @@ jobs:
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.BULLFROG_BOT_PAT }}
 
-      - name: Upload Release Artifact
+      - name: Create release tarball
         if: ${{ steps.release.outputs.release_created }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Upload"
           tar -czf agent.tar.gz agent/agent
-          gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
 
       - name: Attest release agent artifact
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: agent/agent
+          subject-path: agent.tar.gz
 
       - name: Attest release action dist artifacts
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: action/dist/*.js
+
+      - name: Upload Release Artifact
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
 
   pre-release-validation:
     needs: pre-release
