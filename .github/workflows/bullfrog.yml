@@ -161,14 +161,14 @@ jobs:
         with:
           name: build-artifacts
 
-      - name: Create beta tarball
-        run: |
-          tar -czf agent.tar.gz agent/agent
-
       - name: Attest beta agent artifact
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: agent.tar.gz
+          subject-path: agent/agent
+
+      - name: Create beta tarball
+        run: |
+          tar -czf agent.tar.gz agent/agent
 
       - name: Attest beta action dist artifacts
         uses: actions/attest-build-provenance@v2
@@ -201,12 +201,13 @@ jobs:
 
           ## Verifying the Agent Binary
 
-          You can manually verify the agent release artifact attestation using:
+          You can manually verify the agent binary attestation using:
 
           \`\`\`bash
-          # Download and verify the release tarball
+          # Download, extract and verify the agent binary
           curl -L https://github.com/bullfrogsec/bullfrog/releases/download/${TAG_NAME}/agent.tar.gz -o agent.tar.gz
-          gh attestation verify agent.tar.gz --owner bullfrogsec
+          tar -xzf agent.tar.gz
+          gh attestation verify agent/agent --owner bullfrogsec
           \`\`\`"
 
           # Create release with attested tarball
@@ -488,16 +489,16 @@ jobs:
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.BULLFROG_BOT_PAT }}
 
-      - name: Create release tarball
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          tar -czf agent.tar.gz agent/agent
-
       - name: Attest release agent artifact
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: agent.tar.gz
+          subject-path: agent/agent
+
+      - name: Create release tarball
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          tar -czf agent.tar.gz agent/agent
 
       - name: Attest release action dist artifacts
         if: ${{ steps.release.outputs.release_created }}
@@ -527,12 +528,13 @@ jobs:
 
           ## Verifying the Agent Binary
 
-          You can manually verify the agent release artifact attestation using:
+          You can manually verify the agent binary attestation using:
 
           \`\`\`bash
-          # Download and verify the release tarball
+          # Download, extract and verify the agent binary
           curl -L https://github.com/bullfrogsec/bullfrog/releases/download/${TAG_NAME}/agent.tar.gz -o agent.tar.gz
-          gh attestation verify agent.tar.gz --owner bullfrogsec
+          tar -xzf agent.tar.gz
+          gh attestation verify agent/agent --owner bullfrogsec
           \`\`\`"
 
           # Update release with appended notes

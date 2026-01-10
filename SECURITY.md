@@ -25,12 +25,13 @@ The agent binary is protected using GitHub's native [build provenance attestatio
 
 The attestation verification happens automatically during action execution. The verification ensures the downloaded binary matches exactly what was built in the official GitHub Actions workflow.
 
-You can manually verify the agent release artifact using:
+You can manually verify the agent binary using:
 
 ```bash
-# Download and verify the release tarball
+# Download, extract and verify the agent binary
 curl -L https://github.com/bullfrogsec/bullfrog/releases/download/v0.9.2/agent.tar.gz -o agent.tar.gz
-gh attestation verify agent.tar.gz --owner bullfrogsec
+tar -xzf agent.tar.gz
+gh attestation verify agent/agent --owner bullfrogsec
 ```
 
 ### Action Distribution Files
