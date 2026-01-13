@@ -12,15 +12,9 @@ build:
 
 	docker rm --force agent-build
 
-	sha256sum agent | tee agent.sha256
-
 .PHONY: fix
 fix:
 	go fmt ./...
-
-.PHONY: test.artifacts
-test.artifacts:
-	sha256sum --check --strict agent.sha256
 
 GOFMT_OUTPUT = $(shell gofmt -l .)
 

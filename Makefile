@@ -31,15 +31,11 @@ test.integration.block:
 	vagrant ssh --command "bash /vagrant/test/block.sh"
 
 .PHONY: test.artifacts
-test.artifacts: test.artifacts.action test.artifacts.agent
+test.artifacts: test.artifacts.action
 
 .PHONY: test.artifacts.action
 test.artifacts.action:
 	cd $(ACTION_DIRECTORY) && make test.artifacts
-
-.PHONY: test.artifacts.agent
-test.artifacts.agent:
-	cd $(AGENT_DIRECTORY) && make test.artifacts
 
 .PHONY: test.lint
 test.lint: test.lint.action test.lint.agent
