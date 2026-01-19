@@ -19840,6 +19840,34 @@ function formatUrlWithTrailingSlash(url) {
   }
   return url.endsWith("/") ? url : `${url}/`;
 }
+function extractOwnerFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === "github.com") {
+      const pathParts = urlObj.pathname.split("/").filter((p) => p);
+      if (pathParts.length >= 1) {
+        return pathParts[0];
+      }
+    }
+  } catch {
+  }
+  return "bullfrogsec";
+}
+function validateAgentDownloadUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname !== "github.com" || !urlObj.pathname.includes("/releases/download/")) {
+      throw new Error(
+        `_agent-download-base-url must be a GitHub releases download URL (e.g., 'https://github.com/{owner}/{repo}/releases/download/')`
+      );
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`_agent-download-base-url is not a valid URL: ${url}`);
+    }
+    throw error;
+  }
+}
 function parseInputs() {
   const rawAllowedIps = core.getInput("allowed-ips");
   const allowedIps = rawAllowedIps.length !== 0 ? rawAllowedIps.split("\n") : [];
@@ -19867,6 +19895,15 @@ function parseInputs() {
   if (!agentDownloadBaseURL && !localAgent) {
     throw new Error(`_agent-download-base-url cannot be empty`);
   }
+  let agentBinaryOwner = "bullfrogsec";
+  if (agentDownloadBaseURL) {
+    validateAgentDownloadUrl(agentDownloadBaseURL);
+    agentBinaryOwner = extractOwnerFromUrl(agentDownloadBaseURL);
+  }
+  const githubToken = core.getInput("github-token");
+  if (!localAgent && !githubToken) {
+    throw new Error(`github-token cannot be empty`);
+  }
   return {
     allowedDomains,
     allowedIps,
@@ -19884,7 +19921,9 @@ function parseInputs() {
     controlPlaneWebappBaseUrl: formatUrlWithTrailingSlash(
       core.getInput("_control-plane-webapp-base-url")
     ),
-    apiToken: apiToken || void 0
+    apiToken: apiToken || void 0,
+    githubToken: githubToken || void 0,
+    agentBinaryOwner
   };
 }
 
@@ -19944,20 +19983,22 @@ async function installAgent({
   agentDirectory,
   localAgent,
   version,
-  agentDownloadBaseURL
+  agentDownloadBaseURL,
+  githubToken,
+  agentBinaryOwner
 }) {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
-  } else {
-    await downloadAgent({
-      actionDirectory,
-      agentDirectory,
-      // Input validation will ensure there is a value when localAgent = false
-      agentDownloadBaseURL,
-      version
-    });
+    return;
   }
-  await verifyAgent({ agentDirectory });
+  await downloadAgent({
+    actionDirectory,
+    agentDirectory,
+    // Input validation will ensure there is a value when localAgent = false
+    agentDownloadBaseURL,
+    version
+  });
+  await verifyAgent(githubToken, agentBinaryOwner);
 }
 function installPackages() {
   console.log("Installing packages");
@@ -20020,14 +20061,23 @@ async function startAgent({
   }
   console.timeEnd("Agent startup time");
 }
-async function verifyAgent({ agentDirectory }) {
-  const agentDirName = import_node_path.default.dirname(AGENT_INSTALL_PATH);
-  const src = import_node_path.default.join(agentDirectory, "agent.sha256");
-  const dest = import_node_path.default.join(agentDirName, "agent.sha256");
-  await import_promises3.default.cp(src, dest);
-  await exec("sha256sum --check --strict agent.sha256", {
-    cwd: agentDirName
-  });
+async function verifyAgent(githubToken, owner) {
+  console.log("Verifying agent build provenance attestation");
+  console.log(`Using owner for attestation verification: ${owner}`);
+  try {
+    await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
+      env: {
+        ...process.env,
+        GH_TOKEN: githubToken
+      }
+    });
+    console.log("Agent attestation verified successfully");
+  } catch (error) {
+    console.error("Failed to verify agent attestation:", error);
+    throw new Error(
+      "Agent attestation verification failed. The agent binary may have been tampered with."
+    );
+  }
 }
 async function main() {
   const {
@@ -20042,7 +20092,9 @@ async function main() {
     logDirectory,
     agentVersion,
     apiToken,
-    controlPlaneApiBaseUrl
+    controlPlaneApiBaseUrl,
+    githubToken,
+    agentBinaryOwner
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
   const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
@@ -20070,7 +20122,9 @@ async function main() {
     agentDirectory,
     localAgent,
     version,
-    agentDownloadBaseURL
+    agentDownloadBaseURL,
+    githubToken,
+    agentBinaryOwner
   });
   await startAgent({
     agentLogFilepath,

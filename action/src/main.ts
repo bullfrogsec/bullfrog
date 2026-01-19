@@ -60,26 +60,31 @@ async function installAgent({
   localAgent,
   version,
   agentDownloadBaseURL,
+  githubToken,
+  agentBinaryOwner,
 }: {
   actionDirectory: string;
   agentDirectory: string;
   localAgent: boolean;
   version: string;
   agentDownloadBaseURL?: string;
+  githubToken?: string;
+  agentBinaryOwner: string;
 }): Promise<void> {
   if (localAgent) {
     await copyLocalAgent({ agentDirectory });
-  } else {
-    await downloadAgent({
-      actionDirectory,
-      agentDirectory,
-      // Input validation will ensure there is a value when localAgent = false
-      agentDownloadBaseURL: agentDownloadBaseURL!,
-      version,
-    });
+    return;
   }
 
-  await verifyAgent({ agentDirectory });
+  await downloadAgent({
+    actionDirectory,
+    agentDirectory,
+    // Input validation will ensure there is a value when localAgent = false
+    agentDownloadBaseURL: agentDownloadBaseURL!,
+    version,
+  });
+  // Input validation will ensure there is a value when localAgent = false
+  await verifyAgent(githubToken!, agentBinaryOwner);
 }
 
 function installPackages() {
@@ -175,17 +180,24 @@ async function startAgent({
   console.timeEnd("Agent startup time");
 }
 
-async function verifyAgent({ agentDirectory }: { agentDirectory: string }) {
-  const agentDirName = path.dirname(AGENT_INSTALL_PATH);
+async function verifyAgent(githubToken: string, owner: string) {
+  console.log("Verifying agent build provenance attestation");
+  console.log(`Using owner for attestation verification: ${owner}`);
 
-  const src = path.join(agentDirectory, "agent.sha256");
-  const dest = path.join(agentDirName, "agent.sha256");
-
-  await fs.cp(src, dest);
-
-  await exec("sha256sum --check --strict agent.sha256", {
-    cwd: agentDirName,
-  });
+  try {
+    await exec(`gh attestation verify ${AGENT_INSTALL_PATH} --owner ${owner}`, {
+      env: {
+        ...process.env,
+        GH_TOKEN: githubToken,
+      },
+    });
+    console.log("Agent attestation verified successfully");
+  } catch (error) {
+    console.error("Failed to verify agent attestation:", error);
+    throw new Error(
+      "Agent attestation verification failed. The agent binary may have been tampered with.",
+    );
+  }
 }
 
 async function main() {
@@ -202,6 +214,8 @@ async function main() {
     agentVersion,
     apiToken,
     controlPlaneApiBaseUrl,
+    githubToken,
+    agentBinaryOwner,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
@@ -242,6 +256,8 @@ async function main() {
     localAgent,
     version,
     agentDownloadBaseURL,
+    githubToken,
+    agentBinaryOwner,
   });
 
   await startAgent({
