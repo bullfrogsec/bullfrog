@@ -26,6 +26,6 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
-    "@actions/core": "1.11.1"
+    "@actions/core": "2.0.2"
   }
 }
