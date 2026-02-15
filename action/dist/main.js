@@ -20021,17 +20021,7 @@ function validateDomains(domains) {
     }
   });
 }
-function validateAgentVersion(version) {
-  if (!version.match(/^v\d+\.\d+\.\d+(-[A-Za-z0-9-]+)?$/)) {
-    throw new Error(
-      `Invalid agent version format: ${version}. Must start with 'v' followed by semver (e.g., 'v0.8.4' or 'v0.8.4-beta-feature')`
-    );
-  }
-}
 function formatUrlWithTrailingSlash(url) {
-  if (!url) {
-    return;
-  }
   return url.endsWith("/") ? url : `${url}/`;
 }
 function parseInputs() {
@@ -20049,18 +20039,7 @@ function parseInputs() {
   if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
-  const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
-  const agentVersion = core.getInput("_agent-version");
-  if (agentVersion) {
-    validateAgentVersion(agentVersion);
-  }
   const apiToken = core.getInput("api-token");
-  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
-    core.getInput("_agent-download-base-url")
-  );
-  if (!agentDownloadBaseURL && !localAgent) {
-    throw new Error(`_agent-download-base-url cannot be empty`);
-  }
   return {
     allowedDomains,
     allowedIps,
@@ -20068,10 +20047,7 @@ function parseInputs() {
     enableSudo: core.getBooleanInput("enable-sudo"),
     collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
-    localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL,
-    agentVersion: agentVersion || void 0,
     controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
       core.getInput("_control-plane-api-base-url")
     ),
@@ -20103,55 +20079,17 @@ async function waitForFile(filePath, timeout = 15e3, interval = 500) {
 
 // src/main.ts
 var exec = import_node_util.default.promisify(import_node_child_process.exec);
-async function copyLocalAgent({ agentDirectory }) {
-  await import_promises3.default.mkdir(import_node_path.default.dirname(AGENT_INSTALL_PATH), { recursive: true });
-  await import_promises3.default.cp(import_node_path.default.join(agentDirectory, "agent"), AGENT_INSTALL_PATH);
-}
-async function downloadAgent({
-  actionDirectory,
-  agentDirectory,
-  version,
-  agentDownloadBaseURL
-}) {
-  const versionTag = version.startsWith("v") ? version : `v${version}`;
-  console.log(`Downloading agent ${versionTag}`);
+async function downloadAgent(actionDirectory) {
   const { status } = (0, import_node_child_process.spawnSync)(
     "bash",
-    [
-      import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh"),
-      versionTag,
-      agentDownloadBaseURL
-    ],
+    [import_node_path.default.join(actionDirectory, "scripts", "download_agent.sh")],
     {
-      env: {
-        AGENT_DIRECTORY: agentDirectory
-      },
       stdio: "inherit"
     }
   );
   if (status !== 0) {
     throw new Error("Couldn't download agent");
   }
-}
-async function installAgent({
-  actionDirectory,
-  agentDirectory,
-  localAgent,
-  version,
-  agentDownloadBaseURL
-}) {
-  if (localAgent) {
-    await copyLocalAgent({ agentDirectory });
-  } else {
-    await downloadAgent({
-      actionDirectory,
-      agentDirectory,
-      // Input validation will ensure there is a value when localAgent = false
-      agentDownloadBaseURL,
-      version
-    });
-  }
-  await verifyAgent({ agentDirectory });
 }
 function installPackages() {
   console.log("Installing packages");
@@ -20165,7 +20103,6 @@ function installPackages() {
   }
 }
 async function startAgent({
-  agentDirectory,
   agentLogFilepath,
   allowedDomains,
   allowedIps,
@@ -20174,15 +20111,6 @@ async function startAgent({
   enableSudo,
   collectProcessInfo
 }) {
-  const blockingMode = egressPolicy === BLOCK;
-  console.log("Loading nftables rules");
-  if (blockingMode) {
-    await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_block.nft")}`);
-    console.log("loaded blocking rules");
-  } else {
-    await exec(`sudo nft -f ${import_node_path.default.join(agentDirectory, "queue_audit.nft")}`);
-    console.log("loaded audit rules");
-  }
   await exec(`sudo sed -i 's/^-e //' /etc/hosts`);
   const agentOut = await import_promises3.default.open(agentLogFilepath, "a");
   console.log(`Starting agent from ${AGENT_INSTALL_PATH}`);
@@ -20214,33 +20142,19 @@ async function startAgent({
   }
   console.timeEnd("Agent startup time");
 }
-async function verifyAgent({ agentDirectory }) {
-  const agentDirName = import_node_path.default.dirname(AGENT_INSTALL_PATH);
-  const src = import_node_path.default.join(agentDirectory, "agent.sha256");
-  const dest = import_node_path.default.join(agentDirName, "agent.sha256");
-  await import_promises3.default.cp(src, dest);
-  await exec("sha256sum --check --strict agent.sha256", {
-    cwd: agentDirName
-  });
-}
 async function main() {
   const {
-    agentDownloadBaseURL,
     allowedDomains,
     allowedIps,
     dnsPolicy,
     egressPolicy,
     enableSudo,
     collectProcessInfo,
-    localAgent,
     logDirectory,
-    agentVersion,
     apiToken,
     controlPlaneApiBaseUrl
   } = parseInputs();
   const actionDirectory = import_node_path.default.join(__dirname, "..");
-  const agentDirectory = import_node_path.default.join(actionDirectory, "..", "agent");
-  const pkg = require(`${actionDirectory}/../package.json`);
   if (apiToken && controlPlaneApiBaseUrl) {
     try {
       const url = new URL(controlPlaneApiBaseUrl);
@@ -20258,17 +20172,9 @@ async function main() {
   await import_promises3.default.mkdir(logDirectory, { recursive: true });
   const agentLogFilepath = import_node_path.default.join(logDirectory, AGENT_LOG_FILENAME);
   installPackages();
-  const version = agentVersion || `v${pkg.version}`;
-  await installAgent({
-    actionDirectory,
-    agentDirectory,
-    localAgent,
-    version,
-    agentDownloadBaseURL
-  });
+  await downloadAgent(actionDirectory);
   await startAgent({
     agentLogFilepath,
-    agentDirectory,
     allowedDomains,
     allowedIps,
     dnsPolicy,

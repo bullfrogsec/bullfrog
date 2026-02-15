@@ -5,7 +5,6 @@ import { exec as execCb, spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import {
   AGENT_LOG_FILENAME,
-  BLOCK,
   AGENT_INSTALL_PATH,
   AGENT_READY_PATH,
 } from "./constants";
@@ -14,37 +13,11 @@ import { waitForFile } from "./util";
 
 const exec = util.promisify(execCb);
 
-async function copyLocalAgent({ agentDirectory }: { agentDirectory: string }) {
-  await fs.mkdir(path.dirname(AGENT_INSTALL_PATH), { recursive: true });
-  await fs.cp(path.join(agentDirectory, "agent"), AGENT_INSTALL_PATH);
-}
-
-async function downloadAgent({
-  actionDirectory,
-  agentDirectory,
-  version,
-  agentDownloadBaseURL,
-}: {
-  actionDirectory: string;
-  agentDirectory: string;
-  version: string;
-  agentDownloadBaseURL: string;
-}) {
-  // Add 'v' prefix if not present
-  const versionTag = version.startsWith("v") ? version : `v${version}`;
-  console.log(`Downloading agent ${versionTag}`);
-
+async function downloadAgent(actionDirectory: string): Promise<void> {
   const { status } = spawnSync(
     "bash",
-    [
-      path.join(actionDirectory, "scripts", "download_agent.sh"),
-      versionTag,
-      agentDownloadBaseURL,
-    ],
+    [path.join(actionDirectory, "scripts", "download_agent.sh")],
     {
-      env: {
-        AGENT_DIRECTORY: agentDirectory,
-      },
       stdio: "inherit",
     },
   );
@@ -54,35 +27,7 @@ async function downloadAgent({
   }
 }
 
-async function installAgent({
-  actionDirectory,
-  agentDirectory,
-  localAgent,
-  version,
-  agentDownloadBaseURL,
-}: {
-  actionDirectory: string;
-  agentDirectory: string;
-  localAgent: boolean;
-  version: string;
-  agentDownloadBaseURL?: string;
-}): Promise<void> {
-  if (localAgent) {
-    await copyLocalAgent({ agentDirectory });
-  } else {
-    await downloadAgent({
-      actionDirectory,
-      agentDirectory,
-      // Input validation will ensure there is a value when localAgent = false
-      agentDownloadBaseURL: agentDownloadBaseURL!,
-      version,
-    });
-  }
-
-  await verifyAgent({ agentDirectory });
-}
-
-function installPackages() {
+function installPackages(): void {
   console.log("Installing packages");
 
   const { status } = spawnSync(
@@ -97,7 +42,6 @@ function installPackages() {
 }
 
 async function startAgent({
-  agentDirectory,
   agentLogFilepath,
   allowedDomains,
   allowedIps,
@@ -106,7 +50,6 @@ async function startAgent({
   enableSudo,
   collectProcessInfo,
 }: {
-  agentDirectory: string;
   allowedDomains: string[];
   allowedIps: string[];
   agentLogFilepath: string;
@@ -114,19 +57,7 @@ async function startAgent({
   egressPolicy: EgressPolicy;
   enableSudo: boolean;
   collectProcessInfo: boolean;
-}) {
-  const blockingMode = egressPolicy === BLOCK;
-
-  console.log("Loading nftables rules");
-
-  if (blockingMode) {
-    await exec(`sudo nft -f ${path.join(agentDirectory, "queue_block.nft")}`);
-    console.log("loaded blocking rules");
-  } else {
-    await exec(`sudo nft -f ${path.join(agentDirectory, "queue_audit.nft")}`);
-    console.log("loaded audit rules");
-  }
-
+}): Promise<void> {
   // fix buggy /etc/hosts entry in Github private repo runners
   // this misconfiguration causes the agent to fail to start
   await exec(`sudo sed -i 's/^-e //' /etc/hosts`);
@@ -175,41 +106,20 @@ async function startAgent({
   console.timeEnd("Agent startup time");
 }
 
-async function verifyAgent({ agentDirectory }: { agentDirectory: string }) {
-  const agentDirName = path.dirname(AGENT_INSTALL_PATH);
-
-  const src = path.join(agentDirectory, "agent.sha256");
-  const dest = path.join(agentDirName, "agent.sha256");
-
-  await fs.cp(src, dest);
-
-  await exec("sha256sum --check --strict agent.sha256", {
-    cwd: agentDirName,
-  });
-}
-
-async function main() {
+async function main(): Promise<void> {
   const {
-    agentDownloadBaseURL,
     allowedDomains,
     allowedIps,
     dnsPolicy,
     egressPolicy,
     enableSudo,
     collectProcessInfo,
-    localAgent,
     logDirectory,
-    agentVersion,
     apiToken,
     controlPlaneApiBaseUrl,
   } = parseInputs();
 
   const actionDirectory = path.join(__dirname, "..");
-
-  const agentDirectory = path.join(actionDirectory, "..", "agent");
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pkg = require(`${actionDirectory}/../package.json`);
 
   // Add control plane domain to allowed domains if API token is provided
   if (apiToken && controlPlaneApiBaseUrl) {
@@ -233,20 +143,10 @@ async function main() {
 
   installPackages();
 
-  // Determine version: use override or fallback to package.json
-  const version = agentVersion || `v${pkg.version}`;
-
-  await installAgent({
-    actionDirectory,
-    agentDirectory,
-    localAgent,
-    version,
-    agentDownloadBaseURL,
-  });
+  await downloadAgent(actionDirectory);
 
   await startAgent({
     agentLogFilepath,
-    agentDirectory,
     allowedDomains,
     allowedIps,
     dnsPolicy,
