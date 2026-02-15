@@ -11,8 +11,3 @@ process.env["INPUT_ALLOWED-DOMAINS"] = `
 bing.com
 *.github.com
 `;
-
-// uncomment to test with local agent or download release
-process.env["_LOCAL_AGENT"] = "true";
-// process.env["INPUT__AGENT-DOWNLOAD-BASE-URL"] =
-// ("https://github.com/bullfrogsec/bullfrog/releases/download/");

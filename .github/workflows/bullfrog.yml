@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - "beta/**"
 
   pull_request:
     types: [opened, synchronize, reopened]
@@ -54,13 +53,8 @@ jobs:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.docker.io
-            *.golang.org
             github.com
-            deb.debian.org
-            production.cloudflare.docker.com
             registry.npmjs.org
-            storage.googleapis.com
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -78,7 +72,6 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            agent/agent
             action/dist
 
   check-artifacts:
@@ -106,280 +99,6 @@ jobs:
         run: |
           make test.artifacts
 
-  create-beta-prerelease:
-    needs: [build, check-artifacts]
-    if: startsWith(github.head_ref, 'release-please--branches--') || startsWith(github.ref, 'refs/heads/beta/')
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    outputs:
-      version_tag: ${{ steps.version.outputs.tag }}
-    steps:
-      - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
-        with:
-          egress-policy: block
-          api-token: ${{ secrets.BULLFROG_API_TOKEN }}
-          allowed-domains: |
-            github.com
-            uploads.github.com
-            api.github.com
-
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.head_ref || github.ref }}
-
-      - name: Determine version tag
-        id: version
-        env:
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-
-          # Determine context: beta push or release-please PR
-          if [[ "$GITHUB_HEAD_REF" == release-please--branches--* ]]; then
-            # RC release for release-please PR
-            RC_VERSION=$(jq -r '.[]' .release-please-manifest.json | head -1)
-            TAG_NAME="v${RC_VERSION}-rc"
-          elif [[ "$GITHUB_REF" == refs/heads/beta/* ]]; then
-            # Beta release
-            BRANCH_NAME="${GITHUB_REF#refs/heads/beta/}"
-            SANITIZED=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
-            TAG_NAME="v${VERSION}-beta-${SANITIZED}"
-          fi
-
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "Creating beta release: $TAG_NAME"
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-artifacts
-
-      - name: Create or update beta release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
-        run: |
-          TAG_NAME="${{ steps.version.outputs.tag }}"
-
-          # Delete existing release and tag if they exist
-          gh release delete "$TAG_NAME" --yes || true
-          git push origin ":refs/tags/$TAG_NAME" || true
-
-          RELEASE_TYPE="--prerelease"
-          TITLE="$TAG_NAME"
-          NOTES="Automated beta release from branch ${GITHUB_REF#refs/heads/}
-
-          **Testing this beta:**
-          \`\`\`yaml
-          - uses: bullfrogsec/bullfrog@$SHA
-            with:
-              _agent-version: '$TAG_NAME'
-              egress-policy: block
-              allowed-domains: example.com
-          \`\`\`"
-
-          # Create release
-          tar -czf agent.tar.gz agent/agent
-          gh release create "$TAG_NAME" \
-            --title "$TITLE" \
-            --notes "$NOTES" \
-            --target "$SHA" \
-            --prerelease \
-            agent.tar.gz
-
-  test-beta-release:
-    needs: [create-beta-prerelease]
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.head_ref || github.ref }}
-
-      - name: Test beta release with action
-        uses: ./
-        with:
-          _agent-version: ${{ needs.create-beta-prerelease.outputs.version_tag }}
-          egress-policy: block
-          allowed-domains: www.google.com
-
-      - name: Verify blocking works
-        run: |
-          if curl https://www.google.com --max-time 5 --output /dev/null; then
-            echo "Allowed domain works"
-          else
-            echo "Expected curl to allowed domain to succeed"
-            exit 1
-          fi
-
-          if curl https://www.bing.com --max-time 5 --output /dev/null; then
-            echo "Block failed - unauthorized domain accessible"
-            exit 1
-          fi
-
-  test-audit:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-artifacts
-
-      - name: Enable egress filtering
-        uses: ./
-        env:
-          _LOCAL_AGENT: true
-        with:
-          allowed-domains: |
-            *.google.com
-
-      - name: Make HTTP requests
-        run: |
-          timeout 5 curl https://www.google.com --output /dev/null
-          timeout 5 curl https://www.bing.com --output /dev/null
-
-      - name: Test DNS queries to untrusted DNS servers work in audit mode
-        run: |
-          # In audit mode, DNS queries to untrusted DNS servers should be logged but not blocked
-          # 8.8.8.8 (Google DNS) is not in the default allowed DNS servers
-          timeout 5 dig @8.8.8.8 www.google.com
-          timeout 5 dig @8.8.8.8 www.bing.com
-
-  test-block:
-    needs: build
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-artifacts
-
-      - name: Enable egress filtering
-        uses: ./
-        env:
-          _LOCAL_AGENT: true
-        with:
-          egress-policy: block
-          enable-sudo: false
-          allowed-domains: |
-            *.google.com
-          allowed-ips: |
-            1.1.1.1
-
-      - name: Make HTTP requests
-        run: |
-          source test/make_http_requests.sh
-          source test/make_docker_pull.sh
-
-      - name: Make DNS requests
-        run: source test/make_dns_requests.sh
-
-      - name: Run sudo commands
-        run: source test/run_sudo_commands.sh
-
-  test-block-but-allow-any-dns-requests:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-artifacts
-
-      - name: Enable egress filtering
-        uses: ./
-        env:
-          _LOCAL_AGENT: true
-        with:
-          dns-policy: any
-          egress-policy: block
-          allowed-domains: |
-            *.google.com
-
-      - name: Make HTTP requests
-        run: |
-          source test/make_http_requests.sh
-          source test/make_docker_pull.sh
-
-      - name: Make DNS requests
-        run: |
-          timeout 5 dig example.com
-          timeout 5 dig www.wikipedia.org
-
-  test-docker:
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-artifacts
-
-      - name: Enable egress filtering
-        uses: ./
-        env:
-          _LOCAL_AGENT: true
-        with:
-          egress-policy: block
-          allowed-ips: |
-            172.17.0.0/16
-          allowed-domains: |
-            *.docker.io
-            production.cloudflare.docker.com
-            www.google.com
-
-      - name: Test curl calls within Docker
-        run: source test/make_docker_requests.sh
-
-      - name: Nginx
-        run: source test/docker_nginx.sh
-
-      - name: Nginx with port forwarding
-        run: source test/docker_nginx_port_forwarding.sh
-
-  test-integration:
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
-        with:
-          name: build-artifacts
-
-      - name: Run integration test
-        run: bash ./test/block.sh
-
-  # TODO: Rename to something else since it runs test.lint and test.types
   test-lint:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
@@ -391,9 +110,7 @@ jobs:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
           allowed-domains: |
-            *.golang.org
             registry.npmjs.org
-            storage.googleapis.com
             github.com
 
       - name: Checkout
@@ -411,6 +128,39 @@ jobs:
         run: |
           make test.types
 
+  test-integration:
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: build-artifacts
+
+      - name: Enable egress filtering
+        uses: ./
+        with:
+          egress-policy: block
+          allowed-domains: |
+            www.google.com
+
+      - name: Verify blocking works
+        run: |
+          if curl https://www.google.com --max-time 5 --output /dev/null; then
+            echo "Allowed domain works"
+          else
+            echo "Expected curl to allowed domain to succeed"
+            exit 1
+          fi
+
+          if curl https://www.bing.com --max-time 5 --output /dev/null; then
+            echo "Block failed - unauthorized domain accessible"
+            exit 1
+          fi
+
   pre-release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-22.04
@@ -421,12 +171,8 @@ jobs:
       [
         build,
         check-artifacts,
-        test-audit,
-        test-block,
-        test-block-but-allow-any-dns-requests,
-        test-docker,
-        test-integration,
         test-lint,
+        test-integration,
       ]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -442,14 +188,9 @@ jobs:
           allowed-domains: |
             github.com
             api.github.com
-            uploads.github.com
 
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-artifacts
 
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         if: github.event_name == 'push'
@@ -459,15 +200,6 @@ jobs:
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.BULLFROG_BOT_PAT }}
 
-      - name: Upload Release Artifact
-        if: ${{ steps.release.outputs.release_created }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Upload"
-          tar -czf agent.tar.gz agent/agent
-          gh release upload ${{ steps.release.outputs.tag_name }} agent.tar.gz
-
   pre-release-validation:
     needs: pre-release
     if: ${{ needs.pre-release.outputs.release_created }}
@@ -475,11 +207,11 @@ jobs:
     timeout-minutes: 2
 
     steps:
-      # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow. Refer to https://github.com/bullfrogsec/bullfrog/commit/3a3e5e03112ef726b3079d402415760c9021fa39 for details.
+      # This job intentionally skips `actions/checkout` to simulate bullfrog's action as if it were called from another workflow.
       - uses: jenseng/dynamic-uses@8bc24f0360175e710da532c4d19eafdbed489a06
         with:
           uses: ${{ github.repository }}@${{ needs.pre-release.outputs.tag_name }}
-          with: '{"allowed-domains": "www.google.com", "egress-policy": "block", "agent-download-base-url": "https://github.com/${{ github.repository }}/releases/download/"}'
+          with: '{"allowed-domains": "www.google.com", "egress-policy": "block"}'
 
       - name: Make HTTP requests
         run: |

@@ -20033,17 +20033,7 @@ function validateDomains(domains) {
     }
   });
 }
-function validateAgentVersion(version) {
-  if (!version.match(/^v\d+\.\d+\.\d+(-[A-Za-z0-9-]+)?$/)) {
-    throw new Error(
-      `Invalid agent version format: ${version}. Must start with 'v' followed by semver (e.g., 'v0.8.4' or 'v0.8.4-beta-feature')`
-    );
-  }
-}
 function formatUrlWithTrailingSlash(url) {
-  if (!url) {
-    return;
-  }
   return url.endsWith("/") ? url : `${url}/`;
 }
 function parseInputs() {
@@ -20061,18 +20051,7 @@ function parseInputs() {
   if (dnsPolicy !== ALLOWED_DOMAINS_ONLY && dnsPolicy !== ANY) {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
-  const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
-  const agentVersion = core.getInput("_agent-version");
-  if (agentVersion) {
-    validateAgentVersion(agentVersion);
-  }
   const apiToken = core.getInput("api-token");
-  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
-    core.getInput("_agent-download-base-url")
-  );
-  if (!agentDownloadBaseURL && !localAgent) {
-    throw new Error(`_agent-download-base-url cannot be empty`);
-  }
   return {
     allowedDomains,
     allowedIps,
@@ -20080,10 +20059,7 @@ function parseInputs() {
     enableSudo: core.getBooleanInput("enable-sudo"),
     collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
-    localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL,
-    agentVersion: agentVersion || void 0,
     controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
       core.getInput("_control-plane-api-base-url")
     ),
