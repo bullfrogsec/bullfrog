@@ -79,12 +79,25 @@ export function getHumanFriendlyReason(reasonCode: string): string {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
 
+const RUNNER_WORKER_EXE =
+  "/home/runner/actions-runner/cached/bin/Runner.Worker";
+
 export function formatParentProcesses(
   parentProcesses?: ParentProcess[],
 ): string {
   if (!parentProcesses || parentProcesses.length === 0) return "-";
-  // Array is ordered immediate-parent-first; reverse to show root ↩ ... ↩ immediate parent
-  return [...parentProcesses]
+
+  // Drop Runner.Worker and everything above it (GitHub Actions infrastructure noise)
+  const cutoff = parentProcesses.findIndex(
+    (p) => p.executablePath === RUNNER_WORKER_EXE,
+  );
+  const relevant =
+    cutoff === -1 ? parentProcesses : parentProcesses.slice(0, cutoff);
+
+  if (relevant.length === 0) return "-";
+
+  // Array is immediate-parent-first; reverse to show root ↩ ... ↩ immediate parent
+  return [...relevant]
     .reverse()
     .map((p) => p.commandLine)
     .join(" ↩ ");

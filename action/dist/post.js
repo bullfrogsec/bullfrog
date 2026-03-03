@@ -20112,9 +20112,15 @@ function getGitHubContext() {
 function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
+var RUNNER_WORKER_EXE = "/home/runner/actions-runner/cached/bin/Runner.Worker";
 function formatParentProcesses(parentProcesses) {
   if (!parentProcesses || parentProcesses.length === 0) return "-";
-  return [...parentProcesses].reverse().map((p) => p.commandLine).join(" \u21A9 ");
+  const cutoff = parentProcesses.findIndex(
+    (p) => p.executablePath === RUNNER_WORKER_EXE
+  );
+  const relevant = cutoff === -1 ? parentProcesses : parentProcesses.slice(0, cutoff);
+  if (relevant.length === 0) return "-";
+  return [...relevant].reverse().map((p) => p.commandLine).join(" \u21A9 ");
 }
 async function displaySummary(connections, controlPlaneWebappBaseUrl, workflowRunId, runAttempt) {
   const summary2 = core3.summary;
