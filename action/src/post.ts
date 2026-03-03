@@ -86,7 +86,7 @@ export function formatParentProcesses(
   // Array is ordered immediate-parent-first; reverse to show root ↩ ... ↩ immediate parent
   return [...parentProcesses]
     .reverse()
-    .map((p) => p.processName)
+    .map((p) => p.commandLine)
     .join(" ↩ ");
 }
 

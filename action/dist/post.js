@@ -20114,7 +20114,7 @@ function getHumanFriendlyReason(reasonCode) {
 }
 function formatParentProcesses(parentProcesses) {
   if (!parentProcesses || parentProcesses.length === 0) return "-";
-  return [...parentProcesses].reverse().map((p) => p.processName).join(" \u21A9 ");
+  return [...parentProcesses].reverse().map((p) => p.commandLine).join(" \u21A9 ");
 }
 async function displaySummary(connections, controlPlaneWebappBaseUrl, workflowRunId, runAttempt) {
   const summary2 = core3.summary;
