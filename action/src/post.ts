@@ -99,7 +99,7 @@ export function formatParentProcesses(
   // Array is immediate-parent-first; reverse to show root ↩ ... ↩ immediate parent
   return [...relevant]
     .reverse()
-    .map((p) => p.commandLine)
+    .map((p) => p.executablePath)
     .join(" ↩ ");
 }
 
