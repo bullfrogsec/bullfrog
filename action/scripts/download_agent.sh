@@ -3,8 +3,8 @@
 # Immediately exit if any command has a non-zero exit status
 set -e
 
-VERSION="v0.10.0"
-CHECKSUM="99867fa32983f130bcc0d99eee9ef6814c4f9a345003d8652e61757222abf3e7"
+VERSION="v0.10.1-rc"
+CHECKSUM="b1554cd9e781dcf6c5aa3dcdbd2ba47cb2675722a442cc2a3f5cf30c52a63e60"
 BASE_DOWNLOAD_URL="https://github.com/bullfrogsec/agent/releases/download/"
 
 TMP_DIR="/tmp"
