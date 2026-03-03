@@ -21,6 +21,13 @@ type DockerInfo = {
   containerName: string;
 };
 
+export type ParentProcess = {
+  pid: number;
+  processName: string;
+  commandLine: string;
+  executablePath: string;
+};
+
 export type Connection = {
   timestamp: Date;
   domain?: string;
@@ -34,6 +41,7 @@ export type Connection = {
   exePath?: string;
   commandLine?: string;
   docker?: DockerInfo;
+  parentProcesses?: ParentProcess[];
 };
 
 interface WorkflowJobConnectionResults {
@@ -71,6 +79,17 @@ export function getHumanFriendlyReason(reasonCode: string): string {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
 
+export function formatParentProcesses(
+  parentProcesses?: ParentProcess[],
+): string {
+  if (!parentProcesses || parentProcesses.length === 0) return "-";
+  // Array is ordered immediate-parent-first; reverse to show root ↩ ... ↩ immediate parent
+  return [...parentProcesses]
+    .reverse()
+    .map((p) => p.processName)
+    .join(" ↩ ");
+}
+
 export async function displaySummary(
   connections: Connection[],
   controlPlaneWebappBaseUrl?: string,
@@ -105,6 +124,7 @@ export async function displaySummary(
         { data: "Reason", header: true },
         { data: "Status", header: true },
         { data: "Process", header: true },
+        { data: "Parent Processes", header: true },
         { data: "Container", header: true },
         { data: "Exe Path", header: true },
         { data: "Command Line", header: true },
@@ -122,6 +142,7 @@ export async function displaySummary(
             ? "✅ Authorized"
             : "⚠️ Unauthorized",
         conn.process || "-",
+        formatParentProcesses(conn.parentProcesses),
         conn.docker
           ? `${conn.docker.containerImage}:${conn.docker.containerName}`
           : "-",
@@ -179,6 +200,7 @@ export async function getConnections(): Promise<{
         const commandLine = logEntry.commandLine;
         const exePath = logEntry.executablePath;
         const docker = logEntry.docker;
+        const parentProcesses = logEntry.parentProcesses;
 
         allConnections.push({
           timestamp: date,
@@ -193,6 +215,9 @@ export async function getConnections(): Promise<{
           exePath: exePath !== "unknown" ? exePath : undefined,
           commandLine: commandLine !== "unknown" ? commandLine : undefined,
           docker: docker || undefined,
+          parentProcesses: Array.isArray(parentProcesses)
+            ? parentProcesses
+            : undefined,
         });
       } catch {
         core.warning(`Failed to parse log line: ${line}`);

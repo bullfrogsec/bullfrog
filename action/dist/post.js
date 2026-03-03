@@ -19999,6 +19999,7 @@ var post_exports = {};
 __export(post_exports, {
   displaySummary: () => displaySummary,
   filterConnectionsNoise: () => filterConnectionsNoise,
+  formatParentProcesses: () => formatParentProcesses,
   getConnections: () => getConnections,
   getHumanFriendlyReason: () => getHumanFriendlyReason,
   submitResultsToControlPlane: () => submitResultsToControlPlane
@@ -20111,6 +20112,10 @@ function getGitHubContext() {
 function getHumanFriendlyReason(reasonCode) {
   return REASON_CODE_MAP[reasonCode] || reasonCode;
 }
+function formatParentProcesses(parentProcesses) {
+  if (!parentProcesses || parentProcesses.length === 0) return "-";
+  return [...parentProcesses].reverse().map((p) => p.processName).join(" \u21A9 ");
+}
 async function displaySummary(connections, controlPlaneWebappBaseUrl, workflowRunId, runAttempt) {
   const summary2 = core3.summary;
   if (controlPlaneWebappBaseUrl && workflowRunId) {
@@ -20134,6 +20139,7 @@ async function displaySummary(connections, controlPlaneWebappBaseUrl, workflowRu
         { data: "Reason", header: true },
         { data: "Status", header: true },
         { data: "Process", header: true },
+        { data: "Parent Processes", header: true },
         { data: "Container", header: true },
         { data: "Exe Path", header: true },
         { data: "Command Line", header: true }
@@ -20147,6 +20153,7 @@ async function displaySummary(connections, controlPlaneWebappBaseUrl, workflowRu
         getHumanFriendlyReason(conn.reason),
         conn.blocked ? "\u{1F6AB} Blocked" : conn.authorized ? "\u2705 Authorized" : "\u26A0\uFE0F Unauthorized",
         conn.process || "-",
+        formatParentProcesses(conn.parentProcesses),
         conn.docker ? `${conn.docker.containerImage}:${conn.docker.containerName}` : "-",
         conn.exePath || "-",
         conn.commandLine || "-"
@@ -20188,6 +20195,7 @@ async function getConnections() {
         const commandLine = logEntry.commandLine;
         const exePath = logEntry.executablePath;
         const docker = logEntry.docker;
+        const parentProcesses = logEntry.parentProcesses;
         allConnections.push({
           timestamp: date,
           domain: domain !== "unknown" ? domain : void 0,
@@ -20200,7 +20208,8 @@ async function getConnections() {
           process: process2 !== "unknown" ? process2 : void 0,
           exePath: exePath !== "unknown" ? exePath : void 0,
           commandLine: commandLine !== "unknown" ? commandLine : void 0,
-          docker: docker || void 0
+          docker: docker || void 0,
+          parentProcesses: Array.isArray(parentProcesses) ? parentProcesses : void 0
         });
       } catch {
         core3.warning(`Failed to parse log line: ${line}`);
@@ -20337,6 +20346,7 @@ if (require.main === module) {
 0 && (module.exports = {
   displaySummary,
   filterConnectionsNoise,
+  formatParentProcesses,
   getConnections,
   getHumanFriendlyReason,
   submitResultsToControlPlane
