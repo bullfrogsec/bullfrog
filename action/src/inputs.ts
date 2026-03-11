@@ -11,10 +11,7 @@ export interface Inputs {
   enableSudo: boolean;
   collectProcessInfo: boolean;
   egressPolicy: EgressPolicy;
-  localAgent: boolean;
   logDirectory: string;
-  agentDownloadBaseURL?: string;
-  agentVersion?: string;
   controlPlaneApiBaseUrl?: string;
   controlPlaneWebappBaseUrl?: string;
   apiToken?: string;
@@ -38,19 +35,7 @@ function validateDomains(domains: Array<string>): void {
   });
 }
 
-function validateAgentVersion(version: string): void {
-  // Must start with 'v' followed by semver with optional prerelease suffix
-  if (!version.match(/^v\d+\.\d+\.\d+(-[A-Za-z0-9-]+)?$/)) {
-    throw new Error(
-      `Invalid agent version format: ${version}. Must start with 'v' followed by semver (e.g., 'v0.8.4' or 'v0.8.4-beta-feature')`,
-    );
-  }
-}
-
-function formatUrlWithTrailingSlash(url: string): string | undefined {
-  if (!url) {
-    return;
-  }
+function formatUrlWithTrailingSlash(url: string): string {
   return url.endsWith("/") ? url : `${url}/`;
 }
 
@@ -80,20 +65,7 @@ export function parseInputs(): Inputs {
     throw new Error(`dns-policy must be '${ALLOWED_DOMAINS_ONLY}' or '${ANY}'`);
   }
 
-  const localAgent = process.env["_LOCAL_AGENT"]?.toLowerCase() === "true";
-
-  const agentVersion = core.getInput("_agent-version");
-  if (agentVersion) {
-    validateAgentVersion(agentVersion);
-  }
   const apiToken = core.getInput("api-token");
-
-  const agentDownloadBaseURL = formatUrlWithTrailingSlash(
-    core.getInput("_agent-download-base-url"),
-  );
-  if (!agentDownloadBaseURL && !localAgent) {
-    throw new Error(`_agent-download-base-url cannot be empty`);
-  }
 
   return {
     allowedDomains,
@@ -102,10 +74,7 @@ export function parseInputs(): Inputs {
     enableSudo: core.getBooleanInput("enable-sudo"),
     collectProcessInfo: core.getBooleanInput("collect-process-info"),
     egressPolicy,
-    localAgent,
     logDirectory: core.getInput("_log-directory", { required: true }),
-    agentDownloadBaseURL,
-    agentVersion: agentVersion || undefined,
     controlPlaneApiBaseUrl: formatUrlWithTrailingSlash(
       core.getInput("_control-plane-api-base-url"),
     ),

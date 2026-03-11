@@ -12,7 +12,6 @@ describe("inputs", () => {
     "egress-policy": AUDIT,
     "dns-policy": ALLOWED_DOMAINS_ONLY,
     "_log-directory": "/var/log/test",
-    "_agent-download-base-url": "https://example.com/releases/download",
     "_control-plane-api-base-url": "https://api.example.com",
     "_control-plane-webapp-base-url": "https://app.example.com",
     "api-token": "",
@@ -47,9 +46,7 @@ describe("inputs", () => {
         egressPolicy: AUDIT,
         enableSudo: true,
         collectProcessInfo: true,
-        localAgent: false,
         logDirectory: "/var/log/test",
-        agentDownloadBaseURL: "https://example.com/releases/download/",
         controlPlaneApiBaseUrl: "https://api.example.com/",
         controlPlaneWebappBaseUrl: "https://app.example.com/",
         apiToken: undefined,
@@ -133,33 +130,6 @@ describe("inputs", () => {
 
       expect(inputs.enableSudo).toBe(true);
       expect(inputs.collectProcessInfo).toBe(true);
-    });
-
-    it("should detect local agent from environment variable", () => {
-      process.env["_LOCAL_AGENT"] = "true";
-
-      const inputs = parseInputs();
-
-      expect(inputs.localAgent).toBe(true);
-    });
-
-    it("should not detect local agent when env var is false", () => {
-      process.env["_LOCAL_AGENT"] = "false";
-
-      const inputs = parseInputs();
-
-      expect(inputs.localAgent).toBe(false);
-    });
-
-    it("should throw error for missing _agent-download-base-url when not using local agent", () => {
-      vi.mocked(core.getInput).mockImplementation((name: string) => {
-        if (name === "_agent-download-base-url") return "";
-        return defaultInputs[name] || "";
-      });
-
-      expect(() => parseInputs()).toThrow(
-        `_agent-download-base-url cannot be empty`,
-      );
     });
 
     it("should parse api-token when provided", () => {

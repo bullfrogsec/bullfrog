@@ -22,13 +22,3 @@ updates:
         update-types:
           - "patch"
           - "minor"
-  - package-ecosystem: "gomod"
-    directory: "/agent"
-    schedule:
-      interval: "weekly"
-    groups:
-      go-minor-patch:
-        applies-to: version-updates
-        update-types:
-          - "patch"
-          - "minor"
