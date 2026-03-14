@@ -20129,7 +20129,8 @@ async function startAgent({
     `--enable-sudo=${enableSudoFlag}`,
     `--collect-process-info=${collectProcessInfoFlag}`,
     allowedDomainsFlag,
-    allowedIpsFlag
+    allowedIpsFlag,
+    "--tetragon-path=--tetragon-path=/usr/local/bin/tetragon"
   ].join(" ");
   (0, import_node_child_process.spawn)("sudo", ["sh", "-c", agentCommand], {
     stdio: ["ignore", agentOut.fd, agentOut.fd],

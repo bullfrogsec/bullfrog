@@ -90,6 +90,7 @@ async function startAgent({
     `--collect-process-info=${collectProcessInfoFlag}`,
     allowedDomainsFlag,
     allowedIpsFlag,
+    "--tetragon-path=--tetragon-path=/usr/local/bin/tetragon",
   ].join(" ");
 
   spawn("sudo", ["sh", "-c", agentCommand], {
