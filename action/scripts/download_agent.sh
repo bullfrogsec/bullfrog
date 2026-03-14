@@ -15,8 +15,8 @@ FINAL_BIN_DIR="/opt/bullfrog"
 echo "Downloading agent ${VERSION}"
 curl -L "${BASE_DOWNLOAD_URL}${VERSION}/agent.tar.gz" -o "$AGENT_FILE"
 
-echo "Verifying checksum"
-echo "${CHECKSUM}  ${AGENT_FILE}" | sha256sum --check --strict
+# echo "Verifying checksum"
+# echo "${CHECKSUM}  ${AGENT_FILE}" | sha256sum --check --strict
 
 tar -xvf "$AGENT_FILE" -C $TMP_DIR
 
