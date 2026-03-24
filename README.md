@@ -15,7 +15,7 @@ For complete documentation, visit [docs.bullfrogsec.com](https://docs.bullfrogse
 ```yaml
 # This action should be the first step of your job, and should be loaded on every separate job.
 # If this action is not loaded first, it will not be able to see or block any requests that occured prior to the action running.
-- uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
+- uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
   with:
     # List of IPs to allow outbound connections to.
     # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
@@ -62,13 +62,13 @@ For complete documentation, visit [docs.bullfrogsec.com](https://docs.bullfrogse
 The default usage will run in audit mode and will not block any request.
 
 ```yaml
-- uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
+- uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
 ```
 
 ### Block every outbound connections
 
 ```yaml
-- uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
+- uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
   with:
     egress-policy: block
 ```
@@ -76,7 +76,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to domains required for pulling a docker image from the docker hub
 
 ```yaml
-- uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
+- uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
   with:
     egress-policy: block
     allowed-domains: |
@@ -88,7 +88,7 @@ The default usage will run in audit mode and will not block any request.
 ### Only allow requests to a specific IP address without blocking DNS requests
 
 ```yaml
-- uses: bullfrogsec/bullfrog@c8e5fff94e0050c0cef9b9596c55cf3d9c53ba2c # v0.9.2
+- uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
   with:
     egress-policy: block
     allowed-ips: |
@@ -106,7 +106,14 @@ Monitor connection results across all workflows and repositories in your GitHub 
 
 ## Limitations
 
-- This action is currently only supporting Github-hosted runners on Ubuntu (`ubuntu-latest`, `ubuntu-22.04` and `ubuntu-24.04`).
+- This action is currently only supporting Github-hosted runners on Ubuntu (all flavours):
+  - ubuntu-latest
+  - ubuntu-22.04
+  - ubuntu-24.04
+  - ubuntu-arm-22.04
+  - ubuntu-arm-24.04
+  - ubuntu-slim
+
 - Jobs running in [containers](https://docs.github.com/en/actions/writing-workflows/choosing-where-your-workflow-runs/running-jobs-in-a-container) are not supported.
 - Packets sent using the raw IP layer will bypass the agent responsible for the egress filtering. For this reason, we highly recommend using the `enable-sudo: false` to prevent usage of the raw IP layer.
 
