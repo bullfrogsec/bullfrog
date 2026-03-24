@@ -130,8 +130,21 @@ jobs:
 
   test-integration:
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: amd64
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-22.04-arm
+            arch: arm64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+          - runner: ubuntu-24.04
+            arch: amd64-slim
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -167,13 +180,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    needs:
-      [
-        build,
-        check-artifacts,
-        test-lint,
-        test-integration,
-      ]
+    needs: [build, check-artifacts, test-lint, test-integration]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
