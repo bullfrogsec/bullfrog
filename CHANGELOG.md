@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/bullfrogsec/bullfrog/compare/v0.9.3...v0.10.0) (2026-03-24)
+
+
+### Features
+
+* support ARM architecture and slim runners ([#260](https://github.com/bullfrogsec/bullfrog/issues/260)) ([6ad91f1](https://github.com/bullfrogsec/bullfrog/commit/6ad91f116342abf94e4d02c6d05260cacf717bd0))
+
 ## [0.9.3](https://github.com/bullfrogsec/bullfrog/compare/v0.9.2...v0.9.3) (2026-01-08)
 
 
