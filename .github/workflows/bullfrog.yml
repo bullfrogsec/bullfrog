@@ -23,7 +23,7 @@ jobs:
       diff: ${{ steps.changes.outputs.src }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
+        uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
@@ -31,7 +31,7 @@ jobs:
             github.com
             api.github.com
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: fallard84/paths-filter@dfb4213208eb30382ee3e27b8a810fc3fb8cc911 # v3.0.3
         id: changes
         with:
@@ -48,7 +48,7 @@ jobs:
     if: ${{ needs.check-diff.outputs.diff == 'true' }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
+        uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
@@ -57,7 +57,7 @@ jobs:
             registry.npmjs.org
 
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Build
         run: |
@@ -81,7 +81,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
+        uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
@@ -89,7 +89,7 @@ jobs:
             github.com
 
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -105,7 +105,7 @@ jobs:
 
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
+        uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
@@ -114,7 +114,7 @@ jobs:
             github.com
 
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Bootstrap
         run: |
@@ -147,7 +147,7 @@ jobs:
             arch: amd64-slim
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -188,7 +188,7 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
+        uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
@@ -197,7 +197,7 @@ jobs:
             api.github.com
 
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         if: github.event_name == 'push'
@@ -239,7 +239,7 @@ jobs:
     needs: [pre-release, pre-release-validation]
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@78a54a1a4c3d3325fe01846f60b630b6ee7bcf06 # v0.9.3
+        uses: bullfrogsec/bullfrog@7bc9b6e13e2dd9cbe5861f33bc26dc6bdb9d9ed2 # v0.10.0
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
@@ -248,7 +248,7 @@ jobs:
             api.github.com
 
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Promote to a release
         env:
