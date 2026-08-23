@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import { parseInputs } from "./inputs";
 import path from "node:path";
 import { AGENT_LOG_FILENAME, CONNECTIONS_LOG_PATH, BLOCK } from "./constants";
-import { getDate } from "./util";
+import { getDate, getGitHubContext } from "./util";
+import { readResolvedConfig } from "./policy";
 
 // Map reason codes to human-friendly descriptions
 const REASON_CODE_MAP: Record<string, string> = {
@@ -43,28 +44,6 @@ interface WorkflowJobConnectionResults {
   organization: string;
   repo: string;
   connections: Array<Connection>;
-}
-
-function getGitHubContext(): {
-  workflowRunId: string;
-  runAttempt: number;
-  jobName?: string;
-  organization: string;
-  repo: string;
-} {
-  const repo = process.env.GITHUB_REPOSITORY || "";
-  const [organization] = repo.split("/");
-  const workflowRunId = process.env.GITHUB_RUN_ID || "";
-  const runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT ?? "1");
-  const jobName = process.env.GITHUB_JOB || undefined;
-
-  if (!organization || !repo || !workflowRunId) {
-    throw new Error(
-      "Missing GitHub context: GITHUB_REPOSITORY or GITHUB_RUN_ID not set",
-    );
-  }
-
-  return { workflowRunId, runAttempt, jobName, organization, repo };
 }
 
 export function getHumanFriendlyReason(reasonCode: string): string {
@@ -147,7 +126,12 @@ export async function getConnections(): Promise<{
 
   try {
     const allConnections: Connection[] = [];
-    const { egressPolicy } = parseInputs();
+    const inputs = parseInputs();
+    // main.ts may have overridden egressPolicy with a control-plane policy.
+    // It runs as a separate process, so that decision is read back from disk
+    // rather than shared in memory.
+    const resolvedConfig = await readResolvedConfig(inputs.logDirectory);
+    const egressPolicy = resolvedConfig?.egressPolicy ?? inputs.egressPolicy;
     const log = await fs.readFile(CONNECTIONS_LOG_PATH, "utf8");
     const lines = log.split("\n");
     core.debug("\n\nConnections.log:\n");

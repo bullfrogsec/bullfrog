@@ -9,7 +9,12 @@ import {
   AGENT_READY_PATH,
 } from "./constants";
 import { parseInputs, EgressPolicy, DnsPolicy } from "./inputs";
-import { waitForFile } from "./util";
+import { waitForFile, getGitHubContext } from "./util";
+import {
+  fetchPolicyOverride,
+  applyPolicyOverride,
+  writeResolvedConfig,
+} from "./policy";
 
 const exec = util.promisify(execCb);
 
@@ -107,6 +112,20 @@ async function startAgent({
 }
 
 async function main(): Promise<void> {
+  const inputs = parseInputs();
+  const { logDirectory, apiToken, controlPlaneApiBaseUrl, dryRunPrintConfig } =
+    inputs;
+
+  // The control plane's policy for this job, if one is configured, takes
+  // precedence over whatever this action was invoked with.
+  const githubContext = getGitHubContext();
+  const override = await fetchPolicyOverride({
+    apiToken,
+    controlPlaneApiBaseUrl,
+    repo: githubContext.repo,
+    workflow: githubContext.workflowPath,
+    job: githubContext.jobName,
+  });
   const {
     allowedDomains,
     allowedIps,
@@ -114,19 +133,42 @@ async function main(): Promise<void> {
     egressPolicy,
     enableSudo,
     collectProcessInfo,
-    logDirectory,
-    apiToken,
-    controlPlaneApiBaseUrl,
-  } = parseInputs();
+  } = applyPolicyOverride(inputs, override);
+
+  await fs.mkdir(logDirectory, { recursive: true });
+
+  // post.ts runs as a separate process and has no access to the override
+  // decision made above, so it's persisted to disk for post.ts to read back.
+  await writeResolvedConfig(logDirectory, {
+    allowedDomains,
+    allowedIps,
+    dnsPolicy,
+    egressPolicy,
+    enableSudo,
+  });
+
+  if (dryRunPrintConfig) {
+    console.log(
+      JSON.stringify({
+        allowedDomains,
+        allowedIps,
+        dnsPolicy,
+        egressPolicy,
+        enableSudo,
+      }),
+    );
+    return;
+  }
 
   const actionDirectory = path.join(__dirname, "..");
 
   // Add control plane domain to allowed domains if API token is provided
+  const finalAllowedDomains = [...allowedDomains];
   if (apiToken && controlPlaneApiBaseUrl) {
     try {
       const url = new URL(controlPlaneApiBaseUrl);
       const controlPlaneDomain = url.hostname;
-      allowedDomains.push(controlPlaneDomain);
+      finalAllowedDomains.push(controlPlaneDomain);
       core.info(
         `Added control plane domain to allowed domains: ${controlPlaneDomain}`,
       );
@@ -137,8 +179,6 @@ async function main(): Promise<void> {
     }
   }
 
-  await fs.mkdir(logDirectory, { recursive: true });
-
   const agentLogFilepath = path.join(logDirectory, AGENT_LOG_FILENAME);
 
   installPackages();
@@ -147,7 +187,7 @@ async function main(): Promise<void> {
 
   await startAgent({
     agentLogFilepath,
-    allowedDomains,
+    allowedDomains: finalAllowedDomains,
     allowedIps,
     dnsPolicy,
     enableSudo,

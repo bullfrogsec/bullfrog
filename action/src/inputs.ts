@@ -15,6 +15,7 @@ export interface Inputs {
   controlPlaneApiBaseUrl?: string;
   controlPlaneWebappBaseUrl?: string;
   apiToken?: string;
+  dryRunPrintConfig: boolean;
 }
 
 function validateIps(ips: Array<string>): void {
@@ -82,5 +83,6 @@ export function parseInputs(): Inputs {
       core.getInput("_control-plane-webapp-base-url"),
     ),
     apiToken: apiToken || undefined,
+    dryRunPrintConfig: core.getBooleanInput("_dry-run-print-config"),
   };
 }
