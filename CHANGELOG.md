@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/bullfrogsec/bullfrog/compare/v0.10.0...v0.11.0) (2026-08-23)
+
+
+### Features
+
+* allow overriding egress policies via control plane ([#289](https://github.com/bullfrogsec/bullfrog/issues/289)) ([653fb6f](https://github.com/bullfrogsec/bullfrog/commit/653fb6f1d67e79b1a97a45efd2ba9f766129f4e6))
+
+
+### Bug Fixes
+
+* agent resets denied connections instead of dropping them silently ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
+* bump agent to v0.11.0 ([#290](https://github.com/bullfrogsec/bullfrog/issues/290)) ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
+
 ## [0.10.0](https://github.com/bullfrogsec/bullfrog/compare/v0.9.3...v0.10.0) (2026-03-24)
 
 
