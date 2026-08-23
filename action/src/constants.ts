@@ -1,5 +1,6 @@
 export const AGENT_LOG_FILENAME = "agent.log";
 export const CONNECTIONS_LOG_PATH = "/var/log/gha-agent/connections.log";
+export const RESOLVED_CONFIG_FILENAME = "resolved-config.json";
 
 export const AGENT_INSTALL_PATH = "/opt/bullfrog/agent";
 export const AGENT_READY_PATH = "/var/run/bullfrog/agent-ready";

@@ -45,6 +45,11 @@ inputs:
     type: string
     default: ${{ runner.temp }}/agent-logs
 
+  _dry-run-print-config:
+    description: "(Internal) Resolve inputs and the control-plane policy override, print the resulting configuration as JSON, then exit before installing or starting the agent. Used by the e2e test harness."
+    type: boolean
+    default: false
+
 runs:
   using: "node24"
   main: "action/dist/main.js"
