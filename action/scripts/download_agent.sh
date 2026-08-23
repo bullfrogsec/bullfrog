@@ -3,9 +3,9 @@
 # Immediately exit if any command has a non-zero exit status
 set -e
 
-VERSION="v0.10.2"
-CHECKSUM_AMD64="42798719fa6bb65f89fcf677c74b370b68246a79470355b36432f4ad6eefe81e"
-CHECKSUM_ARM64="bcf1d1024d60894e4e4fe1d1cd13c4ee0b9a0c32b4dbf0d39ac9e43a16a24336"
+VERSION="v0.11.0"
+CHECKSUM_AMD64="3a48c0120ec691199091f8001baa69180441df053f5f9bd4411d2fc5dac9d1dd"
+CHECKSUM_ARM64="474caf93baac8adc47fec9fad35a4bb6691f530811a73840ab3285d07427a9ed"
 BASE_DOWNLOAD_URL="https://github.com/bullfrogsec/agent/releases/download/"
 
 TMP_DIR="/tmp"
