@@ -10,6 +10,9 @@
 
 ### Bug Fixes
 
+* agent allow-lists IPv6 (AAAA) addresses for allowed domains ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
+* agent filters Docker daemon API to prevent privilege escalation via the docker group ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
+* agent filters container IPv6 egress ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
 * agent resets denied connections instead of dropping them silently ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
 * bump agent to v0.11.0 ([#290](https://github.com/bullfrogsec/bullfrog/issues/290)) ([ddc14c9](https://github.com/bullfrogsec/bullfrog/commit/ddc14c9b749d82ac171a7d9998b8a06890e036b6))
 
