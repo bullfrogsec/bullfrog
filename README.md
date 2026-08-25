@@ -96,6 +96,12 @@ The default usage will run in audit mode and will not block any request.
     dns-policy: any
 ```
 
+## Why `enable-sudo: false` matters
+
+Root access can be used to bypass egress filtering entirely, for example by sending packets over the raw IP layer. Setting `enable-sudo: false` prevents steps from gaining root, which also restricts Docker, since the Docker daemon runs as root and can be used to escalate privileges or reach the network directly.
+
+See the [official docs](https://docs.bullfrogsec.com/docs/github-action/concepts/bypass-risks-and-limits#root-is-the-whole-game) for more details.
+
 ## Reviewing blocked or unallowed outbound requests
 
 You can view blocked or unallowed outbound requests in the workflow summary.
@@ -115,7 +121,6 @@ Monitor connection results across all workflows and repositories in your GitHub 
   - ubuntu-slim
 
 - Jobs running in [containers](https://docs.github.com/en/actions/writing-workflows/choosing-where-your-workflow-runs/running-jobs-in-a-container) are not supported.
-- Packets sent using the raw IP layer will bypass the agent responsible for the egress filtering. For this reason, we highly recommend using the `enable-sudo: false` to prevent usage of the raw IP layer.
 
 ## Support or Feedback
 
