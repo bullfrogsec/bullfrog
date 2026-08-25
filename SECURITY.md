@@ -5,6 +5,7 @@
 If you discover a security vulnerability in this project, please help us responsibly disclose it by following these steps:
 
 - Use the GitHub Security Advisory ["Report a Vulnerability"](https://github.com/bullfrogsec/bullfrog/security/advisories/new) tab.
+- Also contact us directly at security@bullfrogsec.com so we can respond promptly.
 - Provide detailed information about the vulnerability, including steps to reproduce and any potential impact.
   
 The Bullfrog Security team takes security issues seriously and will respond promptly to evaluate and address the reported vulnerabilities.
