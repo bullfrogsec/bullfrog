@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/bullfrogsec/bullfrog/compare/v0.11.0...v0.11.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* bump agent to v0.11.2 ([#293](https://github.com/bullfrogsec/bullfrog/issues/293)) ([a6c8313](https://github.com/bullfrogsec/bullfrog/commit/a6c83132f7d616997079d08bc241c4e05536f723))
+* docker cp and docker exec are no longer refused for every container ([a6c8313](https://github.com/bullfrogsec/bullfrog/commit/a6c83132f7d616997079d08bc241c4e05536f723))
+
 ## [0.11.0](https://github.com/bullfrogsec/bullfrog/compare/v0.10.0...v0.11.0) (2026-08-23)
 
 
