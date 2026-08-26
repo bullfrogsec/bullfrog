@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Enable egress filtering
-        uses: bullfrogsec/bullfrog@ebd3ce460ed3371d6fd751649fc1637ef0c21a18 # v0.11.0
+        uses: bullfrogsec/bullfrog@7dee337d4575320b6d8cbe9a56d48d2fb765963a # v0.11.1
         with:
           egress-policy: block
           api-token: ${{ secrets.BULLFROG_API_TOKEN }}
