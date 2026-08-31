@@ -12,7 +12,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@eslint/js": "9.39.2",
+    "@eslint/js": "10.0.1",
     "@types/node": "25.0.10",
     "@vitest/ui": "^4.0.16",
     "esbuild": "0.27.2",
