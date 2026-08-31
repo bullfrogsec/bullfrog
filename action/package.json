@@ -15,7 +15,7 @@
     "@eslint/js": "9.39.2",
     "@types/node": "25.0.10",
     "@vitest/ui": "^4.0.16",
-    "esbuild": "0.27.2",
+    "esbuild": "0.28.1",
     "eslint": "9.39.2",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.5",
