@@ -32,7 +32,12 @@ esac
 AGENT_FILE="$AGENT_FILE_PATH-$AGENT_ARCH.tar.gz"
 
 echo "Downloading agent ${VERSION} for ${AGENT_ARCH}"
-curl -L "${BASE_DOWNLOAD_URL}${VERSION}/agent-${AGENT_ARCH}.tar.gz" -o "$AGENT_FILE"
+# --fail keeps an HTTP error page (e.g. a release-CDN 5xx) from being saved as the
+# tarball and surfacing as a checksum mismatch; --retry rides out transient outages.
+curl --fail --location --show-error \
+  --retry 5 --retry-delay 3 --retry-all-errors \
+  --connect-timeout 15 --max-time 120 \
+  "${BASE_DOWNLOAD_URL}${VERSION}/agent-${AGENT_ARCH}.tar.gz" -o "$AGENT_FILE"
 
 echo "Verifying checksum"
 echo "${CHECKSUM}  ${AGENT_FILE}" | sha256sum --check --strict
